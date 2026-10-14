@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Joey's Hub</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --glass: rgba(255, 255, 255, 0.09);
+    --glass-strong: rgba(255, 255, 255, 0.14);
+    --stroke: rgba(255, 255, 255, 0.16);
+    --text: #f2f7ff;
+    --text-dim: rgba(242, 247, 255, 0.62);
+    --accent: #5eead4;
+    --accent2: #7dd3fc;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    color: var(--text);
+    background: #060b18;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ambient background */
+  .bg { position: fixed; inset: 0; z-index: -1; overflow: hidden;
+    background: radial-gradient(120% 90% at 80% -10%, #12305e 0%, #060b18 55%),
+                radial-gradient(100% 80% at 10% 110%, #0b3b4d 0%, #060b18 60%);
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; }
+  .orb.a { width: 340px; height: 340px; background: #155e75; top: -90px; right: -70px; }
+  .orb.b { width: 300px; height: 300px; background: #1e3a8a; bottom: -60px; left: -80px; opacity: .45; }
+  .orb.c { width: 180px; height: 180px; background: #0e7490; top: 38%; left: 55%; opacity: .28; }
+
+  .wrap { max-width: 560px; margin: 0 auto; padding: 28px 18px 110px; }
+
+  header { margin-bottom: 18px; }
+  .date-line { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; }
+  .day-pill {
+    display: inline-block; margin-top: 10px; padding: 6px 14px; border-radius: 999px;
+    background: var(--glass-strong); border: 1px solid var(--stroke);
+    backdrop-filter: blur(18px) saturate(180%); -webkit-backdrop-filter: blur(18px) saturate(180%);
+    font-size: 14px; font-weight: 600; color: var(--accent);
+  }
+
+  .card {
+    background: var(--glass); border: 1px solid var(--stroke); border-radius: 22px;
+    backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    padding: 18px; margin-bottom: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-dim); margin-bottom: 12px; font-weight: 600; }
+  .card h2 .emoji { margin-right: 6px; }
+
+  .weather-big { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .weather-sub { color: var(--text-dim); font-size: 15px; }
+
+  .item { padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  .item:first-of-type { border-top: none; padding-top: 0; }
+  .item:last-child { padding-bottom: 0; }
+  .item .course { font-size: 12px; color: var(--accent2); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .item .title { font-size: 16px; font-weight: 600; margin: 3px 0; }
+  .item .meta { font-size: 14px; color: var(--text-dim); }
+  .item .note { font-size: 13px; color: var(--text-dim); font-style: italic; margin-top: 2px; }
+  .item a { color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block; margin-top: 6px; }
+  .item a:active { opacity: .6; }
+  .empty { color: var(--text-dim); font-size: 15px; }
+  .empty .big { font-size: 22px; display: block; margin-bottom: 4px; }
+
+  .due-pill { display:inline-block; font-size: 12px; font-weight: 700; color: #fda4af; background: rgba(253,164,175,.12);
+    border: 1px solid rgba(253,164,175,.3); padding: 3px 10px; border-radius: 999px; margin-top: 6px; }
+
+  .class-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 8px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--stroke);
+    font-size: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+  .countdown { font-size: 13px; color: var(--accent); font-weight: 700; }
+
+  /* tab bar */
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+    padding: 10px 18px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(10, 16, 32, 0.55);
+    backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border-top: 1px solid var(--stroke);
+  }
+  .tabbar-inner { max-width: 560px; margin: 0 auto; display: flex; }
+  .tab { flex: 1; text-align: center; padding: 8px 0 4px; color: var(--text-dim); font-size: 11px; font-weight: 600;
+    border: 0; background: none; cursor: pointer; font-family: inherit; }
+  .tab .t-emoji { font-size: 22px; display: block; margin-bottom: 2px; filter: grayscale(.4); }
+  .tab.active { color: var(--text); }
+  .tab.active .t-emoji { filter: none; }
+  .tab.active .t-label { color: var(--accent); }
+
+  .page { display: none; animation: fade .25s ease; }
+  .page.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .updated { text-align: center; font-size: 12px; color: var(--text-dim); margin-top: 22px; opacity: .7; }
+  .err { text-align:center; padding: 60px 20px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="bg"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<div class="wrap">
+  <header>
+    <div class="date-line" id="dateLine">—</div>
+    <h1 id="greeting">Hey Joey 👋</h1>
+    <div><span class="day-pill" id="dayPill">—</span></div>
+  </header>
+
+  <main id="app">
+    <!-- TODAY -->
+    <section class="page active" id="page-today">
+      <div class="card">
+        <h2><span class="emoji">🌤️</span>Weather</h2>
+        <div class="weather-big" id="wLine">—</div>
+        <div class="weather-sub" id="wSub">—</div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">📚</span>Due today</h2>
+        <div id="dueToday"></div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">🗓️</span>Today's classes</h2>
+        <div class="class-chips" id="classChips"></div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">🏊</span>Swim today</h2>
+        <div id="swimToday"></div>
+      </div>
+    </section>
+
+    <!-- SCHOOL -->
+    <section class="page" id="page-school">
+      <div class="card">
+        <h2><span class="emoji">📝</span>Upcoming work</h2>
+        <div id="upcoming"></div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">🧪</span>Tests &amp; quizzes</h2>
+        <div id="tests"></div>
+      </div>
+    </section>
+
+    <!-- SWIM -->
+    <section class="page" id="page-swim">
+      <div class="card">
+        <h2><span class="emoji">🏊</span>This week</h2>
+        <div id="swimWeek"></div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">🏁</span>Upcoming meets</h2>
+        <div id="meets"></div>
+      </div>
+      <div class="card">
+        <h2><span class="emoji">🎯</span>Season goal</h2>
+        <div class="weather-big">Sub-30 <span style="font-size:15px;color:var(--text-dim)">50 free</span></div>
+        <div class="weather-sub">Chase it at the Halloween Haunt — Sun Oct 25 🏁</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="updated" id="updated">—</div>
+</div>
+
+<nav class="tabbar"><div class="tabbar-inner">
+  <button class="tab active" data-page="today"><span class="t-emoji">☀️</span><span class="t-label">Today</span></button>
+  <button class="tab" data-page="school"><span class="t-emoji">📚</span><span class="t-label">School</span></button>
+  <button class="tab" data-page="swim"><span class="t-emoji">🏊</span><span class="t-label">Swim</span></button>
+</div></nav>
+
+<script>
+const $ = id => document.getElementById(id);
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('page-' + btn.dataset.page).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+function itemHTML(it) {
+  let h = '<div class="item">';
+  if (it.course) h += '<div class="course">' + it.course + '</div>';
+  h += '<div class="title">' + it.title + '</div>';
+  if (it.due) h += '<div class="meta">Due ' + it.due + '</div>';
+  if (it.note) h += '<div class="note">' + it.note + '</div>';
+  if (it.study) h += '<a href="' + it.study.url + '">📖 Study: ' + it.study.label + '</a><br>';
+  if (it.link) h += '<a href="' + it.link + '">Open →</a>';
+  h += '</div>';
+  return h;
+}
+function emptyHTML(big, small) {
+  return '<div class="empty"><span class="big">' + big + '</span>' + small + '</div>';
+}
+
+fetch('data.json', { cache: 'no-store' })
+  .then(r => { if (!r.ok) throw 0; return r.json(); })
+  .then(d => {
+    $('dateLine').textContent = d.meta.date_label;
+    const hr = new Date().getHours();
+    $('greeting').textContent = (hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening') + ' Joey 👋';
+    $('dayPill').textContent = d.meta.day + (d.meta.day_tag ? ' · ' + d.meta.day_tag : '');
+
+    $('wLine').textContent = d.weather.line;
+    $('wSub').textContent = 'High ' + d.weather.high + '°, low ' + d.weather.low + '° — ' + d.weather.advice;
+
+    $('dueToday').innerHTML = d.today.due.length
+      ? d.today.due.map(it => itemHTML(it) ).join('')
+      : emptyHTML('✨', 'Nothing due — nice.');
+
+    $('classChips').innerHTML = d.today.classes.length
+      ? d.today.classes.map(c => '<span class="chip">' + c + '</span>').join('')
+      : '<span class="empty">No classes today</span>';
+
+    $('swimToday').innerHTML = d.swim.practice_today
+      ? '<div class="weather-big" style="font-size:17px">' + d.swim.practice_today + '</div>'
+      : emptyHTML('😴', 'No practice today.' + (d.swim.next_practice ? '<br>Next: ' + d.swim.next_practice : ''));
+
+    const up = d.school.upcoming || [];
+    $('upcoming').innerHTML = up.length ? up.map(itemHTML).join('') : emptyHTML('🎉', 'Nothing coming up.');
+    const tests = up.filter(i => i.is_test);
+    $('tests').innerHTML = tests.length ? tests.map(itemHTML).join('') : emptyHTML('📭', 'No tests or quizzes posted.');
+
+    $('swimWeek').innerHTML = (d.swim.week && d.swim.week.length)
+      ? d.swim.week.map(p => '<div class="item"><div class="title" style="font-size:15px">' + p.day + '</div><div class="meta">' + p.detail + '</div></div>').join('')
+      : emptyHTML('—', 'No practices listed this week.');
+
+    $('meets').innerHTML = (d.swim.meets && d.swim.meets.length)
+      ? d.swim.meets.map(m => '<div class="item"><div class="title" style="font-size:15px">' + m.name +
+          (m.in_days != null ? ' <span class="countdown">· ' + m.in_days + 'd</span>' : '') +
+          '</div><div class="meta">' + m.dates + '</div>' + (m.note ? '<div class="note">' + m.note + '</div>' : '') + '</div>').join('')
+      : emptyHTML('—', 'No meets coming up.');
+
+    $('updated').textContent = 'Updated ' + d.meta.generated_label;
+  })
+  .catch(() => {
+    $('app').innerHTML = '<div class="err">Couldn\'t load today\'s data.<br>Check back after the morning update.</div>';
+  });
+</script>
+</body>
+</html>
