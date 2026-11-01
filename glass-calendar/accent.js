@@ -8,7 +8,7 @@ function apply(value,persist=true){const hex=valid(value)?value.toUpperCase():nu
 root.style.setProperty('--accent',hex||'var(--primary)');root.style.setProperty('--on-accent',hex?(luminance(hex)>.179?'#0A0A0A':'#FFFFFF'):'var(--on-primary)');
 if(persist)localStorage.setItem('daylight-accent',chosen);
 for(const b of document.querySelectorAll('[data-accent-choice]')){const color=b.dataset.accentChoice;b.style.setProperty('--swatch',color==='graphite'?'var(--primary)':color);b.setAttribute('aria-pressed',String(color.toUpperCase()===chosen.toUpperCase()))}
-$('accentNative').value=hex||'#3B82F6';$('accentHex').value=hex||'';$('accentError').hidden=true;
+$('accentNative').value=hex||'#3B82F6';$('accentHex').value=hex||'';const customSwatch=document.querySelector('.custom-accent-trigger');if(customSwatch)customSwatch.style.background=hex||$('accentNative').value;$('accentError').hidden=true;
 const bg=root.dataset.theme==='light'?'#FFFFFF':'#0A0A0A',warn=$('accentContrast'),low=hex&&ratio(hex,bg)<4.5;warn.hidden=!low;warn.textContent=low?'This may be hard to read in '+(root.dataset.theme==='light'?'Daylight':'Midnight')+'.':''}
 for(const button of document.querySelectorAll('[data-accent-choice]'))button.addEventListener('click',()=>apply(button.dataset.accentChoice));
 $('accentNative').addEventListener('input',e=>apply(e.target.value));
