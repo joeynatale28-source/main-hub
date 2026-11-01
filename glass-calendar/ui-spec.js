@@ -69,7 +69,9 @@
   const defaultTitle=$('defaultViewSelect').closest('.setting-item').querySelector('strong');
   defaultTitle.textContent='Default Calendar View';
   const viewSelect=$('defaultViewSelect');
+  const persistedView=localStorage.getItem('daylight-default-view')||viewSelect.value;
   [...viewSelect.options].sort((a,b)=>['day','week','month','agenda'].indexOf(a.value)-['day','week','month','agenda'].indexOf(b.value)).forEach(o=>viewSelect.append(o));
+  viewSelect.value=persistedView;window.DaylightSyncSelect?.(viewSelect);
   const integrationLink=document.createElement('div');
   integrationLink.className='setting-item integration-jump';
   integrationLink.innerHTML='<div><strong>Integrations</strong><small>Manage connected calendars and available providers.</small></div><button type="button" class="outline" id="openIntegrationView">Manage connected calendars →</button>';
@@ -118,7 +120,7 @@
   // One active view at a time; view changes animate without covering the sidebar.
   let lastSection=null;
   const views={calendar:$('calendarContent'),tasks:$('tasksPage'),settings:$('settingsPage'),integrations:integrationsPage};
-  const findSection=()=>location.hash==='#tasks'?'tasks':location.hash==='#settings'?'settings':location.hash==='#integrations'?'integrations':'calendar';
+  const findSection=()=>window.location.hash==='#tasks'?'tasks':window.location.hash==='#settings'?'settings':window.location.hash==='#integrations'?'integrations':'calendar';
   const updateActive=()=>{
     const current=findSection();
     calendarNav?.classList.toggle('active',current==='calendar');
