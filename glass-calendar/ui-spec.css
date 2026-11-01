@@ -240,3 +240,7 @@ dialog::backdrop{animation:view-in var(--dur-fast) var(--ease)}
 #eventDialog .wizard-location{flex-direction:column!important;align-items:stretch!important;gap:0}
 #eventDialog .address-results:not([hidden]){position:relative!important;top:auto!important;left:auto!important;right:auto!important;flex:0 0 auto;order:2;width:100%!important;box-sizing:border-box!important;margin-top:8px;max-height:230px;overflow-y:auto;z-index:3}
 #eventDialog .wizard-footer{position:relative;z-index:1}
+
+/* Preserve the 16px location pin even while focused or filled; legacy polish hid it. */
+#eventDialog .wizard-location>svg,#eventDialog .wizard-location:focus-within>svg,#eventDialog .wizard-location.has-value>svg{display:block!important;visibility:visible!important;opacity:1!important}
+#eventDialog .wizard-location:focus-within input,#eventDialog .wizard-location.has-value input{padding-left:40px!important}
