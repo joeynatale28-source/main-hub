@@ -235,3 +235,8 @@ dialog::backdrop{animation:view-in var(--dur-fast) var(--ease)}
 @keyframes view-fade-out{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-3px)}}
 .view-ghost{position:absolute!important;z-index:4!important;overflow:hidden!important;background:var(--bg);pointer-events:none!important;animation:view-fade-out var(--dur-fast) var(--ease) forwards}
 :root[data-reduce-motion="true"] .view-ghost{display:none!important}
+
+/* Location options expand the wizard step instead of overlapping its action footer. */
+#eventDialog .wizard-location{flex-direction:column!important;align-items:stretch!important;gap:0}
+#eventDialog .address-results:not([hidden]){position:relative!important;top:auto!important;left:auto!important;right:auto!important;flex:0 0 auto;order:2;width:100%!important;box-sizing:border-box!important;margin-top:8px;max-height:230px;overflow-y:auto;z-index:3}
+#eventDialog .wizard-footer{position:relative;z-index:1}
