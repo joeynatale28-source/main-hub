@@ -181,5 +181,7 @@ const toggle=$('collapsedCalendars'),flyout=$('collapsedCalendarFlyout');toggle.
 // Ensure provider identities have an icon and title in the same 36px-aligned row.
 document.querySelectorAll('.provider-card').forEach(card=>{const top=card.querySelector('.provider-top'),brand=top?.querySelector('.provider-brand'),title=card.querySelector('h3');if(!top||!brand||!title)return;const ident=document.createElement('div');ident.className='provider-ident';brand.before(ident);ident.append(brand,title)});
 // Browser notifications and calendar-state toggles keep existing native change handlers.
+$('addSide').title='New event';
+const collapse=$('collapseSidebar');const collapsed=document.querySelector('.app')?.classList.contains('sidebar-collapsed');collapse.title=collapsed?'Expand sidebar':'Collapse sidebar';collapse.setAttribute('aria-label',collapse.title);
 window.DaylightUI={prepareEvent,eventFields,afterRender,searchChanged,closeSearch,sectionChanged,themeChanged,syncAvatar,nameSaved,openAbout,detailExtras};
 })();
