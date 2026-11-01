@@ -271,3 +271,17 @@ dialog::backdrop{background:rgba(0,0,0,.68);backdrop-filter:blur(4px)}
  .dialog{padding:18px!important}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Blue is reserved for creation, today, focus and selected states. Secondary actions are neutral. */
+.dialog .primary,.provider-card .primary,.tasks-page .primary,.settings-page .primary,.settings-stack .primary{
+  background:var(--panel-hover)!important;border:1px solid var(--strong-line)!important;color:var(--text)!important;
+}
+.dialog .primary:hover,.provider-card .primary:hover,.tasks-page .primary:hover,.settings-page .primary:hover{
+  background:var(--strong-line)!important;border-color:var(--strong-line)!important;
+}
+.sidebar .logo{background:var(--panel)!important;border:1px solid var(--line)!important;color:var(--text)!important}
+.splash-logo{background:var(--panel)!important;border:1px solid var(--line)!important;color:var(--text)!important}
+.splash-progress i{background:var(--text)!important}
+:root[data-theme=light] .week-event{color:#fff!important;background:color-mix(in srgb,var(--event-color) 75%,#222A39)!important;border-color:color-mix(in srgb,var(--event-color) 50%,#20232B)!important}
+:root[data-theme=light] .week-event strong,:root[data-theme=light] .week-event small{color:#fff!important}
+:root[data-theme=light] .all-day-pill,:root[data-theme=light] .calendar-panel .eventchip{color:#fff!important;background:color-mix(in srgb,var(--event-color) 72%,#20242B)!important}
