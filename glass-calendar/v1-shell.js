@@ -47,6 +47,8 @@ const openModal=()=>{$('calendarAddOptions').hidden=true;$('addCalendarMenu').se
 ['createCalendarOption','subscribeCalendarOption'].forEach(id=>$(id)?.addEventListener('click',openModal));
 function fitMonth(){const grid=document.querySelector('.monthgrid');if(grid)grid.style.setProperty('--month-rows',Math.max(5,Math.round(grid.children.length/7)))}
 function scrollWeek(){const grid=$('weekScroll');if(!grid)return;const now=new Date(),hour=now.getHours();if(hour<5){grid.scrollTop=0;return}const desired=(hour*60+now.getMinutes())-grid.clientHeight/3;grid.scrollTop=Math.max(0,desired)}
+// On narrow screens the month cell and its add button overlap. Handle the add intent before the cell selection handler.
+document.addEventListener('click',e=>{const button=e.target.closest?.('[data-add-date]');if(!button||!matchMedia('(max-width:720px)').matches)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();window.DaylightBridge?.openEventOnDate?.(button.dataset.addDate)},true);
 const calendarView=$('calendarView');new MutationObserver(()=>{fitMonth();if($('weekScroll')&&!calendarView.dataset.lastWeek){requestAnimationFrame(scrollWeek)}calendarView.dataset.lastWeek=$('weekScroll')?'yes':''}).observe(calendarView,{childList:true});
 fitMonth();requestAnimationFrame(scrollWeek);
 document.querySelectorAll('[data-switch]').forEach(b=>b.addEventListener('click',()=>requestAnimationFrame(scrollWeek)));
