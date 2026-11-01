@@ -341,3 +341,19 @@ test('visual QA captures Settings, Integrations and event editor in both themes'
  await expect(page.locator('#eventDialog')).toBeVisible();
  await page.screenshot({path:'test-results/event-modal-dark.png',fullPage:false});
 });
+
+test('event modal custom selects work inside dialog and save metadata',async({page})=>{
+  await page.locator('#addSide').click();
+  await page.locator('#eventName').fill('Weekly swim');
+  await page.locator('#eventRepeat + .select-button').click();
+  await page.locator('.select-menu .select-option').filter({hasText:'Weekly'}).click();
+  await expect(page.locator('#eventRepeat')).toHaveValue('weekly');
+  await page.locator('#eventReminder + .select-button').click();
+  await page.locator('.select-menu .select-option').filter({hasText:'15 min before'}).click();
+  await expect(page.locator('#eventReminder')).toHaveValue('15m');
+  await page.locator('#eventLocation').fill('Community pool');
+  await page.locator('#eventSave').click();
+  await expect(page.locator('#eventDialog')).toBeHidden();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('daylight-events-v1')||'[]').find(e=>e.title==='Weekly swim'));
+  expect(saved).toMatchObject({repeat:'weekly',reminder:'15m',location:'Community pool'});
+});
