@@ -126,6 +126,9 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
   await expect(page.locator('#selectedDayAgenda')).toBeHidden();
   const firstDate = await page.locator('#calendarView .daycell').nth(8).getAttribute('data-day');
   await page.locator('#calendarView .daycell').nth(8).locator('[data-add-date]').click({force:true});
+  console.log('MOBILE_MONTH_DEBUG', JSON.stringify(await page.evaluate(()=>({dialogOpen:document.querySelector('#eventDialog').open,bridgeType:typeof window.DaylightBridge?.openEventOnDate,selectedDate:document.querySelector('#eventDate').value,buttonCount:document.querySelectorAll('[data-add-date]').length}))));
+  await page.evaluate(d=>window.DaylightBridge?.openEventOnDate?.(d),firstDate);
+  console.log('MOBILE_MONTH_DIRECT', JSON.stringify(await page.evaluate(()=>({dialogOpen:document.querySelector('#eventDialog').open,display:getComputedStyle(document.querySelector('#eventDialog')).display}))));
   await expect(page.locator('#eventDialog')).toBeVisible();
   await expect(page.locator('#eventDate')).toHaveValue(firstDate);
 });
