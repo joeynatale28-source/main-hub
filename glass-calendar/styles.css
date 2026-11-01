@@ -66,3 +66,55 @@ body.mobile-nav-open{overflow:hidden}
 }
 
 @media(max-width:620px){.daycell.selected:not(.today) .daynum{background:var(--panel-hover);outline:1px solid var(--strong-line)}.daycell.selected.today .daynum{outline:2px solid var(--text);outline-offset:2px}}
+
+/* Studio calendar: Apple-like restraint, information-rich scheduling */
+:root{--week-border:#292b30;--tone-neutral:#9d9fac}
+:root[data-theme=light]{--week-border:#e6e7ed;--tone-neutral:#858890}
+.app .main{padding:0 22px}
+.headline{padding:19px 0 16px}.headline h1{font-size:27px;letter-spacing:-.035em}.page-range{font-size:12px;color:var(--muted);margin:5px 0 0;font-weight:500}
+.content,.content.week-focused{grid-template-columns:minmax(0,1fr)}.rightcolumn{display:none!important}
+.panel-header{background:color-mix(in srgb,var(--panel) 93%,var(--panel-raised));height:54px}
+.panel-timezone{margin-left:auto;font-size:10px;line-height:1.4;color:var(--faint);padding:6px 11px;border:1px solid var(--line);border-radius:8px;white-space:nowrap}
+.calendar-panel{min-width:0;min-height:0;border-radius:12px;box-shadow:0 5px 18px #0001}
+.week-focused .calendar-panel{overflow:hidden}.week-focused #calendarView{animation:calendar-enter .22s var(--motion)}
+#viewSelect{min-width:106px;border-radius:9px;background-color:color-mix(in srgb,var(--panel-raised) 91%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.calendar-filter{font-size:12px;gap:10px;align-items:center}.calendar-filter .dot{filter:none;flex:none;height:8px;width:8px;box-shadow:0 0 0 2px color-mix(in srgb,var(--tone,#999) 12%,transparent);background:var(--tone,#999)!important}.cal-name{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.cal-count{font-size:10px;font-variant-numeric:tabular-nums;color:var(--faint);margin-left:auto}
+.event-tone-violet{--tone:#9184c5}.event-tone-teal{--tone:#56a993}.event-tone-amber{--tone:#c69265}.event-tone-blue{--tone:#6d98c4}.event-tone-rose{--tone:#bb7d99}.event-tone-sage{--tone:#8aab7b}
+.calendar-list-head{padding-top:3px}.mini-calendar{border-bottom-color:var(--line)}
+.calendar-panel .eventchip{display:block;background:color-mix(in srgb,var(--tone,#999) 21%,var(--panel))!important;color:var(--text)!important;border-left:2px solid var(--tone,#aaa)!important;filter:none!important;padding:5px 7px;border-radius:5px;font-size:10px;font-weight:580;transition:background .17s,transform .17s}
+.calendar-panel .eventchip:hover{background:color-mix(in srgb,var(--tone,#999) 34%,var(--panel))!important}
+:root[data-theme=light] .calendar-panel .eventchip{background:color-mix(in srgb,var(--tone,#999) 13%,white)!important;color:#313139!important}
+/* Week header and all-day lane */
+.week-overflow{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-color:var(--strong-line) transparent;scrollbar-width:thin}
+.week-board{min-width:795px;width:100%;--week-gutter:66px}
+.week-days-head,.week-all-day{display:grid;grid-template-columns:var(--week-gutter) repeat(7,minmax(0,1fr));background:var(--panel)}
+.week-days-head{height:66px;align-items:stretch;border-bottom:1px solid var(--week-border)}
+.week-gutter-zone{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);text-align:center;border-right:1px solid var(--week-border);padding:4px}
+.week-day-button{border:0;border-right:1px solid var(--week-border);background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;font-variant-numeric:tabular-nums}
+.week-day-button:last-child{border-right:0}.week-day-button:hover{background:var(--panel-raised)}
+.week-day-name{font-size:11px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
+.week-day-number{height:29px;min-width:29px;padding:0 4px;display:grid;place-items:center;font-size:15px;font-weight:620;border-radius:50%;color:var(--text)}
+.week-day-button.is-today .week-day-number{background:var(--button);color:var(--button-text)}
+.week-all-day{min-height:41px;border-bottom:1px solid var(--week-border);align-items:stretch}
+.week-all-day-label{font-size:9px;color:var(--faint);display:flex;align-items:flex-start;justify-content:center;padding-top:12px;border-right:1px solid var(--week-border)}
+.week-all-day-col{padding:5px 4px;border-right:1px solid var(--week-border);min-width:0}
+.week-all-day-col:last-child{border-right:0}.all-day-pill{display:block;width:100%;border:1px solid color-mix(in srgb,var(--tone) 35%,var(--line));background:color-mix(in srgb,var(--tone) 25%,var(--panel));border-radius:5px;color:var(--text);text-overflow:ellipsis;overflow:hidden;white-space:nowrap;padding:5px 6px;font-size:10px;line-height:1.25;text-align:left;font-weight:600;margin-bottom:3px}.all-day-pill:hover{background:color-mix(in srgb,var(--tone) 38%,var(--panel))}.all-day-overflow{display:block;color:var(--muted);font-size:10px;padding:3px}
+.week-scroll{height:clamp(490px,calc(100dvh - 284px),860px);overflow-y:auto;overscroll-behavior:contain;scrollbar-color:var(--strong-line) transparent;scrollbar-width:thin;background:var(--panel)}
+.week-time-board{height:calc(var(--hour-height) * 24);display:grid;grid-template-columns:var(--week-gutter) repeat(7,minmax(0,1fr));min-width:0;background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour-height) - 1px),var(--week-border) calc(var(--hour-height) - 1px),var(--week-border) var(--hour-height))}
+.week-hours{position:relative;border-right:1px solid var(--week-border)}.week-hour-label{position:absolute;right:10px;transform:translateY(-9px);font-size:10px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}.week-hour-label:first-child{transform:translateY(2px)}
+.week-day-track{position:relative;min-width:0;border-right:1px solid var(--week-border);outline-offset:-3px;cursor:crosshair}
+.week-day-track:last-child{border-right:0}.week-day-track:hover{background:color-mix(in srgb,var(--panel-raised) 36%,transparent)}.week-track-today{background:color-mix(in srgb,var(--panel-raised) 36%,transparent)}
+.week-event{position:absolute;min-width:0;z-index:2;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:4px;overflow:hidden;border-radius:7px;padding:7px 7px 5px;border:1px solid color-mix(in srgb,var(--tone) 43%,var(--panel));border-left:3px solid var(--tone);background:color-mix(in srgb,var(--tone) 24%,var(--panel));color:var(--text);text-align:left;transition:filter .18s,transform .16s,box-shadow .18s}
+.week-event:hover{filter:brightness(1.14);transform:translateY(-1px);z-index:4;box-shadow:0 5px 16px #0003}
+.week-event:focus-visible{z-index:5;outline:2px solid var(--text);outline-offset:1px}
+.week-event strong{display:block;width:100%;font-size:11px;line-height:1.3;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.week-event small{color:color-mix(in srgb,var(--text) 77%,var(--tone));font-size:10px;line-height:1.25;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.week-event.event-short{padding-top:3px;gap:0}.week-event.event-short strong{font-size:10px;white-space:nowrap;display:block;line-height:1.15}.week-event.event-short small{display:none}
+.week-now-line{position:absolute;left:0;right:0;height:1px;background:#f26b6c;z-index:6;pointer-events:none}.week-now-line::before{content:"";position:absolute;top:-3px;left:-3px;width:7px;height:7px;background:#f26b6c;border-radius:50%}
+:root[data-theme=light] .week-event{background:color-mix(in srgb,var(--tone) 15%,white);color:#252531;border-color:color-mix(in srgb,var(--tone) 38%,white)}:root[data-theme=light] .week-event small{color:#444453}
+:root[data-theme=light] .all-day-pill{background:color-mix(in srgb,var(--tone) 16%,white);color:#24242b}
+@media(min-width:1440px){.week-board{min-width:795px}.week-scroll{height:clamp(550px,calc(100dvh - 275px),950px)}}
+@media(max-width:980px){.panel-timezone{display:none}.week-board{min-width:780px}.app .main{padding:0 14px}}
+@media(max-width:860px){.app .main{padding:0 12px}.week-board{min-width:760px}}
+@media(max-width:620px){.app .main{padding:0 7px}.week-board{min-width:740px}.week-scroll{height:calc(100dvh - 285px);min-height:410px}.week-day-name{font-size:10px}.week-day-number{font-size:13px}.week-event strong{font-size:10px}.page-range{font-size:11px}.panel-header{height:50px}}
+@media(prefers-reduced-motion:reduce){.week-event,.all-day-pill{transition:none}}
