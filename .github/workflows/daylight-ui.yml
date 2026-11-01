@@ -36,7 +36,7 @@ jobs:
       - name: Check script syntax
         run: npm run check
       - name: Run browser regression tests
-        run: npx playwright test tests/ui-spec.spec.js
+        run: npm test
       - name: Verify public GitHub Pages calendar
         run: |
           url="https://joeynatale28-source.github.io/main-hub/glass-calendar/"
