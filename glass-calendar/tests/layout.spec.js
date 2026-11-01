@@ -68,8 +68,8 @@ test('mobile navigation is an accessible dismissible drawer', async ({ page }) =
   await page.locator('#mobileMenuButton').click();
   await expect(page.locator('.sidebar')).toHaveClass(/mobile-open/);
   await expect(page.locator('#mobileBackdrop')).toBeVisible();
+  await expect.poll(async () => (await page.locator('.sidebar').boundingBox()).x, { timeout: 2000 }).toBeGreaterThanOrEqual(-1);
   const rect = await page.locator('.sidebar').boundingBox();
-  expect(rect.x).toBeGreaterThanOrEqual(-1);
   expect(rect.width).toBeLessThanOrEqual(390);
   await page.locator('#mobileBackdrop').click({ position: { x: 375, y: 350 } });
   await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);
