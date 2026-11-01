@@ -24,3 +24,7 @@ The subscription endpoint uses HTTPS, denies redirects, restricts hostnames, lim
 
 ## Deployment
 Import `joeynatale28-source/main-hub` on Vercel with root directory `glass-calendar`. No build command is required. The project has not been deployed by this integration because Vercel returns HTTP 403 to project-creation requests.
+
+## Integrations interface
+
+The current interface includes an **Integrations** navigation item and a Settings section for Google Calendar, Outlook, Apple Calendar, iCal/webcal, and CalDAV. Only public, compatible read-only calendar feeds and `.ics` import/export are implemented. Google/Microsoft OAuth and authenticated CalDAV remain planned. This project uses the `glass-calendar` root directory on Vercel.
