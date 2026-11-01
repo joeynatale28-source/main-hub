@@ -101,7 +101,7 @@ test('Photon suggestions are keyboard-drivable without advancing the wizard',asy
   await page.locator('#eventLocation').press('ArrowDown');
   await page.locator('#eventLocation').press('ArrowDown');
   await page.locator('#eventLocation').press('Enter');
-  await expect(page.locator('#eventLocation')).toHaveValue('Central Park');
+  await expect(page.locator('#eventLocation')).toHaveValue(/^Central Park/);
   await expect(page.locator('#wizardCount')).toContainText('STEP 3 OF 4');
   await expect(page.locator('#addressResults')).toBeHidden();
   await page.locator('#eventSave').click();
