@@ -125,7 +125,7 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
 
 test('week schedule positions events by actual time and opens details', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#viewSelect').selectOption('week');
+  await page.locator('[data-switch="week"]').click();
   await expect(page.locator('.week-days-head .week-day-button')).toHaveCount(7);
   await expect(page.locator('.week-day-track')).toHaveCount(7);
   await expect(page.locator('.week-hour-label')).toHaveCount(48);
@@ -148,7 +148,7 @@ test('week schedule positions events by actual time and opens details', async ({
 
 test('week layout is scrollable inside calendar on mobile without page overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#viewSelect').selectOption('week');
+  await page.locator('[data-switch="week"]').click();
   const result = await page.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
@@ -166,7 +166,7 @@ test('week layout is scrollable inside calendar on mobile without page overflow'
 test('US holidays appear as all-day events in week view', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-26T12:00:00Z'));
   await page.reload();
-  await page.locator('#viewSelect').selectOption('week');
+  await page.locator('[data-switch="week"]').click();
   await expect(page.locator('.week-all-day')).toContainText('Thanksgiving Day');
   await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
 });
@@ -179,7 +179,7 @@ test('fresh installs open the new weekly schedule while saved preferences win', 
     await fresh.goto('http://127.0.0.1:4173/');
     await expect(fresh.locator('.week-board')).toBeVisible();
     await expect(fresh.locator('#viewSelect')).toHaveValue('week');
-    await fresh.locator('#viewSelect').selectOption('month');
+    await fresh.locator('[data-switch="month"]').click();
     await expect(fresh.locator('#viewSelect')).toHaveValue('month');
   } finally {
     await context.close();
@@ -188,7 +188,7 @@ test('fresh installs open the new weekly schedule while saved preferences win', 
 
 test('clicking an empty week slot pre-fills date and rounded start time', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#viewSelect').selectOption('week');
+  await page.locator('[data-switch="week"]').click();
   const track = page.locator('[data-week-track]').nth(3);
   const key = await track.getAttribute('data-week-track');
   await track.click({ position: { x: 40, y: 600 } });
@@ -215,7 +215,7 @@ test('event editor saves all-day events with a full-day duration', async ({ page
   await expect(page.locator('#eventTime')).toBeDisabled();
   await page.locator('#eventForm button[type="submit"]').click();
   await expect(page.locator('#eventDialog')).toBeHidden();
-  await page.locator('#viewSelect').selectOption('week');
+  await page.locator('[data-switch="week"]').click();
   await expect(page.locator('.week-all-day')).toContainText('All-day planning');
 });
 
