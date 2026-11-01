@@ -23,7 +23,7 @@ const selectUI=new WeakMap();let activeMenu=null;
 function closeSelect(){if(activeMenu){activeMenu.remove();activeMenu=null}document.querySelectorAll('.select-button[aria-expanded=true]').forEach(b=>b.setAttribute('aria-expanded','false'))}
 function updateSelect(select){const ref=selectUI.get(select);if(!ref)return;const option=select.selectedOptions[0];ref.textContent=option?.textContent||'Select';ref.disabled=select.disabled}
 function enhanceSelect(select){
- if(selectUI.has(select)||select.hidden||select.closest('.legacy-event-fields')||select.id==='pageThemeSelect'||select.id==='themeSelect'||select.id==='viewSelect')return;
+ if(selectUI.has(select)||select.hidden||select.closest('.legacy-event-fields')||select.id==='pageThemeSelect'||select.id==='viewSelect')return;
  select.classList.add('native-select-accessible');
  const button=document.createElement('button');button.type='button';button.className='select-button';button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',select.getAttribute('aria-label')||'Select '+(select.closest('label')?.textContent||'option').trim().slice(0,40));
  select.after(button);selectUI.set(select,button);updateSelect(select);
