@@ -1,0 +1,97 @@
+/* Daylight wizard + optional, user-selected accent. Graphite inherits semantic monochrome. */
+:root{--accent:var(--primary);--on-accent:var(--on-primary)}
+/* Only intentional interaction accents. Never tint calendar event cards. */
+.sidebar>#addSide,.event-editor #eventSave:not(:disabled),#saveName,.welcome-action,.accent-preview-button{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--on-accent)!important}
+.sidebar>#addSide:hover,.event-editor #eventSave:not(:disabled):hover{filter:brightness(.91)}
+.mini-day.today .mini-day-number,.week-day-button.is-today .week-day-number,.daycell.today .daynum,.accent-preview-today{background:var(--accent)!important;color:var(--on-accent)!important}
+.week-day-button.is-today::after,.week-now-line,.week-now-line::before{background:var(--accent)!important}
+.mini-day.selected:not(.today) .mini-day-number{outline-color:var(--accent)!important}
+:focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px!important}
+input.daylight-switch:checked,.accent-preview-switch{background:var(--accent)!important;border-color:var(--accent)!important}
+input.daylight-switch:checked::before,.accent-preview-switch i{background:var(--on-accent)!important}
+.view-toggle button.selected{background:var(--accent)!important;color:var(--on-accent)!important}
+.event-editor{position:relative;isolation:isolate}
+.event-editor::before{content:"";position:absolute;inset:0 0 auto;height:120px;border-radius:12px 12px 0 0;background:radial-gradient(ellipse 70% 90% at 90% 0%,color-mix(in srgb,var(--wizard-tint,transparent) 8%,transparent),transparent);pointer-events:none;z-index:-1}
+.event-editor .dialoghead{position:relative;display:flex;align-items:center;justify-content:space-between;padding-right:38px;margin:0 0 12px!important}
+.wizard-progress{display:grid;gap:9px;margin:0 0 22px}
+.wizard-progress-info{display:flex;align-items:center;justify-content:space-between;min-height:34px;gap:10px}
+.wizard-progress-info>span:first-child{font-size:11px;letter-spacing:.1em;color:var(--text-2);font-weight:650;text-transform:uppercase}
+.wizard-progress-right{display:flex;align-items:center;gap:12px}
+.wizard-progress-right>span:first-child{font-size:11px;color:var(--text-2);font-weight:550}
+.wizard-icon{height:40px;width:40px;border-radius:50%;border:1px solid color-mix(in srgb,var(--wizard-tint,#888) 24%,transparent);background:color-mix(in srgb,var(--wizard-tint,#888) 15%,transparent);color:var(--wizard-tint,#888);display:grid;place-items:center;animation:wizard-theme-in .2s ease both}
+.wizard-icon svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.wizard-progress-track{width:100%;height:4px;border-radius:999px;background:var(--border);overflow:hidden}
+.wizard-progress-fill{width:25%;height:100%;border-radius:999px;background:var(--accent);transition:width .3s ease}
+.wizard-step{display:grid;align-content:start;gap:18px;min-height:285px}
+.wizard-step[hidden]{display:none!important}
+.wizard-step.from-right{animation:wizard-slide-right .2s ease both}
+.wizard-step.from-left{animation:wizard-slide-left .2s ease both}
+.wizard-step .field-label{font-size:18px!important;line-height:1.35;color:var(--text)!important;font-weight:650!important;margin:0!important}
+.wizard-step .field-label>input:not([type=checkbox]),.wizard-step .field-label>textarea{display:block;margin-top:12px!important;width:100%;font-size:16px!important;font-weight:450!important;background:var(--bg)!important;padding:14px!important;border:1px solid var(--border)!important;border-radius:9px!important}
+.wizard-step .field-label>textarea{font-size:13px!important;resize:vertical;min-height:88px}
+.wizard-step .field-label input::placeholder,.wizard-step textarea::placeholder{color:var(--text-2)!important}
+.wizard-step .wizard-hint{font-size:11px;color:var(--text-2);margin:-8px 0 0}
+.wizard-step .switch-row{display:flex!important;align-items:center;justify-content:space-between;gap:12px;padding:12px 0!important;margin:0}
+.wizard-step .event-dates-layout{margin:0}
+.wizard-step .event-duration-chips{margin:0}
+.wizard-step .event-date-group{padding:9px 11px}
+.wizard-step .event-date-group legend{font-size:11px}
+.wizard-step .wizard-question{font-size:18px;line-height:1.25;font-weight:650;margin:0;color:var(--text)}
+.wizard-repeat,.wizard-reminder{display:grid;gap:10px}
+.wizard-repeat>strong,.wizard-reminder>strong{font-size:12px;color:var(--text-2);font-weight:600}
+.wizard-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.wizard-chip{min-height:34px;padding:7px 12px;white-space:nowrap;border:1px solid var(--border);background:var(--surface);border-radius:8px;color:var(--text-2);font-size:12px}
+.wizard-chip:hover{background:var(--surface-hover);color:var(--text)}
+.wizard-chip.selected{background:var(--accent)!important;color:var(--on-accent)!important;border-color:var(--accent)!important}
+.wizard-hidden-select{display:none!important}
+.wizard-holiday{display:flex;align-items:center;gap:10px;background:var(--surface-hover);border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:12px;color:var(--text-2)}
+.wizard-holiday svg{height:18px;width:18px;stroke:var(--holiday-tint);fill:none;stroke-width:1.8;flex:none}
+.wizard-holiday strong{font-weight:600;color:var(--text);flex:1}
+.wizard-holiday button{border:0;background:transparent;color:var(--text-2);font-size:19px;width:20px;height:20px;padding:0}
+.wizard-location{position:relative}
+.wizard-location .field-label>input{padding-left:42px!important}
+.wizard-location>svg{position:absolute;top:55px;left:13px;width:18px;height:18px;stroke:var(--text-2);stroke-width:1.7;fill:none;pointer-events:none}
+.wizard-footer{display:flex!important;align-items:center;justify-content:space-between;gap:10px;min-height:66px;margin-top:8px!important;padding:16px 0 0!important;border-top:1px solid var(--border)!important}
+.wizard-footer-start{display:flex;align-items:center;gap:12px}
+.wizard-footer .wizard-text-button{background:transparent;border:0;color:var(--text-2);font-size:12px;padding:8px;white-space:nowrap}
+.wizard-footer .wizard-text-button:hover{color:var(--text)}
+.wizard-footer .wizard-back{min-width:60px}
+.wizard-footer #eventSave{min-width:125px;min-height:40px}
+.wizard-footer #eventSave:disabled{opacity:.4!important;cursor:not-allowed}
+.wizard-success{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:310px;gap:14px;text-align:center}
+.wizard-success svg{height:46px;width:46px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round}
+.wizard-success h3{font-size:22px;color:var(--text);margin:0}
+.wizard-success p{font-size:12px;color:var(--text-2);margin:0}
+.wizard-discard,.wizard-resume{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px}
+.wizard-discard strong,.wizard-resume strong{font-size:12px;color:var(--text)}
+.wizard-discard p,.wizard-resume p{font-size:11px;color:var(--text-2);margin:3px 0}
+.wizard-discard-actions,.wizard-resume-actions{display:flex;gap:6px;flex-shrink:0}
+.wizard-discard-actions button,.wizard-resume-actions button{border:1px solid var(--border);border-radius:7px;padding:7px 9px;background:var(--surface);font-size:11px;color:var(--text)}
+.wizard-discard-actions button:hover,.wizard-resume-actions button:hover{background:var(--bg)}
+.event-flash{outline:2px solid var(--accent)!important;outline-offset:1px;animation:event-highlight 1.7s ease-out}
+@keyframes event-highlight{0%{filter:brightness(1.4)}100%{filter:brightness(1)}}
+@keyframes wizard-slide-right{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes wizard-slide-left{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes wizard-theme-in{from{opacity:0;transform:scale(.87)}to{opacity:1;transform:scale(1)}}
+/* Accent settings. User-owned accents never leak into events or informational surfaces. */
+.accent-settings{padding:18px 20px 22px;border-top:1px solid var(--border);display:grid;gap:15px}
+.accent-settings-heading strong{font-size:13px;font-weight:650;color:var(--text)}
+.accent-settings-heading p{font-size:12px;margin:4px 0 0;color:var(--text-2);line-height:1.5}
+.accent-swatches{display:flex;gap:11px;flex-wrap:wrap}
+.accent-swatch{width:32px;height:32px;border-radius:50%;background:var(--swatch,var(--primary));border:2px solid var(--surface);outline:1px solid var(--border);position:relative}
+.accent-swatch.graphite{background:linear-gradient(135deg,#FAFAFA 0 49.5%,#0A0A0A 50.5% 100%)}
+.accent-swatch[aria-pressed=true]{outline:2px solid var(--text)!important;outline-offset:2px}
+.accent-swatch:hover{transform:translateY(-1px)}
+.custom-accent-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.custom-accent-row>label{font-size:12px;color:var(--text-2)}
+.custom-accent-row input[type=color]{width:38px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:2px;cursor:pointer}
+.custom-accent-row input[type=text]{width:118px;height:36px;border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text)}
+.accent-error,.accent-warning{font-size:11px;color:var(--text-2);margin:0}
+.accent-error{color:var(--text)}
+.accent-preview{display:flex;align-items:center;gap:16px;padding:12px 15px;background:var(--surface-hover);border:1px solid var(--border);border-radius:9px}
+.accent-preview-button{border:0;border-radius:7px;background:var(--accent)!important;color:var(--on-accent)!important;font-size:11px;font-weight:650;padding:8px 12px;pointer-events:none}
+.accent-preview-progress{height:4px;width:60px;background:var(--border);border-radius:5px;overflow:hidden}.accent-preview-progress i{display:block;height:100%;width:65%;background:var(--accent)}
+.accent-preview-today{height:29px;width:29px;display:grid;place-items:center;border-radius:50%;font-size:12px;font-weight:650}
+.accent-preview-switch{height:22px;width:40px;border-radius:12px;padding:3px;display:flex;justify-content:flex-end;align-items:center}.accent-preview-switch i{height:16px;width:16px;border-radius:50%}
+@media(max-width:550px){.wizard-step{min-height:260px}.event-editor{padding:18px!important}.wizard-footer #eventSave{min-width:112px}.wizard-resume,.wizard-discard{flex-wrap:wrap}.accent-preview{gap:9px}}
+@media(prefers-reduced-motion:reduce){.wizard-progress-fill,.wizard-step,.wizard-icon,.event-flash{animation:none!important;transition:none!important}}
