@@ -121,3 +121,50 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
   await expect(page.locator('#eventDialog')).toBeVisible();
   await expect(page.locator('#eventDate')).toHaveValue(firstDate);
 });
+
+test('week schedule positions events by actual time and opens details', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('#viewSelect').selectOption('week');
+  await expect(page.locator('.week-days-head .week-day-button')).toHaveCount(7);
+  await expect(page.locator('.week-day-track')).toHaveCount(7);
+  await expect(page.locator('.week-hour-label')).toHaveCount(24);
+  const day = await page.locator('[data-week-track]').nth(2).getAttribute('data-week-track');
+  await page.locator('#addTop').click();
+  await page.locator('#eventName').fill('Team planning');
+  await page.locator('#eventDate').fill(day);
+  await page.locator('#eventTime').fill('09:30');
+  await page.locator('#eventDuration').selectOption('60');
+  await page.locator('#eventForm button[type="submit"]').click();
+  const event = page.locator('.week-event').filter({ hasText: 'Team planning' });
+  await expect(event).toBeVisible();
+  const top = await event.evaluate(el => parseFloat(el.style.top));
+  expect(top).toBeGreaterThan(600);
+  expect(top).toBeLessThan(650);
+  await event.click();
+  await expect(page.locator('#detailTitle')).toHaveText('Team planning');
+  await page.screenshot({ path: 'test-results/week-desktop.png', fullPage: false });
+});
+
+test('week layout is scrollable inside calendar on mobile without page overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#viewSelect').selectOption('week');
+  const result = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    week: document.querySelector('.week-board').getBoundingClientRect().width,
+    scrollArea: document.querySelector('.week-overflow').clientWidth,
+    hours: document.querySelectorAll('.week-hour-label').length
+  }));
+  expect(result.document).toBeLessThanOrEqual(result.viewport + 2);
+  expect(result.week).toBeGreaterThan(result.scrollArea);
+  expect(result.hours).toBe(24);
+  await page.screenshot({ path: 'test-results/week-phone.png', fullPage: false });
+});
+
+test('US holidays appear as all-day events in week view', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-26T12:00:00Z'));
+  await page.reload();
+  await page.locator('#viewSelect').selectOption('week');
+  await expect(page.locator('.week-all-day')).toContainText('Thanksgiving Day');
+  await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
+});
