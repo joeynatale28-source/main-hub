@@ -320,3 +320,24 @@ test('search across dates resets completely on Escape and clear button',async({p
   await page.locator('#searchClear').click();
   await expect(page.locator('#searchResults')).toBeHidden();
 });
+
+test('visual QA captures Settings, Integrations and event editor in both themes',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ await page.locator('#settingsHeaderButton').click();
+ await expect(page.locator('#settingsPage')).toBeVisible();
+ await page.screenshot({path:'test-results/settings-dark.png',fullPage:false});
+ await page.locator('#settingsAppearance').scrollIntoViewIfNeeded();
+ await page.locator('[data-theme-choice="light"]').click();
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await page.screenshot({path:'test-results/settings-light.png',fullPage:false});
+ await page.locator('#settingsBack').click();
+ await page.locator('#integrationsNav').click();
+ await expect(page.locator('#settingsIntegrations')).toBeVisible();
+ await page.screenshot({path:'test-results/integrations-light.png',fullPage:false});
+ await page.locator('#settingsBack').click();
+ await page.locator('#quickThemeButton').click();
+ await page.locator('#quickThemeButton').click();
+ await page.locator('#addSide').click();
+ await expect(page.locator('#eventDialog')).toBeVisible();
+ await page.screenshot({path:'test-results/event-modal-dark.png',fullPage:false});
+});
