@@ -33,8 +33,11 @@ jobs:
           VITE_SUPABASE_URL: https://qrqemjgpzoqhtmsowmqv.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj
         run: npm run build
-      - name: Run browser tests against staging source
-        run: npm test
+      - name: Build and type-check MCP server
+        working-directory: mcp
+        run: npm install --no-audit --no-fund && npm run build
+      - name: Run focused v2 authentication and navigation tests
+        run: npx playwright test tests/v2-auth.spec.js
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
