@@ -1,14 +1,22 @@
 {
   "name": "daylight-calendar",
   "private": true,
-  "version": "2.0.0-beta.1",
-  "description": "Daylight calendar with Supabase accounts and protected cloud synchronization",
+  "version": "2.0.0-beta.2",
+  "description": "Daylight v2 accounts, navigation and Supabase data",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "check": "node --check app.js && node --check enhance.js && node --check integrations.js && node --check wizard.js && node --check occasion.js && node --check accent.js && node --check v1-shell.js && node --check v1-details.js && node --check v2-auth.js"
+    "check": "node --check app.js && node --check enhance.js && node --check integrations.js && node --check wizard.js && node --check occasion.js && node --check accent.js && node --check v1-shell.js && node --check v1-details.js && node --check v2-auth.js",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
   },
   "devDependencies": {
-    "@playwright/test": "1.55.0"
+    "@playwright/test": "1.55.0",
+    "vite": "^7.1.0"
+  },
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0"
   }
 }
