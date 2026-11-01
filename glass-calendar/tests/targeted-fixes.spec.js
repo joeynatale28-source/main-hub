@@ -24,8 +24,8 @@ test('subscription fetches ICS TEXT, keeps chosen name, expands and refreshes wi
  await page.locator('#subscribeName').fill('My Swim Calendar');
  await page.locator('#subscribeURL').fill('https://calendar.test/feed.ics');
  await page.locator('#subscribeSubmit').click();
- await expect(page.locator('.subscription-row')).toContainText('My Swim Calendar');
- await expect(page.locator('.subscription-row')).toContainText('Last fetched');
+ await expect(page.locator('#subscriptionList .subscription-row')).toContainText('My Swim Calendar');
+ await expect(page.locator('#subscriptionList .subscription-row')).toContainText('Last fetched');
  const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('daylight-events-v1')||'[]').filter(x=>x.sourceId));
  let entries=await read();
  expect(entries.filter(e=>e.title==='Weekly Meeting')).toHaveLength(3);
@@ -58,12 +58,12 @@ test('feed name used if Name blank; HTML is a human-readable error, never JSON',
  await page.locator('#integrationSubscribe').click();
  await page.locator('#subscribeURL').fill('https://calendar.test/schedule.ics');
  await page.locator('#subscribeSubmit').click();
- await expect(page.locator('.subscription-row').first()).toContainText('Original Feed');
+ await expect(page.locator('#subscriptionList .subscription-row').first()).toContainText('Original Feed');
  await page.locator('#integrationSubscribe').click();
  await page.locator('#subscribeName').fill('Bad link');
  await page.locator('#subscribeURL').fill('https://calendar.test/not-a-calendar');
  await page.locator('#subscribeSubmit').click();
- const bad=page.locator('.subscription-row').filter({hasText:'Bad link'});
+ const bad=page.locator('#subscriptionList .subscription-row').filter({hasText:'Bad link'});
  await expect(bad).toContainText("That link didn't return a calendar file.");
  await expect(bad).not.toContainText('JSON');
  await expect(page.locator('#toast')).toContainText("That link didn't return a calendar file.");
@@ -135,6 +135,8 @@ test('center Settings and Tasks; task primary; date pickers; accent live; flat w
  await expect(page.locator('.task-date-panel')).toBeVisible();
  await page.locator('.task-date-panel [data-day]').first().click();
  await page.locator('#taskDialog [data-close]').first().click();
+ if(await page.locator('#taskDiscardPrompt').isVisible())await page.locator('#discardTask').click();
+ await expect(page.locator('#taskDialog')).toBeHidden();
  await page.locator('.nav[data-view="month"]').click();
  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
  const flat=await page.locator('.week-day-track').first().evaluate(x=>getComputedStyle(x).backgroundImage);
