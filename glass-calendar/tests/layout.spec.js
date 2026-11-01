@@ -18,6 +18,21 @@ test.beforeEach(async ({ page }) => {
     localStorage.removeItem('daylight-sidebar-collapsed');
     localStorage.setItem('daylight-default-view', 'month');
   });
+  await page.route('https://qrqemjgpzoqhtmsowmqv.supabase.co/**', async route => {
+    const url=new URL(route.request().url());
+    if(url.pathname.includes('workspace_snapshots') && route.request().method()==='GET'){
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{payload:{'daylight-onboarded':'yes','daylight-theme':'dark','daylight-default-view':'month'},updated_at:new Date().toISOString()}])});return;
+    }
+    if(route.request().method()==='POST')await route.fulfill({status:204,body:''});
+    else await route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  });
+  await page.addInitScript(()=>{
+    localStorage.setItem('daylight-supabase-session-v2',JSON.stringify({
+      access_token:'mock-access-token',refresh_token:'mock-refresh-token',expires_at:4102444800,
+      user:{id:'11111111-1111-4111-8111-111111111111',email:'qa@example.test',user_metadata:{first_name:'QA',last_name:'Tester'}}
+    }));
+    sessionStorage.setItem('daylight-hydrated-user','11111111-1111-4111-8111-111111111111');
+  });
   await page.goto('/');
   await expect(page.locator('#calendarView .daycell').first()).toBeVisible();
   await expect(page.locator('#splash')).toBeHidden();
