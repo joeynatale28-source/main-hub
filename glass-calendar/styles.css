@@ -187,3 +187,29 @@ h1,h2,h3,.brand,.splash strong,.datehero>span,.quote-card strong{font-family:-ap
 footer button{border:0;background:none;color:inherit;text-decoration:underline;font-size:inherit}.view-switch select{transition:background .24s,box-shadow .24s}
 :root[data-theme=light] .tasks-board{background:#fff}html,body,.main,.sidebar,.glass,.calendar-panel,.todaycard,.upcomingcard{transition:background-color .36s ease,color .36s ease,border-color .36s ease}button:not(.eventchip){transition:background-color .2s,transform .2s,box-shadow .2s,color .2s}button:active{transform:scale(.965)}@media(max-width:800px){.app.sidebar-collapsed{grid-template-columns:1fr}.sidebar-collapsed .sidebar{padding:12px}.sidebar-collapsed .brand>span{display:block}.tasks-titlebar{padding-top:22px}}
 .calendar-list-head{position:relative}.calendar-add-options{position:absolute;top:29px;left:0;right:0;z-index:14;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 16px 38px #0005;backdrop-filter:blur(22px);animation:dialog-enter .18s ease}.calendar-add-options button{display:flex;width:100%;height:auto;padding:11px 10px;border:0;border-radius:8px;text-align:left;justify-content:flex-start;color:var(--text);background:transparent;text-transform:none;letter-spacing:normal;font-size:12px}.calendar-add-options button:hover{background:var(--surface2)}.sidebar-collapsed .calendar-add-options{display:none!important}
+/* Event detail sheet: calm hierarchy and accessible action row */
+.event-sheet{position:fixed;inset:0 0 0 auto;margin:0 0 0 auto;height:100dvh;max-height:100dvh;width:min(425px,100vw);padding:0;background:var(--surface)!important;border:0!important;border-left:1px solid var(--line)!important;border-radius:0!important;color:var(--text)!important;box-shadow:-20px 0 100px #0008!important;overflow-y:auto}
+.event-sheet[open]{animation:event-sheet-enter .3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes event-sheet-enter{from{transform:translateX(36px);opacity:.55}to{transform:translateX(0);opacity:1}}
+.event-sheet::backdrop{background:#0007!important;backdrop-filter:blur(3px)}
+.event-sheet-header{display:flex;justify-content:space-between;align-items:center;padding:22px 25px 14px}
+.event-sheet-label{font:700 10px/1.4 system-ui,sans-serif;color:var(--muted);letter-spacing:.12em}
+.event-sheet-actions{display:flex;gap:6px}
+.detail-icon-action{height:36px;width:36px;display:grid;place-items:center;border-radius:9px;background:transparent;border:1px solid transparent;color:var(--muted)}
+.detail-icon-action:hover{color:var(--text);background:var(--surface2);border-color:var(--line)}
+.detail-icon-action svg,.event-meta-row svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.event-sheet-main{display:flex;gap:17px;padding:28px 26px 31px;align-items:flex-start}
+.event-sheet-mark{height:17px;width:17px;border-radius:5px;background:var(--text);margin-top:7px;flex:0 0 17px}
+.event-sheet-main h2{font-size:25px;line-height:1.27;font-weight:650;letter-spacing:-.025em;margin:0 0 10px;overflow-wrap:anywhere}
+.event-sheet-subheading{margin:0;font-size:12px;color:var(--muted)}
+.event-sheet-divider{height:1px;background:var(--line);margin:0 25px 15px}
+.event-meta-row{display:flex;gap:17px;padding:16px 27px;align-items:flex-start}
+.event-meta-row>svg{color:var(--muted);margin-top:5px;flex:none}
+.event-meta-row div{min-width:0}
+.event-meta-label{font-size:11px;color:var(--muted);font-weight:600}
+.event-meta-row p{font-size:13px;line-height:1.6;margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.event-sheet-footer{border-top:1px solid var(--line);padding:17px 25px;display:flex;justify-content:space-between;align-items:center;gap:15px;font-size:11px;color:var(--muted);margin-top:22px}
+.event-sheet-footer button{min-width:74px}
+:root[data-theme=light] .event-sheet{background:#fff!important}
+@media(max-width:540px){.event-sheet{inset:auto 0 0 0;width:100%;height:auto;max-height:85dvh;border:1px solid var(--line)!important;border-radius:18px 18px 0 0!important}.event-sheet[open]{animation:event-sheet-mobile .28s ease both}@keyframes event-sheet-mobile{from{transform:translateY(35px);opacity:.5}to{transform:translateY(0);opacity:1}}}
+@media(prefers-reduced-motion:reduce){.event-sheet[open]{animation:none!important}}
