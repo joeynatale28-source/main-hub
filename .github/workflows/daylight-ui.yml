@@ -11,6 +11,9 @@ on:
       - '.github/workflows/daylight-ui.yml'
 permissions:
   contents: read
+concurrency:
+  group: daylight-ui-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   responsive-ui:
     runs-on: ubuntu-latest
