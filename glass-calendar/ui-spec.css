@@ -229,3 +229,9 @@ dialog::backdrop{animation:view-in var(--dur-fast) var(--ease)}
 /* Pickers live in their owning step's document flow, never over headings or footer. */
 #eventDialog .picker-overlay:not([hidden]){position:relative!important;inset:auto!important;display:block!important;width:100%;height:auto;background:none!important;padding:8px 0!important;z-index:3!important}
 #eventDialog .picker-panel{position:relative!important;inset:auto!important;width:min(100%,320px)!important;max-height:255px!important;margin:0 auto!important;box-shadow:0 10px 22px #0002;overflow:auto}
+
+/* Outgoing view snapshot fades before removal; incoming view rises gently. */
+.app .main{position:relative!important}
+@keyframes view-fade-out{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-3px)}}
+.view-ghost{position:absolute!important;z-index:4!important;overflow:hidden!important;background:var(--bg);pointer-events:none!important;animation:view-fade-out var(--dur-fast) var(--ease) forwards}
+:root[data-reduce-motion="true"] .view-ghost{display:none!important}
