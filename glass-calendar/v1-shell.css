@@ -1,0 +1,147 @@
+/* DAYLIGHT 1.0 — fixed viewport shell and takeovers */
+html,body{height:100%!important;max-height:100%!important;overflow:hidden!important;overscroll-behavior:none!important}
+body{margin:0!important}
+.app{height:100dvh!important;max-height:100dvh!important;min-height:0!important;display:grid!important;grid-template-columns:264px minmax(0,1fr)!important;grid-template-rows:minmax(0,100dvh)!important;overflow:hidden!important;transition:grid-template-columns .2s ease!important}
+.app.sidebar-collapsed{grid-template-columns:68px minmax(0,1fr)!important}
+.sidebar,.sidebar.glass{height:100dvh!important;min-height:0!important;max-height:100dvh!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;padding:18px 16px!important;box-sizing:border-box!important}
+.sidebar>.brand{flex:0 0 auto;min-height:42px;margin:0 0 16px!important;display:flex}
+.sidebar>#addSide{flex:0 0 42px;margin:0 0 12px!important}
+.sidebar-middle{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;flex:1 1 auto;scrollbar-width:thin;scrollbar-color:transparent transparent;padding-bottom:16px}
+.sidebar-middle:hover{scrollbar-color:var(--border) transparent}
+.sidebar-middle::-webkit-scrollbar,.week-scroll::-webkit-scrollbar,.settings-scroll::-webkit-scrollbar{width:6px;height:6px}
+.sidebar-middle::-webkit-scrollbar-thumb,.week-scroll::-webkit-scrollbar-thumb,.settings-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+.sidebar-bottom{flex:0 0 auto;margin:0!important;padding:12px 0 0!important;background:var(--bg-sidebar);position:relative}
+.sidebar-bottom .profile{border-top:1px solid var(--border);padding-top:12px;min-height:58px}
+#appFooter{display:none!important}
+.brand .logo{flex:0 0 30px}
+.brand-button{display:flex;align-items:center;gap:9px;border:0;background:transparent;color:var(--text);padding:0;min-width:0;max-width:100%;font-size:17px;font-weight:750;letter-spacing:-.04em;cursor:pointer;border-radius:8px}
+.brand-button:hover{background:var(--surface-hover)}
+.brand-button .logo{display:grid;place-items:center}
+.brand-button .brand-name{white-space:nowrap}
+.sidebar .brand .collapse-control{margin-left:auto!important}
+.main,.app .main{height:100dvh!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;box-sizing:border-box!important;padding:0 24px!important}
+.compact-toolbar{height:68px!important;min-height:68px!important;flex:0 0 68px!important}
+#calendarContent{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;padding:20px 0!important;box-sizing:border-box!important}
+#calendarContent[hidden]{display:none!important}
+.calendar-panel{flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+#calendarView{flex:1 1 auto;min-height:0!important;display:flex;flex-direction:column;overflow:hidden}
+.week-overflow{flex:1 1 auto;min-height:0!important;display:flex;flex-direction:column;overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior:contain}
+.week-board{flex:1 1 auto;min-height:0;display:flex!important;flex-direction:column!important}
+.week-days-head,.week-all-day{flex:0 0 auto}
+.week-scroll{flex:1 1 auto!important;height:auto!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.week-hour-label:not(.half-hour){font-weight:600!important}
+.week-gutter-zone{display:flex;align-items:center;justify-content:center;font-size:10px!important;color:var(--text-2)!important;letter-spacing:0!important}
+.week-hours{min-width:68px}
+.week-time-board{flex:0 0 auto}
+.week-now-line{z-index:6}
+.weekdays{flex:0 0 36px!important;display:grid!important}
+.monthgrid{flex:1 1 auto!important;min-height:0!important;height:auto!important;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;grid-template-rows:repeat(var(--month-rows,6),minmax(0,1fr))!important;overflow:hidden!important}
+.daycell{height:auto!important;min-height:0!important;overflow:hidden!important}
+.daycell.outside{background:color-mix(in srgb,var(--surface-hover) 45%,var(--bg))!important}
+.cell-add{opacity:.35!important}
+.daycell:hover .cell-add,.cell-add:focus-visible{opacity:1!important}
+.agenda{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 8px 18px}
+.agendaday{position:sticky;top:0;z-index:3;background:var(--bg);border-bottom:1px solid var(--border)}
+.agenda-more{display:block;margin:16px auto;min-height:38px}
+.selected-day-section,#selectedDayAgenda,.below-calendar,.calendar-bottom,.upcomingcard,.todaycard{display:none!important}
+.mini-dots{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:3px;height:4px}
+.mini-dots .mini-event-dot{position:static!important;flex:0 0 4px}
+.sidebar-collapsed .sidebar{padding:12px 9px!important}
+.sidebar-collapsed .sidebar>.brand{display:flex!important;flex-direction:column!important;gap:7px!important;min-height:76px!important;margin:0 0 10px!important}
+.sidebar-collapsed .brand-button{width:48px;height:36px;display:grid;place-items:center}
+.sidebar-collapsed .brand-button .brand-name{display:none!important}
+.sidebar-collapsed .sidebar .collapse-control{margin:0!important;width:48px!important;height:28px!important}
+.sidebar-collapsed #addSide{width:48px!important;min-width:48px!important;max-width:48px!important;margin:0 0 12px!important;font-size:0!important}
+.sidebar-collapsed #addSide span{display:none!important}
+.sidebar-collapsed #addSide svg{display:block!important}
+.sidebar-collapsed .sidebar-middle{display:flex!important;flex-direction:column;align-items:center;gap:4px;padding:4px 0}
+.sidebar-collapsed .sidebar-middle>.mini-calendar,.sidebar-collapsed .sidebar-middle>.navlabel,.sidebar-collapsed .sidebar-middle>.calendar-list-head,.sidebar-collapsed .sidebar-middle>#calendars,.sidebar-collapsed .sidebar-middle>#newCalendar{display:none!important}
+.sidebar-collapsed .sidebar-middle>.nav{display:flex!important;align-items:center!important;justify-content:center!important;width:48px!important;min-width:48px!important;height:42px!important;padding:0!important;font-size:0!important;white-space:nowrap!important;overflow:hidden}
+.sidebar-collapsed .sidebar-middle>.nav>span{display:grid!important;width:20px!important;height:20px!important;flex:0 0 20px!important}
+.sidebar-collapsed .sidebar-middle>.nav>span svg{display:block}
+.sidebar-collapsed .sidebar-middle>.nav.legacy-view{display:none!important}
+.sidebar-collapsed .sidebar-bottom{padding:10px 0 0!important}
+.sidebar-collapsed .sidebar-bottom>.profile{display:flex!important;justify-content:center!important;padding:10px 0 0!important;min-height:52px!important}
+.sidebar-collapsed .sidebar-bottom .profile .avatar{width:36px;height:36px;display:grid!important;place-items:center}
+.sidebar-collapsed .sidebar-bottom .profile>div:not(.avatar),.sidebar-collapsed .sidebar-bottom .profile>#profileMenuBtn{display:none!important}
+.sidebar-collapsed .sidebar-bottom .profile .avatar{cursor:pointer}
+.rail-calendar-dots{display:none}
+.sidebar-collapsed .rail-calendar-dots{display:flex;flex-direction:column;align-items:center;gap:9px;padding:12px 0;border-top:1px solid var(--border);width:100%;margin-top:9px}
+.rail-calendar-dot{width:28px;height:28px;display:grid;place-items:center;border:1px solid transparent;background:transparent;border-radius:8px}
+.rail-calendar-dot>span{height:9px;width:9px;border-radius:50%;background:var(--text-2)}
+.rail-calendar-dot[aria-pressed=false]>span{background:transparent;border:1px solid var(--text-2);opacity:.5}
+.rail-calendar-dot:hover{background:var(--surface-hover)}
+.sidebar-collapsed #collapsedCalendars{display:none!important}
+#profileMenu{position:absolute!important;bottom:calc(100% + 8px)!important;top:auto!important;left:0!important;width:240px;z-index:60}
+#profileMenu .account-legal-link{display:none!important}
+#profileSettings{display:block!important}
+.account-menu-head{display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.account-menu-head>span{width:30px;height:30px;border-radius:50%;background:var(--surface-hover);display:grid;place-items:center}
+.account-menu-head strong{font-size:12px}
+.account-menu-head small{font-size:10px;display:block;color:var(--text-2)}
+/* Takeovers replace the entire shell, including sidebar */
+#settingsPage,#tasksPage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-height:100dvh!important;z-index:90!important;background:var(--bg)!important;overflow:hidden!important;padding:0!important;display:flex!important;flex-direction:column!important}
+#settingsPage[hidden],#tasksPage[hidden]{display:none!important}
+.view-page-top{height:64px;min-height:64px;flex:0 0 64px!important;padding:0 28px!important;border-bottom:1px solid var(--border)!important}
+.view-page-top>.outline{height:36px}
+#settingsPage .settings-intro{max-width:1080px;width:calc(100% - 48px);margin:0 auto!important;padding:22px 0 12px!important;flex:0 0 auto}
+#settingsPage .settings-intro h1{font-size:23px!important}
+#settingsPage .settings-intro .subtitle{display:none}
+#settingsPage .settings-layout{flex:1 1 auto;min-height:0!important;max-width:1080px!important;width:calc(100% - 48px)!important;margin:0 auto!important;display:grid!important;grid-template-columns:200px minmax(0,1fr)!important;gap:32px!important;padding:0 0 20px!important;align-items:stretch!important}
+.settings-sections{height:fit-content;max-height:100%!important;position:sticky!important;top:0!important}
+.settings-stack{overflow-y:auto!important;overflow-x:hidden!important;min-height:0!important;max-width:none!important;padding-right:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;overscroll-behavior:contain}
+#settingsPage.integrations-only .settings-layout{display:grid!important}
+#settingsPage.integrations-only .settings-sections{display:flex!important;flex-direction:column!important}
+#settingsPage.integrations-only .settings-stack>section:not(#settingsIntegrations){display:block!important}
+#settingsPage.integrations-only .settings-intro h1{font-size:23px!important}
+#settingsPage.integrations-only .settings-intro h1::after{display:none}
+#tasksPage .tasks-titlebar,#tasksPage .tasks-board{max-width:860px;width:calc(100% - 48px);margin-inline:auto!important}
+#tasksPage .tasks-titlebar{flex:0 0 auto}
+#tasksPage .tasks-board{flex:1 1 auto;min-height:0;overflow:hidden!important;display:flex;flex-direction:column}
+#tasksList{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.empty-tasks{display:flex;align-items:center;flex-direction:column;gap:14px;margin:20px;padding:30px;border:1px solid var(--border);border-radius:12px;height:auto!important;min-height:unset!important}
+.empty-tasks button{min-height:38px}
+.provider-card{min-height:unset!important;height:auto!important}
+.integration-grid .provider-card:last-child:nth-child(odd){grid-column:span 2}
+.integration-note{padding:16px!important;gap:10px}
+.integration-note svg{margin:0!important;flex:0 0 16px!important;max-width:16px!important;overflow:visible!important}
+#accentNative{opacity:0!important;position:absolute;width:36px!important;height:36px!important;pointer-events:none!important}
+.custom-accent-row{position:relative}
+.custom-accent-trigger{width:36px;height:36px;background:var(--accent);border:1px solid var(--border);border-radius:8px}
+.custom-accent-trigger:focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px}
+#taskDue{position:absolute!important;opacity:0!important;width:1px!important;height:1px!important;pointer-events:none!important}
+.task-due-button{height:40px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:0 12px;min-width:160px;text-align:left}
+.task-date-panel{position:fixed;z-index:300;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);width:300px;max-width:calc(100vw - 24px)}
+.task-date-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.task-date-grid button{width:36px;height:32px;border-radius:8px;background:transparent;border:0;color:var(--text);font-size:12px}
+.task-date-grid button:hover,.task-date-grid button.active{background:var(--surface-hover)}
+.task-date-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.task-date-header button{border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);padding:5px 9px}
+#taskDiscardPrompt{padding:12px;margin:8px 0;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:12px}
+#taskDiscardPrompt button{margin:8px 8px 0 0;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text)}
+#eventDialog .wizard-step{min-height:0!important}
+#eventDialog .wizard-steps{min-height:0!important}
+#eventDialog .wizard-step{padding-bottom:8px}
+#eventDialog .wizard-step .wizard-location{min-height:0}
+#eventDialog .wizard-step .wizard-question{margin:0 0 12px}
+#eventDialog .wizard-footer{margin-top:8px!important}
+#eventDialog .wizard-step .select-button{width:100%!important}
+#eventDialog .wizard-step label.field-label{min-width:0}
+#eventDialog .wizard-step .select-button{display:flex!important}
+#eventDialog .picker-overlay{position:fixed;z-index:500}
+#eventDialog .picker-panel{max-height:min(350px,55dvh)!important}
+#wizardSkip[hidden]{display:none!important}
+.search-results{z-index:90}
+.search-caption{font-size:10px;color:var(--text-2);letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border)}
+.event-popover[open],#detailDialog[open]{animation:detail-slide-in .16s ease both}
+@keyframes detail-slide-in{from{transform:translateX(8px);opacity:0}to{transform:translateX(0);opacity:1}}
+#calendarAddOptions{width:228px!important;max-width:228px;left:0!important;right:auto!important;top:calc(100% + 8px)!important;z-index:55;animation:popover-rise .12s ease}
+#calendarAddOptions button{white-space:nowrap!important}
+#profileMenu:not([hidden]),.select-menu,.search-results:not([hidden]){animation:popover-rise .12s ease}
+@keyframes popover-rise{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+:root{--text-2:#B8B8B8;--text-3:#A0A0A0}
+:root[data-theme=light]{--text-2:#555555;--text-3:#666666}
+@media(max-width:1100px) and (min-width:721px){.app:not(.sidebar-manual-expand){grid-template-columns:68px minmax(0,1fr)!important}.app:not(.sidebar-manual-expand) .sidebar{width:68px}}
+@media(max-width:1100px){.main,.app .main{padding-inline:20px!important}#settingsPage .settings-layout{grid-template-columns:minmax(0,1fr)!important;gap:10px!important}.settings-sections{position:sticky!important;top:0;display:flex!important;flex-direction:row!important;gap:5px;white-space:nowrap;overflow-x:auto;min-height:52px;max-width:100%}.settings-stack{padding-right:0}}
+@media(max-width:720px){.app,.app.sidebar-collapsed{display:block!important;height:100dvh}.main,.app .main{height:100dvh;padding:0 10px!important}.sidebar,.sidebar.glass,.sidebar-collapsed .sidebar{position:fixed!important;width:min(282px,85vw)!important;max-width:282px!important;z-index:120;transform:translateX(-105%);transition:transform .2s ease!important}.sidebar.mobile-open,.sidebar-collapsed .sidebar.mobile-open{transform:translateX(0)!important}.sidebar-collapsed .sidebar .brand{flex-direction:row!important}.sidebar-collapsed .sidebar-middle>.mini-calendar,.sidebar-collapsed .sidebar-middle>.navlabel,.sidebar-collapsed .sidebar-middle>.calendar-list-head,.sidebar-collapsed .sidebar-middle>#calendars{display:block!important}.sidebar-collapsed .sidebar-middle>.nav{justify-content:flex-start!important;font-size:13px!important;width:100%!important}.sidebar-collapsed .sidebar-bottom .profile>div:not(.avatar),.sidebar-collapsed .sidebar-bottom .profile>#profileMenuBtn{display:block!important}.sidebar-collapsed .rail-calendar-dots{display:none!important}.week-board{min-width:540px!important}.week-board.day-board{min-width:100%!important}.week-board{--week-gutter:44px}.week-hours{min-width:44px}.week-hour-label{font-size:10px!important;right:5px!important}.compact-toolbar{flex:0 0 auto!important;min-height:96px!important}#calendarContent{padding:12px 0!important}#settingsPage .settings-layout{width:calc(100% - 28px)!important}#settingsPage .settings-intro{width:calc(100% - 28px)}#tasksPage .tasks-titlebar,#tasksPage .tasks-board{width:calc(100% - 28px)}.integration-grid{grid-template-columns:1fr!important}.integration-grid .provider-card:last-child:nth-child(odd){grid-column:span 1}#eventDialog{width:100vw!important;height:100dvh!important;max-height:100dvh!important;max-width:100vw!important;margin:0!important;border-radius:0!important;inset:0!important;box-sizing:border-box!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
