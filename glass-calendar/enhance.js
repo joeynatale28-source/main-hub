@@ -71,7 +71,7 @@ function renderPicker(){
  }else{
   panel.innerHTML='<label class="picker-type-label">Enter time<input id="pickerTimeInput" type="text" inputmode="text" value="'+formatTime(fields[part+'Time'])+'" placeholder="e.g. 9:15 AM"></label><div class="time-option-list">'+Array.from({length:96},(_,i)=>{const h=Math.floor(i/4),m=(i%4)*15,v=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');return '<button type="button" class="time-option'+(v===fields[part+'Time']?' selected':'')+'" data-picker-time="'+v+'">'+formatTime(v)+'</button>'}).join('')+'</div>';
   const input=$('pickerTimeInput');const apply=v=>{fields[part+'Time']=v;if(part==='start')adjustEnd();syncEventFields();closePicker()};
-  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=parseTime(input.value);if(v)apply(v);else input.setCustomValidity('Enter a valid time')}});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=parseTime(input.value);if(v)apply(v);else input.setCustomValidity('Enter a valid time');input.reportValidity()}});
   panel.querySelectorAll('[data-picker-time]').forEach(b=>b.onclick=()=>apply(b.dataset.pickerTime));
   setTimeout(()=>panel.querySelector('.time-option.selected')?.scrollIntoView({block:'center'}),0);
  }
@@ -85,7 +85,9 @@ $('eventAllDay').addEventListener('change',syncEventFields);
 $('eventName').addEventListener('input',()=>{const enabled=$('eventName').value.trim().length>0;$('eventSave').disabled=!enabled;$('eventSave').title=enabled?'Save event':'Add a name first'});
 function prepareEvent(e,day,time){
  const startDate=e?.date||day||todayISO(),startTime=e?.time||time||'09:00',mins=Math.max(15,Number(e?.duration)||60);
- Object.assign(fields,{startDate,startTime,endDate:e?.endDate||stepTime(startDate,startTime,mins).date,endTime:e?.endTime||stepTime(startDate,startTime,mins).time});
+ const inferred=stepTime(startDate,startTime,mins);let endDate=e?.endDate||inferred.date,endTime=e?.endTime||inferred.time;
+ if(Date.parse(endDate+'T'+endTime+':00')<=Date.parse(startDate+'T'+startTime+':00')){endDate=inferred.date;endTime=inferred.time}
+ Object.assign(fields,{startDate,startTime,endDate,endTime});
  $('eventLocation').value=e?.location||'';$('eventRepeat').value=e?.repeat||'never';$('eventReminder').value=e?.reminder||'none';
  $('eventSave').disabled=!$('eventName').value.trim();$('eventSave').title=$('eventSave').disabled?'Add a name first':'Save event';
  syncEventFields();document.querySelectorAll('select').forEach(updateSelect);
