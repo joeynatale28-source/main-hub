@@ -18,6 +18,43 @@ test.beforeEach(async ({ page }) => {
     localStorage.removeItem('daylight-sidebar-collapsed');
     localStorage.setItem('daylight-default-view', 'month');
   });
+  const owner='11111111-1111-4111-8111-111111111111';
+  const calendarIds=[
+    '11111111-2222-4111-8111-111111111111',
+    '11111111-2222-4111-8111-222222222222',
+    '11111111-2222-4111-8111-333333333333',
+    '11111111-2222-4111-8111-444444444444'
+  ];
+  const database={
+    profiles:[{id:owner,username:'qa_tester',display_name:'QA Tester',first_name:'QA',last_name:'Tester'}],
+    calendars:['personal','work','life','us-holidays'].map((id,i)=>({id:calendarIds[i],user_id:owner,client_id:id,name:['Personal','Work','Life & plans','US Holidays'][i],color:['#FAFAFA','#B3B3B3','#8A8A8A','#636363'][i],sort_order:i,is_visible:true})),
+    events:[],tasks:[],subscriptions:[],
+    user_settings:[{user_id:owner,theme:'dark',accent:'graphite',default_view:'month',start_of_week:'sunday',mcp_allow_delete:false,reduce_motion:false,extra:{}}],
+    mcp_tokens:[]
+  };
+  await page.route('https://qrqemjgpzoqhtmsowmqv.supabase.co/**',async route=>{
+    const req=route.request(),url=new URL(req.url()),table=url.pathname.split('/rest/v1/')[1]?.split('/')[0],method=req.method();
+    if(url.pathname.includes('/auth/v1/user'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({id:owner,email:'qa_tester@daylight.app',user_metadata:{username:'qa_tester'}})});
+    if(!table||!(table in database))return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+    if(method==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(database[table])});
+    const body=req.postDataJSON?.()||{};
+    if(method==='POST'){
+      const input=Array.isArray(body)?body:[body],result=[];
+      for(const row of input){const old=database[table].find(x=>(row.client_id&&x.client_id===row.client_id)||(row.id&&x.id===row.id));
+        if(old){Object.assign(old,row);result.push({...old})}else{const item={id:crypto.randomUUID(),...row,updated_at:new Date().toISOString()};database[table].push(item);result.push(item)}
+      }
+      return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify(result)});
+    }
+    if(method==='PATCH'){const updated=database[table].map(row=>{Object.assign(row,body);return row});return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(updated)})}
+    if(method==='DELETE')return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+    return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  });
+  await page.addInitScript((id)=>{
+    localStorage.setItem('sb-qrqemjgpzoqhtmsowmqv-auth-token',JSON.stringify({
+      access_token:'mock-access-token',token_type:'bearer',refresh_token:'mock-refresh-token',expires_in:3600,expires_at:4102444800,
+      user:{id,email:'qa_tester@daylight.app',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{username:'qa_tester'}}
+    }));
+  },owner);
   await page.goto('/');
   await expect(page.locator('#calendarView .daycell').first()).toBeVisible();
   await expect(page.locator('#splash')).toBeHidden();
@@ -370,7 +407,7 @@ test('event modal custom selects work inside dialog and save metadata',async({pa
   await expect(page.locator('#eventReminder')).toHaveValue('15m');
   await page.locator('#eventSave').click();
   await expect(page.locator('#eventDialog')).toBeHidden({timeout:5000});
-  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('daylight-events-v1')||'[]').find(e=>e.title==='Weekly swim'));
+  const saved=await page.evaluate(()=>JSON.parse(window.DaylightStore?.getItem('daylight-events-v1')||'[]').find(e=>e.title==='Weekly swim'));
   expect(saved).toMatchObject({repeat:'weekly',reminder:'15m',location:'Community pool'});
 });
 

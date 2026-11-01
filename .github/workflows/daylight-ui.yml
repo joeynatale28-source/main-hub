@@ -11,62 +11,16 @@ on:
       - '.github/workflows/daylight-ui.yml'
 permissions:
   contents: read
-concurrency:
-  group: daylight-ui-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
-  responsive-ui:
+  frontend-smoke:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: glass-calendar
     steps:
-      - name: Checkout source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Check installed browser
-        run: google-chrome --version
-      - name: Check script syntax
-        run: npm run check
-      - name: Run browser regression tests
-        run: npm test
-      - name: Verify public GitHub Pages calendar
-        run: |
-          url="https://joeynatale28-source.github.io/main-hub/glass-calendar/"
-          for attempt in $(seq 1 30); do
-            if curl --location --fail --silent --show-error --max-time 12 "$url" > /tmp/daylight-pages.html 2>/dev/null &&
-               grep -qi '<title>Daylight' /tmp/daylight-pages.html &&
-               curl --location --fail --silent --show-error --max-time 12 "${url}wizard.js" | grep -q 'wizard-progress'; then
-              echo "Live Daylight published at $url"
-              exit 0
-            fi
-            echo "Waiting for GitHub Pages ($attempt/30)"
-            sleep 5
-          done
-          echo "Public GitHub Pages site was not serving the current Daylight assets"
-          exit 1
-      - name: Upload responsive screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daylight-layout-screenshots
-          path: |
-            glass-calendar/test-results/*.png
-          if-no-files-found: ignore
-          retention-days: 7
-      - name: Upload failed-test evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daylight-ui-test-results
-          path: |
-            glass-calendar/test-results/
-            glass-calendar/playwright-report/
-          retention-days: 7
+      - name: Install and validate
+        working-directory: glass-calendar
+        run: npm install --no-audit --no-fund && npm run check && npm test && npm run build

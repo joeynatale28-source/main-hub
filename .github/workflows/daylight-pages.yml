@@ -1,0 +1,44 @@
+name: Publish Daylight v2 and main hub to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'bg.jpg'
+      - 'data.json'
+      - 'glass-calendar/**'
+      - '.github/workflows/daylight-pages.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assemble main hub and daylight static site
+        run: |
+          mkdir -p _site/glass-calendar
+          cp index.html bg.jpg data.json _site/
+          cp glass-calendar/index.html glass-calendar/main.js glass-calendar/style.css _site/glass-calendar/
+          cp glass-calendar/.nojekyll _site/
+          cp glass-calendar/privacy.html glass-calendar/terms.html _site/glass-calendar/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
