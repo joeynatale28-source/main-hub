@@ -44,6 +44,7 @@ function closePicker(){overlay.hidden=true;panel.replaceChildren();picker=null}
 function showPicker(button,kind,part){
  if(picker&&picker.button===button){closePicker();return}
  closePicker();picker={button,kind,part,display:dayDate(fields[part+'Date'])};
+ button.closest('.event-date-group')?.appendChild(overlay);
  overlay.hidden=false;renderPicker();
 }
 const stepTime=(d,t,delta)=>{const x=new Date(d+'T'+t+':00');x.setMinutes(x.getMinutes()+delta);return{date:asISO(x),time:String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0')}};
