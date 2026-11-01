@@ -180,8 +180,8 @@
     location.addEventListener('input',()=>{
       clearTimeout(timer);request?.abort();
       if(selected&&location.value!==selected.label){selected=null;note()}
-      const q=location.value.trim();previous=q;active=-1;
-      if(q.length<3){hide();return}
+      const q=location.value.trim();previous=q;active=-1;results=[];hide();
+      if(q.length<3){return}
       timer=setTimeout(()=>fetchPlaces(q),300);
     });
     location.addEventListener('focus',()=>{const q=location.value.trim();if(q.length>=3&&cache.has(q.toLowerCase())){results=cache.get(q.toLowerCase());active=-1;draw()}});
