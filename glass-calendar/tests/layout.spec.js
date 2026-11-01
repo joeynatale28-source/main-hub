@@ -170,13 +170,19 @@ test('US holidays appear as all-day events in week view', async ({ page }) => {
   await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
 });
 
-test('fresh installs open the new weekly schedule while saved preferences win', async ({ page }) => {
-  await page.evaluate(() => localStorage.removeItem('daylight-default-view'));
-  await page.reload();
-  await expect(page.locator('.week-board')).toBeVisible();
-  await expect(page.locator('#viewSelect')).toHaveValue('week');
-  await page.locator('#viewSelect').selectOption('month');
-  await expect(page.locator('#viewSelect')).toHaveValue('month');
+test('fresh installs open the new weekly schedule while saved preferences win', async ({ browser }) => {
+  const context = await browser.newContext();
+  await context.addInitScript(() => localStorage.setItem('daylight-onboarded','yes'));
+  const fresh = await context.newPage();
+  try {
+    await fresh.goto('http://127.0.0.1:4173/');
+    await expect(fresh.locator('.week-board')).toBeVisible();
+    await expect(fresh.locator('#viewSelect')).toHaveValue('week');
+    await fresh.locator('#viewSelect').selectOption('month');
+    await expect(fresh.locator('#viewSelect')).toHaveValue('month');
+  } finally {
+    await context.close();
+  }
 });
 
 test('clicking an empty week slot pre-fills date and rounded start time', async ({ page }) => {
