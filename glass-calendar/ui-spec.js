@@ -133,6 +133,7 @@
     }
     if(current==='settings')syncSelects();
   };
+  window.DaylightBeforeViewChange=(oldSection,newSection)=>{if(oldSection===newSection)return;const from=views[oldSection];if(!from||from.hidden)return;const copy=from.cloneNode(true),rect=from.getBoundingClientRect(),mainRect=main.getBoundingClientRect();copy.id='';copy.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));copy.className='view-ghost';copy.setAttribute('aria-hidden','true');copy.inert=true;copy.style.top=(rect.top-mainRect.top)+'px';copy.style.left=(rect.left-mainRect.left)+'px';copy.style.width=rect.width+'px';copy.style.height=rect.height+'px';main.append(copy);setTimeout(()=>copy.remove(),150)};
   window.DaylightViewChange=updateActive;
   updateActive();
   new MutationObserver(updateActive).observe(main,{subtree:true,attributes:true,attributeFilter:['hidden']});
@@ -184,7 +185,7 @@
     location.addEventListener('focus',()=>{const q=location.value.trim();if(q.length>=3&&cache.has(q.toLowerCase())){results=cache.get(q.toLowerCase());active=-1;draw()}});
     location.addEventListener('keydown',e=>{
       if(resultList.hidden)return;
-      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+Math.max(1,results.length))%Math.max(1,results.length);highlight()}
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=active<0?(e.key==='ArrowDown'?0:Math.max(0,results.length-1)):(active+(e.key==='ArrowDown'?1:-1)+Math.max(1,results.length))%Math.max(1,results.length);highlight()}
       else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(results.length)choose(active<0?0:active);else hide()}
       else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();hide()}
       else if(e.key==='Tab')hide();
@@ -198,10 +199,11 @@
   }
 
   // Restore focus after native modal dialogs; native showModal traps focus.
+  let lastModalTrigger=null;document.addEventListener('pointerdown',e=>{const control=e.target.closest('button,[role=button],input');if(control)lastModalTrigger=control},true);
   for(const dialog of document.querySelectorAll('dialog')){
     let opener=null;
     new MutationObserver(()=>{
-      if(dialog.open){opener=document.activeElement;dialog.classList.remove('dialog-enter');void dialog.offsetWidth;dialog.classList.add('dialog-enter')}
+      if(dialog.open){opener=lastModalTrigger||document.activeElement;dialog.classList.remove('dialog-enter');void dialog.offsetWidth;dialog.classList.add('dialog-enter')}
       else if(opener?.isConnected&&typeof opener.focus==='function'){opener.focus({preventScroll:true});opener=null}
     }).observe(dialog,{attributes:true,attributeFilter:['open']});
   }
