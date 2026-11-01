@@ -11,7 +11,7 @@ const sizes = [
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('daylight-onboarded', 'yes');
-    localStorage.setItem('daylight-theme', 'dark');
+    if(!localStorage.getItem('daylight-theme'))localStorage.setItem('daylight-theme', 'dark');
     localStorage.removeItem('daylight-sidebar-collapsed');
     localStorage.setItem('daylight-default-view', 'month');
   });
@@ -117,7 +117,7 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('#selectedDayAgenda')).toBeVisible();
   const firstDate = await page.locator('#calendarView .daycell').nth(8).getAttribute('data-day');
-  await page.locator('#calendarView .daycell').nth(8).click({ position: { x: 25, y: 14 } });
+  await page.locator('#calendarView .daycell').nth(8).click({ position: { x: 8, y: 45 } });
   const title = await page.locator('#selectedDayTitle').textContent();
   expect(title).toBeTruthy();
   await page.locator('#selectedDayAdd').click();
@@ -301,7 +301,7 @@ test('monochrome colors, calendar shade, native controls and all-day switch',asy
   await page.locator('#eventAllDay').uncheck();
   await expect(page.locator('#startTimePicker')).toBeVisible();
   await expect(page.locator('#eventRepeat')).toHaveCSS('opacity','0');
-  await page.locator('#eventDialog [data-close]').click();
+  await page.locator('#eventDialog [data-close]').first().click();
 });
 test('search across dates resets completely on Escape and clear button',async({page})=>{
   await page.locator('#addSide').click();
