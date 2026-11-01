@@ -235,3 +235,8 @@ dialog::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(5px)}
 .detail-extra{padding:0 16px}
 .detail-extra .event-meta-row{padding:10px 3px}
 #eventSave:not(:disabled):hover{filter:none}
+
+.calendar-empty-state:has(button){pointer-events:auto!important}
+.clear-inline-search{pointer-events:auto!important}
+.profile-menu-title{display:flex;flex-direction:column;gap:3px}
+.profile-menu-title::after{content:"Personal workspace · Local-first";font-size:10px;font-weight:400;color:var(--text-2)}
