@@ -126,7 +126,7 @@ function afterRender(shown){
 function themeChanged(mode,actual){
  const b=$('quickThemeButton');b.innerHTML=icons[mode==='dark'?'moon':mode==='light'?'sun':'system'];b.title='Theme: '+({dark:'Midnight',light:'Daylight',system:'System'}[mode]||'Midnight');b.setAttribute('aria-label','Theme: '+mode+'. Switch theme');
  document.documentElement.dataset.themeReady='1';
- if(document.body.dataset.loaded==='1'){document.documentElement.classList.add('theme-transition');clearTimeout(themeChanged.timeout);themeChanged.timeout=setTimeout(()=>document.documentElement.classList.remove('theme-transition'),225)}
+ if(document.body.dataset.loaded==='1'){document.documentElement.classList.add('theme-transition');clearTimeout(themeChanged.timeout);themeChanged.timeout=setTimeout(()=>document.documentElement.classList.remove('theme-transition'),270)}
 }
 $('quickThemeButton').onclick=()=>{const modes=['dark','light','system'],next=modes[(modes.indexOf(savedTheme())+1)%modes.length];$('pageThemeSelect').value=next;$('pageThemeSelect').dispatchEvent(new Event('change',{bubbles:true}))};
 themeChanged(savedTheme(),document.documentElement.dataset.theme);
