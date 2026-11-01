@@ -109,3 +109,15 @@ test('tasks and mini-calendar navigation work', async ({ page }) => {
   await page.locator('#taskForm button[type="submit"]').click();
   await expect(page.locator('#tasksList')).toContainText('Polish review');
 });
+
+test('mobile month dates reveal their events and add-event shortcut', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('#selectedDayAgenda')).toBeVisible();
+  const firstDate = await page.locator('#calendarView .daycell').nth(8).getAttribute('data-day');
+  await page.locator('#calendarView .daycell').nth(8).click({ position: { x: 25, y: 14 } });
+  const title = await page.locator('#selectedDayTitle').textContent();
+  expect(title).toBeTruthy();
+  await page.locator('#selectedDayAdd').click();
+  await expect(page.locator('#eventDialog')).toBeVisible();
+  await expect(page.locator('#eventDate')).toHaveValue(firstDate);
+});
