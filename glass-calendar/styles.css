@@ -64,3 +64,5 @@ body.mobile-nav-open{overflow:hidden}
  .day-event-copy{flex:1;min-width:0}.day-event-copy strong{display:block;font-size:12px;line-height:1.35;overflow-wrap:anywhere}.day-event-copy small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
  .day-event-chevron{color:var(--muted);font-size:20px}.selected-day-empty{color:var(--muted);font-size:12px;padding:6px 0;margin:0}
 }
+
+@media(max-width:620px){.daycell.selected:not(.today) .daynum{background:var(--panel-hover);outline:1px solid var(--strong-line)}.daycell.selected.today .daynum{outline:2px solid var(--text);outline-offset:2px}}
