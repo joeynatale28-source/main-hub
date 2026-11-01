@@ -35,7 +35,7 @@ test('subscription fetches ICS TEXT, keeps chosen name, expands and refreshes wi
  expect(entries.some(e=>e.title==='December Meet'&&e.date==='2026-12-08')).toBeTruthy();
  expect(entries.find(e=>e.title==='Swim Practice').location).toBe('Community Pool');
  expect(entries.filter(e=>e.title==='Skip One').map(e=>e.date).sort()).toEqual(['2026-11-01','2026-11-03']);
- await page.locator('.subscription-row [data-refresh]').click();
+ await page.locator('#integrationsSubscriptions .subscription-row [data-refresh]').click();
  await expect.poll(()=>requests).toBe(2);
  expect(await read()).toEqual(entries);
  await page.locator('.nav[data-view="month"]').click();
@@ -48,7 +48,7 @@ test('subscription fetches ICS TEXT, keeps chosen name, expands and refreshes wi
  await page.locator('#agendaMore').click();
  await expect(page.locator('.agenda')).toContainText('December Meet');
  await page.locator('#integrationsNav').click();
- await page.locator('.subscription-row [data-remove]').click();
+ await page.locator('#integrationsSubscriptions .subscription-row [data-remove]').click();
  expect(await read()).toHaveLength(0);
 });
 test('feed name used if Name blank; HTML is a human-readable error, never JSON',async({page})=>{
