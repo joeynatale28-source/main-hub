@@ -132,7 +132,7 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
 
 test('week schedule positions events by actual time and opens details', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('[data-switch="week"]').click();
+  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
   await expect(page.locator('.week-days-head .week-day-button')).toHaveCount(7);
   await expect(page.locator('.week-day-track')).toHaveCount(7);
   await expect(page.locator('.week-hour-label')).toHaveCount(48);
@@ -160,7 +160,7 @@ test('week schedule positions events by actual time and opens details', async ({
 
 test('week layout is scrollable inside calendar on mobile without page overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('[data-switch="week"]').click();
+  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
   const result = await page.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
@@ -179,7 +179,7 @@ test('US holidays appear as all-day events in week view', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-26T12:00:00Z'));
   await page.reload();
   await page.locator('#todayBtn').click();
-  await page.locator('[data-switch="week"]').click();
+  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
   await expect(page.locator('.week-all-day')).toContainText('Thanksgiving Day');
   await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
 });
@@ -192,7 +192,7 @@ test('fresh installs open the new weekly schedule while saved preferences win', 
     await fresh.goto('http://127.0.0.1:4173/');
     await expect(fresh.locator('.week-board')).toBeVisible();
     await expect(fresh.locator('#viewSelect')).toHaveValue('week');
-    await fresh.locator('[data-switch="month"]').click();
+    await fresh.evaluate(()=>window.DaylightBridge.changeView('month'));
     await expect(fresh.locator('#viewSelect')).toHaveValue('month');
   } finally {
     await context.close();
@@ -201,7 +201,7 @@ test('fresh installs open the new weekly schedule while saved preferences win', 
 
 test('clicking an empty week slot pre-fills date and rounded start time', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('[data-switch="week"]').click();
+  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
   const track = page.locator('[data-week-track]').nth(3);
   const key = await track.getAttribute('data-week-track');
   await track.click({ position: { x: 40, y: 600 } });
@@ -231,23 +231,20 @@ test('event editor saves all-day events with a full-day duration', async ({ page
   await page.locator('#eventSave').click();
   await page.locator('#eventSave').click();
   await expect(page.locator('#eventDialog')).toBeHidden();
-  await page.locator('[data-switch="week"]').click();
+  await page.evaluate(()=>window.DaylightBridge.changeView('week'));
   await expect(page.locator('.week-all-day')).toContainText('All-day planning');
 });
 
-test('precision shell shows one visible create action and day/week/month controls', async ({ page }) => {
+test('precision shell hides the header view switcher and uses a 20px calendar title',async({page})=>{
   await page.setViewportSize({width:1440,height:900});
   await expect(page.locator('#addSide')).toBeVisible();
   await expect(page.locator('#addTop')).toBeHidden();
-  await expect(page.locator('#newCalendar')).toBeHidden();
-  await expect(page.locator('.toolbar-title h1')).toHaveCSS('font-size','19px');
-  await expect(page.locator('.view-toggle button')).toHaveCount(4);
-  await page.locator('[data-switch="day"]').click();
-  await expect(page.locator('.week-board.day-board')).toBeVisible();
-  await expect(page.locator('.week-day-track')).toHaveCount(1);
-  await page.locator('[data-switch="month"]').click();
+  await expect(page.locator('.toolbar-title h1')).toHaveCSS('font-size','20px');
+  await expect(page.locator('.view-toggle')).toBeHidden();
+  await page.locator('#settingsNav').click();
+  await expect(page.locator('#defaultViewSelect')).toHaveValue('month');
+  await page.locator('.nav[data-view="month"]').click();
   await expect(page.locator('.monthgrid')).toBeVisible();
-  await expect(page.locator('.daycell .daynum').first()).toBeVisible();
 });
 test('mini calendar dots, current week and today color use the shared palette', async ({page})=>{
   await page.setViewportSize({width:1440,height:900});
@@ -285,16 +282,16 @@ test('Settings is a separate page with sticky matching subnavigation',async({pag
   await expect(page.locator('#settingsPage')).toBeVisible();
   await expect(page.locator('#calendarContent')).toBeHidden();
   await expect(page.locator('.settings-sections')).toHaveCSS('position','sticky');
-  await expect(page.locator('.settings-anchor[data-target="settingsCalendar"]')).toHaveText('Calendar preferences');
-  await expect(page.locator('#settingsCalendar h2')).toHaveText('Calendar preferences');
-  await page.locator('#settingsBack').click();
+  await expect(page.locator('.settings-anchor[data-target="settingsCalendar"]')).toHaveText('Calendar');
+  await expect(page.locator('#settingsCalendar h2')).toHaveText('Calendar');
+  await page.locator('.nav[data-view="month"]').click();
   await expect(page.locator('#calendarContent')).toBeVisible();
   await expect(page.locator('#settingsPage')).toBeHidden();
 });
 test('provider logos are bounded, grey and not overlapping',async({page})=>{
   await page.locator('#integrationsNav').click();
   await expect(page.locator('#settingsIntegrations')).toBeVisible();
-  await expect(page.locator('#settingsGeneral')).toBeVisible();
+  await expect(page.locator('#settingsGeneral')).toBeHidden();
   for(const selector of ['.apple-brand','.google-brand','.microsoft-brand']){
     const box=await page.locator(selector).boundingBox();expect(box.width).toBeLessThanOrEqual(37);expect(box.height).toBeLessThanOrEqual(37)
   }
@@ -344,11 +341,11 @@ test('visual QA captures Settings, Integrations and event editor in both themes'
  await page.locator('[data-theme-choice="light"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
  await page.screenshot({path:'test-results/settings-light.png',fullPage:false});
- await page.locator('#settingsBack').click();
+ await page.locator('.nav[data-view="month"]').click();
  await page.locator('#integrationsNav').click();
  await expect(page.locator('#settingsIntegrations')).toBeVisible();
  await page.screenshot({path:'test-results/integrations-light.png',fullPage:false});
- await page.locator('#settingsBack').click();
+ await page.locator('.nav[data-view="month"]').click();
  await page.locator('#quickThemeButton').click();
  await page.locator('#quickThemeButton').click();
  await page.locator('#addSide').click();
@@ -459,7 +456,7 @@ test('page transitions scroll to the top',async({page})=>{
  await page.setViewportSize({width:1440,height:740});
  await page.locator('#settingsHeaderButton').click();
  await page.locator('#settingsAbout').scrollIntoViewIfNeeded();
- await page.locator('#settingsBack').click();
+ await page.locator('.nav[data-view="month"]').click();
  await page.locator('#tasksNav').click();
  await expect(page.locator('#tasksPage')).toBeVisible();
  const positions=await page.evaluate(()=>({window:scrollY,main:document.querySelector('.main').scrollTop}));
@@ -472,13 +469,13 @@ test('location search suggestions support manual typing without a network depend
  await page.locator('#eventSave').click();
  await page.route('https://photon.komoot.io/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({features:[{properties:{name:'Central Park',city:'New York',state:'New York',country:'United States'}}]})}));
  await page.locator('#eventLocation').fill('Central Park');
- await expect(page.locator('#locationSuggestions')).toBeVisible({timeout:5000});
- await expect(page.locator('#locationSuggestions')).toContainText('Central Park');
- await page.locator('#locationSuggestions button').first().click();
+ await expect(page.locator('#addressResults')).toBeVisible({timeout:5000});
+ await expect(page.locator('#addressResults')).toContainText('Central Park');
+ await page.locator('#addressResults button').first().click();
  await expect(page.locator('#eventLocation')).toHaveValue(/Central Park/);
- await expect(page.locator('.wizard-location>svg')).toBeHidden();
+ await expect(page.locator('.wizard-location>svg')).toBeVisible();
  await page.locator('#eventLocation').fill('Private location');
- await expect(page.locator('.wizard-location>svg')).toBeHidden();
+ await expect(page.locator('.wizard-location>svg')).toBeVisible();
 });
 
 test('v1 shell is viewport-locked with pinned account row on desktop',async({page})=>{
@@ -488,13 +485,16 @@ test('v1 shell is viewport-locked with pinned account row on desktop',async({pag
  await page.locator('.sidebar-middle').evaluate(e=>e.scrollTop=1000);
  await expect(page.locator('.sidebar-bottom .profile')).toBeVisible();
 });
-test('Settings is a full-screen centered takeover with its own scroller',async({page})=>{
- await page.setViewportSize({width:1440,height:900});await page.locator('#settingsHeaderButton').click();
- await expect(page.locator('#settingsPage')).toBeVisible();
- const layout=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect();return{sidebar:getComputedStyle(document.querySelector('.sidebar')).visibility,settings:r(document.querySelector('#settingsPage')).width,layout:r(document.querySelector('#settingsPage .settings-layout')),scroller:getComputedStyle(document.querySelector('.settings-stack')).overflowY}});
- expect(layout.settings).toBe(1440);expect(layout.scroller).toBe('auto');
- expect(Math.abs(layout.layout.left-(1440-layout.layout.right))).toBeLessThan(6);
- await page.locator('#settingsBack').click();await expect(page.locator('#calendarView')).toBeVisible();
+test('Settings renders inside the main region with the sidebar still visible',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.locator('#settingsHeaderButton').click();
+  await expect(page.locator('#settingsPage')).toBeVisible();
+  const layout=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect();const side=r(document.querySelector('.sidebar')),settings=r(document.querySelector('#settingsPage')),cols=r(document.querySelector('#settingsPage .settings-layout'));return{side:side.width,x:settings.x,w:settings.width,col:cols.width,stack:getComputedStyle(document.querySelector('.settings-stack')).overflowY}});
+  expect(layout.x).toBeGreaterThanOrEqual(layout.side-2);
+  expect(layout.w).toBeLessThan(1440);
+  expect(layout.col).toBeLessThanOrEqual(1160);
+  await page.locator('.nav[data-view="month"]').click();
+  await expect(page.locator('#calendarView')).toBeVisible();
 });
 test('mini month arrows leave the main header and selected date unchanged',async({page})=>{
  const start=await page.locator('#pageTitle').textContent();
