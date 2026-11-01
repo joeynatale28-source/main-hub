@@ -180,3 +180,6 @@ body{margin:0!important}
 .app.sidebar-collapsed .sidebar{width:68px!important;min-width:68px!important;max-width:68px!important;box-sizing:border-box!important;flex-basis:68px!important}
 #taskDue{visibility:hidden!important;pointer-events:none!important}
 @media(max-width:720px){.app.sidebar-collapsed .sidebar.mobile-open{width:min(282px,85vw)!important;min-width:0!important;max-width:282px!important}}
+
+/* Mobile month cell hit targets: the date and plus cannot occupy the same space. */
+@media(max-width:720px){.monthgrid .daycell{position:relative!important;isolation:isolate;padding:6px 4px!important}.monthgrid .daycell .daynum{margin:0!important;width:22px!important;height:22px!important;position:relative;z-index:1}.monthgrid .daycell .cell-add{display:grid!important;place-items:center!important;position:absolute!important;top:5px!important;right:3px!important;left:auto!important;width:22px!important;height:22px!important;padding:0!important;margin:0!important;z-index:20!important;opacity:.55!important;pointer-events:auto!important;touch-action:manipulation}}
