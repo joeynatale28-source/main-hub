@@ -13,7 +13,7 @@ export default defineConfig({
     channel: process.env.CI ? 'chrome' : undefined,
   },
   webServer: {
-    command: 'python3 -m http.server 4173 --bind 127.0.0.1',
+    command: 'npm run preview',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 25_000,
