@@ -480,3 +480,54 @@ test('location search suggestions support manual typing without a network depend
  await page.locator('#eventLocation').fill('Private location');
  await expect(page.locator('.wizard-location>svg')).toBeHidden();
 });
+
+test('v1 shell is viewport-locked with pinned account row on desktop',async({page})=>{
+ await page.setViewportSize({width:1440,height:800});
+ const result=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect();return{html:getComputedStyle(document.documentElement).overflow,body:getComputedStyle(document.body).overflow,app:r(document.querySelector('.app')).height,sidebar:r(document.querySelector('.sidebar')).height,footer:r(document.querySelector('.sidebar-bottom')).bottom,brand:r(document.querySelector('.brand')).top,inner:innerHeight,sidebarMiddle:getComputedStyle(document.querySelector('.sidebar-middle')).overflowY}});
+ expect(result.body).toBe('hidden');expect(result.app).toBe(800);expect(result.sidebar).toBe(800);expect(result.footer).toBeLessThanOrEqual(result.inner+1);expect(result.sidebarMiddle).toBe('auto');
+ await page.locator('.sidebar-middle').evaluate(e=>e.scrollTop=1000);
+ await expect(page.locator('.sidebar-bottom .profile')).toBeVisible();
+});
+test('Settings is a full-screen centered takeover with its own scroller',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await page.locator('#settingsHeaderButton').click();
+ await expect(page.locator('#settingsPage')).toBeVisible();
+ const layout=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect();return{sidebar:getComputedStyle(document.querySelector('.sidebar')).visibility,settings:r(document.querySelector('#settingsPage')).width,layout:r(document.querySelector('#settingsPage .settings-layout')),scroller:getComputedStyle(document.querySelector('.settings-stack')).overflowY}});
+ expect(layout.settings).toBe(1440);expect(layout.scroller).toBe('auto');
+ expect(Math.abs(layout.layout.left-(1440-layout.layout.right))).toBeLessThan(6);
+ await page.locator('#settingsBack').click();await expect(page.locator('#calendarView')).toBeVisible();
+});
+test('mini month arrows leave the main header and selected date unchanged',async({page})=>{
+ const start=await page.locator('#pageTitle').textContent();
+ await page.locator('#miniNext').click();
+ expect(await page.locator('#pageTitle').textContent()).toBe(start);
+ await expect(page.locator('#miniMonth')).not.toHaveText(start.trim());
+});
+test('all-date search leaves the rendered month grid intact',async({page})=>{
+ const before=await page.locator('.daycell').count();await page.locator('#searchButton').click();await page.locator('#searchInput').fill('totally-absent-event');
+ await expect(page.locator('.daycell')).toHaveCount(before);
+ await expect(page.locator('#searchResults')).toContainText('No results');
+ await page.locator('#searchInput').press('Escape');
+ await expect(page.locator('#searchResults')).toBeHidden();
+});
+test('collapsed rail has only icon navigation and no calendar name overflow',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await page.locator('#collapseSidebar').click();
+ await expect(page.locator('.app')).toHaveClass(/sidebar-collapsed/);
+ await expect(page.locator('.brand-name')).toBeHidden();
+ await expect(page.locator('.sidebar-middle .mini-calendar')).toBeHidden();
+ await expect(page.locator('.rail-calendar-dots button').first()).toBeVisible();
+ const box=await page.locator('.sidebar').boundingBox();expect(box.width).toBeLessThanOrEqual(70);
+});
+test('wizard step four hides Skip and keeps Back',async({page})=>{
+ await page.locator('#addSide').click();await page.locator('#eventName').fill('Test meeting');
+ await page.locator('#eventSave').click();await page.locator('#eventSave').click();await page.locator('#eventSave').click();
+ await expect(page.locator('#wizardCount')).toHaveText('STEP 4 OF 4');await expect(page.locator('#wizardSkip')).toBeHidden();
+ await expect(page.locator('#wizardBack')).toBeVisible();
+});
+test('Tasks takeover has a custom due date and filter counts',async({page})=>{
+ await page.locator('#tasksNav').click();await expect(page.locator('#tasksPage')).toBeVisible();
+ await expect(page.locator('[data-task-filter="all"]')).toContainText('·');
+ await page.locator('#newTask').click();
+ await expect(page.locator('#taskDue')).toBeHidden();
+ await page.locator('.task-due-button').click();
+ await expect(page.locator('.task-date-panel')).toBeVisible();
+});
