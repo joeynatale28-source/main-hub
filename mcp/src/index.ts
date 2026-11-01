@@ -41,11 +41,10 @@ async function deletesAllowed(uid:string){
 }
 async function auditedDelete(table:'events'|'tasks',tool:string,id:string){
  const auth=await owner();
- await deletesAllowed(auth.id);
- const {data,error}=await db.from(table).delete().eq('id',id).eq('user_id',auth.id).select('id').maybeSingle();
- if(error||!data)throw new Error('Item not found');
- const audit=await db.from('mcp_audit_log').insert({user_id:auth.id,tool,action:'delete',target_id:id});
- if(audit.error)throw new Error('Item deleted but audit log failed; review database security');
+ // Atomic SECURITY DEFINER RPC checks owner permissions, deletes one owned row,
+ // and inserts the audit row in the same Postgres transaction.
+ const {data,error}=await db.rpc('mcp_delete_owned_item',{p_user_id:auth.id,p_kind:table,p_target_id:id});
+ if(error||!data)throw new Error(error?.message||'Delete failed');
  return ok({deleted:true,id});
 }
 const server=new McpServer({name:'daylight',version:'2.0.0'});
