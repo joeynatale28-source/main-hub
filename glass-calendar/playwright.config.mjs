@@ -10,6 +10,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     ...devices['Desktop Chrome'],
+    channel: process.env.CI ? 'chrome' : undefined,
   },
   webServer: {
     command: 'python3 -m http.server 4173 --bind 127.0.0.1',
