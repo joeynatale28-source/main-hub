@@ -1,13 +1,7 @@
 /* Daylight integrations: disclosure-first provider setup; no fake OAuth. */
 (() => {
 const $=id=>document.getElementById(id);
-function openIntegrations(){
-  if($('profileMenu'))$('profileMenu').hidden=true;
-  $('profileSettings')?.click();
-  document.querySelectorAll('.settings-anchor').forEach(b=>b.classList.toggle('active',b.dataset.target==='settingsIntegrations'));
-  requestAnimationFrame(()=>$('settingsIntegrations')?.scrollIntoView({behavior:'smooth',block:'start'}));
-}
-$('integrationsNav')?.addEventListener('click',openIntegrations);
+function openIntegrations(){window.DaylightBridge?.openIntegrations?.()}
 $('integrationSubscribe')?.addEventListener('click',()=>{$('openSubscribe')?.click()});
 const details={
 google:'Google Calendar: open Google Calendar on a desktop browser → Settings → Settings for my calendars → Integrate calendar → copy the secret iCal address. Paste it into Add subscription. Keep the private link secret: anyone with it may be able to view that calendar. This is a read-only feed, not account sync.',
