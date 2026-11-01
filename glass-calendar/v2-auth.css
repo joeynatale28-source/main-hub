@@ -32,3 +32,27 @@ html:not([data-daylight-authenticated="true"]) .app{visibility:hidden!important;
 .sync-choice button small{display:block;color:var(--text-2);margin-top:5px;font-size:11px;line-height:1.5;font-weight:400}
 @media(max-width:540px){.auth-card{padding:22px;border-radius:12px}}
 @media(prefers-reduced-motion:reduce){.auth-card *{transition:none!important;animation:none!important}}
+
+.auth-card{width:min(390px,100%);animation:auth-card-enter 200ms cubic-bezier(.2,0,0,1) both}
+.auth-brand{display:flex;gap:12px;align-items:center;font-size:18px;font-weight:650;letter-spacing:-.035em}
+.auth-mark{display:grid;place-items:center;width:35px;height:35px;border-radius:10px;border:1px solid var(--border);background:var(--surface-hover);font-size:22px;line-height:1}
+.auth-form h2{font-size:17px;margin:0}
+.auth-password-field{display:flex;align-items:center;position:relative}
+.auth-password-field input{padding-right:62px!important;width:100%}
+.auth-password-field button{position:absolute;right:7px;top:5px;height:32px;border:0;border-radius:7px;background:transparent;color:var(--text-2);font-size:11px;padding:5px 9px}
+.auth-password-field button:hover{background:var(--surface-hover)}
+.auth-field small{font-size:11px;color:var(--text-2);line-height:1.5}
+.auth-requirements{list-style:none;margin:-4px 0 0;padding:0;display:grid;gap:6px}
+.auth-requirements li{font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:7px}
+.auth-requirements li::before{content:"○";font-size:12px}
+.auth-requirements li.met{color:var(--text)}
+.auth-requirements li.met::before{content:"✓"}
+#usernameAvailability.available{color:var(--text)}
+#usernameAvailability.unavailable{color:var(--text-2)}
+.auth-loading-bars{display:grid;gap:9px;padding-block:15px}
+.auth-loading-bars span{display:block;height:12px;width:100%;border-radius:6px;background:var(--surface-hover);animation:auth-breathe 2s ease-in-out infinite}
+.auth-loading-bars span:nth-child(2){width:82%;animation-delay:.3s}
+.auth-loading-bars span:nth-child(3){width:65%;animation-delay:.6s}
+@keyframes auth-breathe{50%{opacity:.55}}
+@keyframes auth-card-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.auth-card,.auth-loading-bars span{animation:none!important}}
