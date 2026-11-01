@@ -43,8 +43,7 @@ jobs:
         with:
           name: daylight-layout-screenshots
           path: |
-            glass-calendar/test-results/layout-*.png
-            glass-calendar/test-results/week-*.png
+            glass-calendar/test-results/*.png
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload failed-test evidence
