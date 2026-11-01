@@ -173,3 +173,5 @@ body{margin:0!important}
 #settingsAbout .about-body a{text-decoration:underline;text-underline-offset:3px;color:var(--text)}
 #settingsAbout .about-body a:hover{color:var(--text-2)}
 @media(max-width:720px){.settings-name-fields{grid-template-columns:1fr;width:100%}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .mini-calendar{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .navlabel{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .calendar-list-head{display:flex!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle #calendars{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-bottom .profile>div:not(.avatar){display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-bottom .profile #profileMenuBtn{display:block!important}}
+
+#settingsPage,#tasksPage{max-width:none!important;max-height:100dvh!important;width:100vw!important;left:0!important;right:0!important;margin:0!important}
