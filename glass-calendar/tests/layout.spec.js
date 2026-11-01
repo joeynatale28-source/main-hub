@@ -102,8 +102,6 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await page.locator('#eventName').fill('Updated UI test');
   await toDetails(page);
   await page.locator('#eventSave').click();
-  await page.locator('#eventSave').click();
-  await page.locator('#eventSave').click();
   await expect(page.locator('#eventDialog')).toBeHidden();
   await page.locator('#quickThemeButton').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
@@ -149,7 +147,9 @@ test('week schedule positions events by actual time and opens details', async ({
   await page.locator('#startTimePicker').click();
   await page.locator('#pickerTimeInput').fill('9:30 AM');
   await page.locator('#pickerTimeInput').press('Enter');
-  await page.locator('#eventForm button[type="submit"]').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
   const event = page.locator('.week-event').filter({ hasText: 'Team planning' });
   await expect(event).toBeVisible();
   const top = await event.evaluate(el => parseFloat(el.style.top));
@@ -228,7 +228,9 @@ test('event editor saves all-day events with a full-day duration', async ({ page
   await page.locator('#eventSave').click();
   await page.locator('#eventAllDay').check();
   await expect(page.locator('#eventTime')).toBeDisabled();
-  await page.locator('#eventForm button[type="submit"]').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
   await expect(page.locator('#eventDialog')).toBeHidden();
   await page.locator('[data-switch="week"]').click();
   await expect(page.locator('.week-all-day')).toContainText('All-day planning');
@@ -397,9 +399,12 @@ test('theme treatments respond live and holiday banner uses dates',async({page})
  await expect(page.locator('#wizardThemeIcon')).toBeHidden();
  await page.locator('#eventSave').click();
  await page.locator('#startDatePicker').click();
- await page.locator('.picker-header').toBeVisible();
- await page.locator('#pickerPanel [data-picker-date="2026-10-31"]').count().then(async n=>{if(!n){await page.locator('#startDatePicker').click()}});
- await page.evaluate(()=>{const x=document.querySelector('#eventDate');x.value='2026-10-31';x.dispatchEvent(new Event('change',{bubbles:true}))});
+ await expect(page.locator('.picker-header')).toBeVisible();
+ for(let i=0;i<18&&!(await page.locator('.picker-header strong').textContent()).includes('October 2026');i++){
+   await page.locator('[data-picker-shift="-1"]').click();
+ }
+ await page.locator('[data-picker-date="2026-10-31"]').click();
+ await expect(page.locator('#eventDate')).toHaveValue('2026-10-31');
  await expect(page.locator('#wizardHoliday')).toContainText('Halloween');
  await page.locator('#wizardHoliday button').click();
  await expect(page.locator('#wizardHoliday')).toBeHidden();
