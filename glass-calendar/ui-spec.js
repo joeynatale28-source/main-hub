@@ -147,21 +147,21 @@
     const resultList=document.createElement('div');
     resultList.id='addressResults';resultList.className='address-results';resultList.role='listbox';
     resultList.setAttribute('aria-label','Address suggestions');resultList.hidden=true;
-    where.append(resultList);
+    where.append(resultList);const addressNote=document.createElement('small');addressNote.id='savedAddressLine';addressNote.className='saved-address-line';addressNote.hidden=true;addressNote.setAttribute('aria-live','polite');where.insertBefore(addressNote,resultList);
     location.setAttribute('autocomplete','off');location.setAttribute('aria-controls','addressResults');
     let selected=null,results=[],active=-1,previous='',timer=0,request=null;
     const cache=new Map();
     const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;', '"':'&quot;',"'":'&#39;'}[c]));
-    const nameOf=p=>p.name||p.street||p.city||'Location';
-    const fullOf=p=>[p.name||p.street,p.housenumber,p.postcode,p.city,p.state,p.country].filter(Boolean).join(', ');
+    const nameOf=p=>[p.name||(p.housenumber&&p.street?[p.housenumber,p.street].join(' '):p.street)||p.city||'Location',p.name&&p.street?[p.housenumber,p.street].filter(Boolean).join(' '):null,p.city,p.state].filter((v,i,a)=>v&&a.indexOf(v)===i).join(', ');
+    const fullOf=p=>[p.name||p.street,p.housenumber&&p.street?[p.housenumber,p.street].join(' '):p.street,p.postcode,p.city,p.state,p.country].filter((v,i,a)=>v&&a.indexOf(v)===i).join(', ');
     const secondaryOf=p=>[p.city,p.state,p.country].filter(Boolean).join(', ');
-    const hide=()=>{resultList.hidden=true;active=-1;location.setAttribute('aria-expanded','false')};
+    const hide=()=>{resultList.hidden=true;active=-1;location.setAttribute('aria-expanded','false')};const note=()=>{addressNote.hidden=!selected;addressNote.textContent=selected?'Full address saved: '+selected.address:''};
     const highlight=()=>resultList.querySelectorAll('[data-address-index]').forEach((el,i)=>{el.classList.toggle('active',i===active);el.setAttribute('aria-selected',String(i===active))});
-    const choose=i=>{const item=results[i];if(!item)return;selected={label:item.label,address:item.address};location.value=item.label;hide();location.dispatchEvent(new Event('change',{bubbles:true}));location.focus()};
+    const choose=i=>{const item=results[i];if(!item)return;selected={label:item.label,address:item.address};location.value=item.label;hide();note();location.dispatchEvent(new Event('change',{bubbles:true}));location.focus()};
     const draw=()=>{
       location.setAttribute('aria-expanded','true');resultList.hidden=false;
       resultList.innerHTML=results.length?results.map((r,i)=>'<button type="button" role="option" class="address-option" data-address-index="'+i+'"><span class="address-pin" aria-hidden="true">⌖</span><span><strong>'+esc(r.label)+'</strong><small>'+esc(r.secondary)+'</small></span></button>').join(''):'<div class="address-empty">No matches — you can still use what you typed.</div>';
-      resultList.querySelectorAll('[data-address-index]').forEach(b=>b.addEventListener('click',()=>choose(+b.dataset.addressIndex)));highlight();
+      resultList.querySelectorAll('[data-address-index]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();choose(+b.dataset.addressIndex)});b.addEventListener('mousedown',e=>{e.preventDefault()});b.addEventListener('click',()=>choose(+b.dataset.addressIndex))});highlight();
     };
     const fetchPlaces=async query=>{
       request?.abort();const signal=(request=new AbortController()).signal;
@@ -179,7 +179,7 @@
     };
     location.addEventListener('input',()=>{
       clearTimeout(timer);request?.abort();
-      if(selected&&location.value!==selected.label)selected=null;
+      if(selected&&location.value!==selected.label){selected=null;note()}
       const q=location.value.trim();previous=q;active=-1;
       if(q.length<3){hide();return}
       timer=setTimeout(()=>fetchPlaces(q),300);
@@ -195,7 +195,7 @@
     document.addEventListener('pointerdown',e=>{if(!where.contains(e.target))hide()});
     window.DaylightLocationMenuOpen=()=>!resultList.hidden;
     const oldPrepare=window.DaylightUI.prepareEvent;
-    window.DaylightUI.prepareEvent=(e,day,time)=>{selected=e?.locationAddress?{label:e.location,address:e.locationAddress}:null;hide();return oldPrepare(e,day,time)};
+    window.DaylightUI.prepareEvent=(e,day,time)=>{selected=e?.locationAddress?{label:e.location,address:e.locationAddress}:null;hide();note();return oldPrepare(e,day,time)};
     const oldFields=window.DaylightUI.eventFields;
     window.DaylightUI.eventFields=()=>({...oldFields(),locationAddress:selected?.address||''});
   }
