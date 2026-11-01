@@ -97,3 +97,35 @@ dialog::backdrop{background:rgba(0,0,0,.82)!important;backdrop-filter:blur(8px)}
 :root[data-theme=light] .splash-progress i{background:#111!important}
 :root[data-theme=light] .branddot,:root[data-theme=light] .eyebrow,:root[data-theme=light] .nav.active span,:root[data-theme=light] .roundicon,:root[data-theme=light] .spark,:root[data-theme=light] .quote-symbol{color:#111!important}
 @media(prefers-reduced-motion:reduce){.daycell,#calendarView,dialog[open]{animation:none!important}}
+
+/* Professional interface refinements */
+:root{font-family:'DM Sans',system-ui,-apple-system,sans-serif;font-synthesis:none}
+button{display:inline-flex;align-items:center;justify-content:center;gap:8px;user-select:none;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.iconbutton svg,.nav svg,.primary svg,.roundicon svg,.search-wrap svg{flex-shrink:0}
+.iconbutton{display:inline-grid;place-items:center}
+.nav{justify-content:flex-start}.nav span{display:grid;place-items:center}.nav kbd{margin-left:auto}
+.logo{display:grid;place-items:center}.tinyglow{width:auto;height:auto;border:0;background:none!important;box-shadow:none!important;display:grid;place-items:center}
+#prevBtn svg{transform:rotate(180deg)}.arrows button{height:37px;min-width:37px;padding:0}.topnew{height:40px}
+.roundicon{display:grid;place-items:center}.quote-symbol{display:inline-flex}
+.close{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;transition:background .2s,transform .2s}
+.close:hover{background:var(--surface2);transform:rotate(90deg)}
+.search-wrap input{width:155px}.search-wrap input::placeholder{color:var(--muted)}
+.calendar-panel{overflow:hidden}.daycell{position:relative;cursor:pointer}.daycell:focus-within{outline:1px solid var(--text);outline-offset:-1px}
+.daycell:hover .daynum:not(.today .daynum){background:var(--surface2)}
+.todaycard,.upcomingcard,.calendar-panel,.quote-card{transition:border-color .25s,box-shadow .25s}
+.todaycard:hover,.upcomingcard:hover{border-color:color-mix(in srgb,var(--line),var(--text) 16%)}
+.upcomingitem{border-radius:8px;padding:8px 5px;margin:12px -5px 0;transition:background .2s,transform .2s}
+.upcomingitem:hover{background:var(--surface2);transform:translateX(3px)}
+.view-switch button{transition:background .18s,color .18s,transform .18s}
+.view-switch button:hover:not(.selected){background:var(--surface2);color:var(--text)}
+.agendarow{transition:background .2s,transform .2s,border-color .2s}
+.agendarow:hover{transform:translateX(3px);border-color:var(--muted)}
+.dialog label{line-height:1.5}.dialog input,.dialog select,.dialog textarea{transition:border-color .2s,box-shadow .2s}
+.dialog input:focus,.dialog select:focus,.dialog textarea:focus{box-shadow:0 0 0 3px #8882}
+.dialogactions .primary,.dialogactions .outline{min-height:39px}
+#addSide{width:100%}.toast{max-width:calc(100vw - 32px);text-align:center}
+@media(min-width:801px){.headline{gap:22px}.search-wrap:focus-within input{width:210px;transition:width .22s}}
+@media(max-width:800px){.sidebar>.primary{width:auto}.topbar .breadcrumbs{display:none}.topbar{justify-content:flex-end}.headline-actions{gap:8px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important}}
