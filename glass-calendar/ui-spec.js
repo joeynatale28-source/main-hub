@@ -185,13 +185,26 @@
       timer=setTimeout(()=>fetchPlaces(q),300);
     });
     location.addEventListener('focus',()=>{const q=location.value.trim();if(q.length>=3&&cache.has(q.toLowerCase())){results=cache.get(q.toLowerCase());active=-1;draw()}});
-    location.addEventListener('keydown',e=>{
-      if(resultList.hidden)return;
-      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=active<0?(e.key==='ArrowDown'?0:Math.max(0,results.length-1)):(active+(e.key==='ArrowDown'?1:-1)+Math.max(1,results.length))%Math.max(1,results.length);highlight()}
-      else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(results.length)choose(active<0?0:active);else hide()}
-      else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();hide()}
-      else if(e.key==='Tab')hide();
-    });
+    const handleAddressKey=e=>{
+      if(resultList.hidden)return false;
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+        e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+        if(!results.length)return true;
+        active=active<0?(e.key==='ArrowDown'?0:results.length-1):(active+(e.key==='ArrowDown'?1:-1)+results.length)%results.length;
+        highlight();return true;
+      }
+      if(e.key==='Enter'){
+        e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+        if(results.length)choose(active<0?0:active);else hide();
+        return true;
+      }
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();hide();return true}
+      if(e.key==='Tab'){hide();return false}
+      return false;
+    };
+    // The wizard uses an Enter-to-continue capture handler. Handle location
+    // keyboard selection first so Enter never advances or clears the pairing.
+    document.addEventListener('keydown',e=>{if(e.target===location)handleAddressKey(e)},true);
     document.addEventListener('pointerdown',e=>{if(!where.contains(e.target))hide()});
     window.DaylightLocationMenuOpen=()=>!resultList.hidden;
     const oldPrepare=window.DaylightUI.prepareEvent;
