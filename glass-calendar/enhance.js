@@ -178,6 +178,8 @@ $('profileSettings').hidden=true;
 $('caldavConnect').onclick=()=>alert('Authenticated CalDAV is not connected in this release. You can use an iCalendar subscription in the meantime; Daylight does not store CalDAV passwords.');
 $('refreshAllSubscriptions').onclick=()=>{const buttons=$('subscriptionList')?.querySelectorAll('[data-refresh]')||[];if(!buttons.length){alert('There are no subscribed calendars to refresh yet.');return}buttons.forEach(b=>b.click())};
 const toggle=$('collapsedCalendars'),flyout=$('collapsedCalendarFlyout');toggle.hidden=false;toggle.onclick=()=>flyout.hidden=!flyout.hidden;document.addEventListener('pointerdown',e=>{if(!e.target.closest('#collapsedCalendarFlyout')&&!e.target.closest('#collapsedCalendars'))flyout.hidden=true});
+// Ensure provider identities have an icon and title in the same 36px-aligned row.
+document.querySelectorAll('.provider-card').forEach(card=>{const top=card.querySelector('.provider-top'),brand=top?.querySelector('.provider-brand'),title=card.querySelector('h3');if(!top||!brand||!title)return;const ident=document.createElement('div');ident.className='provider-ident';brand.before(ident);ident.append(brand,title)});
 // Browser notifications and calendar-state toggles keep existing native change handlers.
 window.DaylightUI={prepareEvent,eventFields,afterRender,searchChanged,closeSearch,sectionChanged,themeChanged,syncAvatar,nameSaved,openAbout,detailExtras};
 })();
