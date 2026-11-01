@@ -62,32 +62,26 @@
 <div id="pickerOverlay" class="picker-overlay" hidden><div id="pickerPanel" class="picker-panel" role="dialog" aria-label="Choose date or time"></div></div>
 <dialog id="preferencesDialog" class="dialog preferences"><div class="dialoghead"><div><span class="eyebrow">MAKE IT YOURS</span><h2>Preferences & sync</h2></div><button type="button" class="close" data-close aria-label="Close dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><p>Signed-in data syncs with your Supabase account. Export regularly to keep an independent backup.</p><div class="prefrow"><div><strong>Appearance</strong><small>Choose your preferred theme</small></div><select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></div><div class="prefrow"><div><strong>Import iCalendar</strong><small>Read .ics calendars from Apple Calendar, Google Calendar, Outlook, and more.</small></div><button class="outline" id="settingsImport">Import</button></div><div class="prefrow"><div><strong>Export iCalendar</strong><small>Save your calendar as a portable .ics file.</small></div><button class="outline" id="settingsExport">Export</button></div><div class="prefrow"><div><strong>CalDAV</strong><small>Two-way server syncing is planned; not connected in this release.</small></div><span class="coming">Coming later</span></div><div class="prefrow"><div><strong>Data privacy</strong><small>Supabase stores account data. External calendar credentials are not connected.</small></div><span class="coming">Local only</span></div></dialog>
 <div id="authGateway" class="auth-gateway" role="region" aria-label="Daylight account">
-<div class="auth-card">
-<p class="auth-logo">daylight.</p><h1 id="authHeading">Welcome back</h1>
-<p id="authIntroduction">Your calendars and tasks, safely available across your devices.</p>
-<div id="authError" class="auth-error" role="alert" hidden></div>
-<form id="authLogin" data-auth-mode="login" class="auth-form">
-<div class="auth-field"><label for="loginEmail">Email address</label><input id="loginEmail" name="email" type="email" autocomplete="email" required></div>
-<div class="auth-field"><label for="loginPassword">Password</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="8" required></div>
-<button type="submit">Sign in</button><div class="auth-row"><button type="button" class="auth-link" data-auth-link="signup">Create account</button><button type="button" class="auth-link" data-auth-link="recover">Forgot password?</button></div>
-</form>
-<form id="authSignup" data-auth-mode="signup" class="auth-form" hidden>
-<div class="auth-field"><label for="signupUsername">Username</label><input id="signupUsername" name="username" autocomplete="username" pattern="[a-z][a-z0-9_]{2,29}" minlength="3" maxlength="30" required></div>
-<div class="auth-row"><div class="auth-field" style="flex:1;min-width:0"><label for="signupFirst">First name</label><input id="signupFirst" name="first_name" autocomplete="given-name" maxlength="35" required></div><div class="auth-field" style="flex:1;min-width:0"><label for="signupLast">Last name</label><input id="signupLast" name="last_name" autocomplete="family-name" maxlength="35" required></div></div>
-<div class="auth-field"><label for="signupEmail">Email for account verification and recovery</label><input id="signupEmail" name="email" type="email" autocomplete="email" required></div>
-<div class="auth-field"><label for="signupPassword">Password (at least 8 characters)</label><input id="signupPassword" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
-<button type="submit">Create account</button><button type="button" class="auth-link" data-auth-link="login">Already have an account? Sign in</button>
-</form>
-<form id="authRecover" data-auth-mode="recover" class="auth-form" hidden>
-<p>Enter the email address used for your account. If it exists, Supabase will send recovery instructions.</p>
-<div class="auth-field"><label for="recoverEmail">Email address</label><input id="recoverEmail" type="email" name="email" autocomplete="email" required></div>
-<button type="submit">Send recovery email</button><button type="button" class="auth-link" data-auth-link="login">Back to sign in</button>
-</form>
-<div id="authChoice" data-auth-mode="choice" class="auth-form sync-choice" hidden>
-<p>A calendar is already saved in this browser. Choose what to do before turning on cloud sync.</p>
-<button id="authImport" type="button">Use this browser’s data<small>Upload your existing events, calendars and tasks to this account. A local backup is preserved first.</small></button>
-<button id="authUseCloud" type="button">Use my cloud calendar<small>Download the existing cloud calendar instead, retaining a separate local backup where available.</small></button>
-</div>
-<div data-auth-mode="error" class="auth-form" hidden><button type="button" data-auth-link="login" class="auth-primary">Return to sign in</button></div>
-<p class="auth-note">Daylight stores account data in Supabase. It is protected by account-based database access controls, not end-to-end encryption. <a href="./privacy.html">Privacy policy</a> · <a href="./terms.html">Terms</a></p>
-</div></div><script src="./app.js" defer></script><script src="./integrations.js" defer></script><script src="./enhance.js" defer></script><script src="./wizard.js" defer></script><script src="./occasion.js" defer></script><script src="./accent.js" defer></script><script src="./release-polish.js" defer></script><script src="./v1-shell.js" defer></script><script src="./v1-details.js" defer></script><script src="./v2-auth.js" defer></script></body></html>
+ <div class="auth-card">
+ <div class="auth-brand"><span class="auth-mark" aria-hidden="true">✳</span><span>daylight.</span></div>
+ <h1 id="authHeading">Welcome back</h1><p id="authIntroduction">Your personal calendar, wherever you sign in.</p>
+ <div id="authError" role="alert" class="auth-error" hidden></div>
+ <form id="authLogin" class="auth-form" data-auth-mode="login">
+ <div class="auth-field"><label for="loginUsername">Username</label><input id="loginUsername" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required></div>
+ <div class="auth-field"><label for="loginPassword">Password</label><div class="auth-password-field"><input id="loginPassword" name="password" type="password" autocomplete="current-password" required><button type="button" data-password-toggle="loginPassword" aria-label="Show password">Show</button></div></div>
+ <button type="submit" class="auth-primary">Log in</button>
+ <div class="auth-row"><button type="button" class="auth-link" data-auth-link="signup">Create account</button><button type="button" class="auth-link" data-auth-link="recover">Forgot password?</button></div></form>
+ <form id="authSignup" class="auth-form" data-auth-mode="signup" hidden>
+ <div class="auth-field"><label for="signupUsername">Username</label><input id="signupUsername" name="username" type="text" autocomplete="username" spellcheck="false" autocapitalize="none" minlength="3" maxlength="20" required><small id="usernameAvailability" role="status">3–20 lowercase letters, numbers, or underscores</small></div>
+ <div class="auth-field"><label for="signupPassword">Password</label><div class="auth-password-field"><input id="signupPassword" name="password" type="password" autocomplete="new-password" required><button type="button" data-password-toggle="signupPassword" aria-label="Show password">Show</button></div></div>
+ <ul id="passwordRequirements" class="auth-requirements"><li data-rule="length">At least 8 characters</li><li data-rule="upper">One uppercase letter</li><li data-rule="lower">One lowercase letter</li><li data-rule="number">One number</li><li data-rule="symbol">One symbol</li></ul>
+ <div class="auth-field"><label for="signupConfirm">Confirm password</label><div class="auth-password-field"><input id="signupConfirm" name="confirm" type="password" autocomplete="new-password" required><button type="button" data-password-toggle="signupConfirm" aria-label="Show password">Show</button></div><small id="passwordMatch" role="status">Passwords must match</small></div>
+ <button type="submit" class="auth-primary" disabled>Create account</button><button type="button" class="auth-link" data-auth-link="login">Already have an account? Log in</button></form>
+ <form id="authRecover" class="auth-form" data-auth-mode="recover" hidden>
+ <div class="auth-field"><label for="recoverUsername">Username</label><input id="recoverUsername" name="username" autocomplete="username" maxlength="20" required></div>
+ <button type="submit" class="auth-primary">Continue</button><button type="button" class="auth-link" data-auth-link="login">Back to log in</button></form>
+ <div id="authNotice" class="auth-form" data-auth-mode="notice" hidden><h2>Password resets aren't available yet.</h2><p>This feature is coming soon.</p><button type="button" class="auth-primary" data-auth-link="login">Back to log in</button></div>
+ <div id="authNotConfigured" class="auth-form" data-auth-mode="unconfigured" hidden><h2>Backend not configured</h2><p>Daylight needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY during its build. No data was changed.</p></div>
+ <div id="authLoading" class="auth-form" data-auth-mode="loading" hidden><p>Opening your calendar…</p><div class="auth-loading-bars" aria-hidden="true"><span></span><span></span><span></span></div></div>
+ </div></div>
+<script type="module" src="./v2-main.js"></script></body></html>
