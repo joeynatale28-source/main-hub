@@ -131,8 +131,36 @@ function themeChanged(mode,actual){
 $('quickThemeButton').onclick=()=>{const modes=['dark','light','system'],next=modes[(modes.indexOf(savedTheme())+1)%modes.length];$('pageThemeSelect').value=next;$('pageThemeSelect').dispatchEvent(new Event('change',{bubbles:true}))};
 themeChanged(savedTheme(),document.documentElement.dataset.theme);
 requestAnimationFrame(()=>document.body.dataset.loaded='1');
-function syncAvatar(name){const avatar=document.querySelector('.profile .avatar');if(!avatar)return;avatar.textContent=name?.trim()?name.trim().charAt(0).toUpperCase():'♙';avatar.setAttribute('aria-label',name?.trim()?'Account '+name:'Guest account')}
+function syncAvatar(name){const avatar=document.querySelector('.profile .avatar');if(!avatar)return;if(name?.trim())avatar.textContent=name.trim().charAt(0).toUpperCase();else avatar.innerHTML='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>';avatar.setAttribute('aria-label',name?.trim()?'Account '+name:'Guest account')}
 syncAvatar(localStorage.getItem('daylight-name')||'');
+function detailExtras(e){
+ const dialog=$('detailDialog');if(!dialog)return;
+ let extra=$('detailExtras');if(!extra){extra=document.createElement('div');extra.id='detailExtras';extra.className='detail-extra';dialog.querySelector('.event-sheet-footer')?.before(extra)}
+ if(!extra)return;
+ const rows=[];if(e.location)rows.push(['Location',e.location]);if(e.repeat&&e.repeat!=='never')rows.push(['Repeats',e.repeat.charAt(0).toUpperCase()+e.repeat.slice(1)]);if(e.reminder&&e.reminder!=='none')rows.push(['Reminder',({'at-time':'At event time','15m':'15 minutes before','1h':'1 hour before','1d':'1 day before'})[e.reminder]||e.reminder]);
+ extra.innerHTML=rows.map(([title,value])=>'<div class="event-meta-row"><div><span class="event-meta-label">'+esc(title)+'</span><p>'+esc(value)+'</p></div></div>').join('');
+ extra.hidden=!rows.length
+}
+// Reminders are best-effort notifications while this page stays open, never background push.
+const fired=new Set(),offsets={'at-time':0,'15m':15,'1h':60,'1d':1440};
+function checkEventReminders(){
+ if(!('Notification' in window)||Notification.permission!=='granted')return;
+ const now=Date.now();
+ for(const e of bridge()?.getEvents()||[]){
+  if(!e.reminder||e.reminder==='none'||e.holiday||e.sourceId)continue;
+  const offset=offsets[e.reminder];if(offset===undefined)continue;
+  const base=dayDate(e.date),today=dayDate(todayISO()),repeat=e.repeat||'never';
+  for(const shift of [-1,0,1,2]){const day=new Date(today);day.setDate(day.getDate()+shift);
+   if(day<base)continue;
+   const diff=Math.round((Date.UTC(day.getFullYear(),day.getMonth(),day.getDate())-Date.UTC(base.getFullYear(),base.getMonth(),base.getDate()))/86400000);
+   const applies=asISO(day)===e.date||repeat==='daily'||repeat==='weekly'&&diff%7===0||repeat==='monthly'&&day.getDate()===base.getDate()||repeat==='yearly'&&day.getDate()===base.getDate()&&day.getMonth()===base.getMonth();
+   if(!applies)continue;
+   const stamp=asISO(day)+'T'+(e.time||'09:00')+':00',due=new Date(stamp).getTime()-offset*60000,key=e.id+'-'+stamp+'-'+e.reminder;
+   if(now>=due&&now-due<60000&&!fired.has(key)){fired.add(key);try{new Notification('Daylight reminder',{body:e.title+(e.location?' · '+e.location:'')})}catch{}}
+  }
+ }
+}
+setInterval(checkEventReminders,20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkEventReminders()});
 function nameSaved(){const saved=$('nameSaved');saved.hidden=false;clearTimeout(nameSaved.timer);nameSaved.timer=setTimeout(()=>saved.hidden=true,2000)}
 $('settingsBack').onclick=()=>$('profileCalendar').click();$('tasksBack').onclick=()=>$('profileCalendar').click();
 // Dedicated Integrations view reuses its original settings form, without showing other panels.
@@ -151,5 +179,5 @@ $('caldavConnect').onclick=()=>alert('Authenticated CalDAV is not connected in t
 $('refreshAllSubscriptions').onclick=()=>{const buttons=$('subscriptionList')?.querySelectorAll('[data-refresh]')||[];if(!buttons.length){alert('There are no subscribed calendars to refresh yet.');return}buttons.forEach(b=>b.click())};
 const toggle=$('collapsedCalendars'),flyout=$('collapsedCalendarFlyout');toggle.hidden=false;toggle.onclick=()=>flyout.hidden=!flyout.hidden;document.addEventListener('pointerdown',e=>{if(!e.target.closest('#collapsedCalendarFlyout')&&!e.target.closest('#collapsedCalendars'))flyout.hidden=true});
 // Browser notifications and calendar-state toggles keep existing native change handlers.
-window.DaylightUI={prepareEvent,eventFields,afterRender,searchChanged,closeSearch,sectionChanged,themeChanged,syncAvatar,nameSaved,openAbout};
+window.DaylightUI={prepareEvent,eventFields,afterRender,searchChanged,closeSearch,sectionChanged,themeChanged,syncAvatar,nameSaved,openAbout,detailExtras};
 })();
