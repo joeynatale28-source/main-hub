@@ -21,13 +21,13 @@ new MutationObserver(()=>document.querySelectorAll('input[type=checkbox]:not(.da
 // Native selects remain the accessible data model, but are never visually rendered.
 const selectUI=new WeakMap();let activeMenu=null;
 function closeSelect(){if(activeMenu){activeMenu.remove();activeMenu=null}document.querySelectorAll('.select-button[aria-expanded=true]').forEach(b=>b.setAttribute('aria-expanded','false'))}
-function updateSelect(select){const ref=selectUI.get(select);if(!ref)return;const option=select.selectedOptions[0];ref.textContent=option?.textContent||'Select';ref.disabled=select.disabled}
+function updateSelect(select){const ref=selectUI.get(select);if(!ref)return;const option=select.selectedOptions[0];ref.textContent=option?.textContent||'Select';ref.disabled=select.disabled}window.DaylightSyncSelect=updateSelect;
 function enhanceSelect(select){
  if(selectUI.has(select)||select.hidden||select.closest('.legacy-event-fields')||select.id==='pageThemeSelect'||select.id==='viewSelect')return;
  select.classList.add('native-select-accessible');
  const button=document.createElement('button');button.type='button';button.className='select-button';button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',select.getAttribute('aria-label')||'Select '+(select.closest('label')?.textContent||'option').trim().slice(0,40));
  select.after(button);selectUI.set(select,button);updateSelect(select);
- button.addEventListener('click',e=>{e.preventDefault();if(button.disabled)return;if(activeMenu&&activeMenu.dataset.owner===select.id){closeSelect();return}closeSelect();const menu=document.createElement('div');menu.className='select-menu';menu.setAttribute('role','listbox');menu.dataset.owner=select.id||'unnamed';const rect=button.getBoundingClientRect();menu.style.left=Math.min(rect.left,innerWidth-230)+'px';menu.style.minWidth=Math.max(190,rect.width)+'px';menu.style.maxHeight='min(310px, 55vh)';
+ button.addEventListener('click',e=>{e.preventDefault();if(button.disabled)return;if(activeMenu&&activeMenu.dataset.owner===select.id){closeSelect();return}closeSelect();const menu=document.createElement('div');menu.className='select-menu';menu.setAttribute('role','listbox');menu.dataset.owner=select.id||'unnamed';const rect=button.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(rect.left,innerWidth-rect.width-8))+'px';menu.style.minWidth=Math.max(190,rect.width)+'px';menu.style.maxHeight='min(310px, 55vh)';
  for(const option of select.options){const item=document.createElement('button');item.type='button';item.className='select-option';item.role='option';item.setAttribute('aria-selected',String(option.selected));item.disabled=option.disabled;item.innerHTML='<span>'+esc(option.textContent)+'</span>'+(option.selected?'<span class="option-check">✓</span>':'');item.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));updateSelect(select);closeSelect()});menu.appendChild(item)}
  (select.closest('dialog[open]')||document.body).appendChild(menu);activeMenu=menu;const desiredTop=rect.bottom+5;menu.style.top=(desiredTop+Math.min(menu.scrollHeight,310)>innerHeight?Math.max(8,rect.top-Math.min(menu.scrollHeight,310)-5):desiredTop)+'px';button.setAttribute('aria-expanded','true')});
  select.addEventListener('change',()=>updateSelect(select));new MutationObserver(()=>updateSelect(select)).observe(select,{childList:true,attributes:true,subtree:true});
@@ -164,11 +164,9 @@ function nameSaved(){const saved=$('nameSaved');saved.hidden=false;clearTimeout(
 $('settingsBack').onclick=()=>$('profileCalendar').click();$('tasksBack').onclick=()=>$('profileCalendar').click();
 // Dedicated Integrations view reuses its original settings form, without showing other panels.
 const settingsPage=$('settingsPage');
-function openIntegrations(e){e?.stopImmediatePropagation();$('profileSettings').click();settingsPage.classList.add('integrations-only');$('integrationsNav').classList.add('active');const section=$('settingsIntegrations');section?.scrollIntoView({block:'start'})}
-$('integrationsNav').addEventListener('click',openIntegrations,true);
-function sectionChanged(next){if(next==='calendar'||next==='tasks'){settingsPage.classList.remove('integrations-only');$('integrationsNav').classList.remove('active')}if(next==='settings')document.querySelectorAll('.select-button').forEach(b=>{const parent=b.previousElementSibling;if(parent?.tagName==='SELECT')updateSelect(parent)})}
-$('settingsHeaderButton').addEventListener('click',()=>{settingsPage.classList.remove('integrations-only');$('integrationsNav').classList.remove('active')});
-function openAbout(){settingsPage.classList.remove('integrations-only');$('settingsAbout').scrollIntoView({block:'start'})}
+function openIntegrations(){window.DaylightBridge?.openIntegrations?.()}
+function sectionChanged(next){if(next==='settings')document.querySelectorAll('.select-button').forEach(b=>{const parent=b.previousElementSibling;if(parent?.tagName==='SELECT')updateSelect(parent)})}
+function openAbout(){window.DaylightBridge?.openSettings?.();requestAnimationFrame(()=>$('settingsAbout').scrollIntoView({block:'start'}))}
 $('profileAbout').addEventListener('click',openAbout);
 $('footerAbout').addEventListener('click',openAbout);
 const footer=$('appFooter'),sidebarBottom=document.querySelector('.sidebar-bottom');if(footer&&sidebarBottom)sidebarBottom.appendChild(footer);
