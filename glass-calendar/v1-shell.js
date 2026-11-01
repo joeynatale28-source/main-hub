@@ -7,7 +7,7 @@ window.scrollTo(0,0);
 const brand=sidebar.querySelector('.brand'),logo=brand.querySelector('.logo'),name=brand.querySelector(':scope > span');
 const brandButton=document.createElement('button');brandButton.id='brandToday';brandButton.className='brand-button';brandButton.type='button';brandButton.title='Today';brandButton.setAttribute('aria-label','Go to today');const nameLabel=document.createElement('span');nameLabel.className='brand-name';if(name){nameLabel.innerHTML=name.innerHTML;name.remove()}logo.before(brandButton);brandButton.append(logo,nameLabel);brandButton.onclick=()=>$('todayBtn').click();
 const middle=document.createElement('div');middle.className='sidebar-middle';middle.setAttribute('aria-label','Sidebar navigation and calendars');
-const bottom=sidebar.querySelector('.sidebar-bottom');const next=sidebar.querySelector('.mini-calendar');sidebar.insertBefore(middle,bottom);for(let n=next;n&&n!==bottom;){const after=n.nextSibling;middle.append(n);n=after}
+const bottom=sidebar.querySelector('.sidebar-bottom');const next=sidebar.querySelector('.mini-calendar');sidebar.insertBefore(middle,bottom);for(let n=next;n&&n!==middle&&n!==bottom;){const after=n.nextSibling;middle.append(n);n=after}
 $('appFooter')?.remove();
 sidebar.querySelector('.calendars-label')?.remove();middle.querySelectorAll('.nav.legacy-view').forEach(n=>n.remove());
 for(const el of middle.querySelectorAll('.nav')){el.title=(el.textContent||'').trim();el.setAttribute('aria-label',el.title)}
