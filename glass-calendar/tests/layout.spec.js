@@ -158,6 +158,7 @@ test('week layout is scrollable inside calendar on mobile without page overflow'
   expect(result.document).toBeLessThanOrEqual(result.viewport + 2);
   expect(result.week).toBeGreaterThan(result.scrollArea);
   expect(result.hours).toBe(24);
+  await expect.poll(async () => (await page.locator('.sidebar').boundingBox()).x + (await page.locator('.sidebar').boundingBox()).width, { timeout: 3000 }).toBeLessThanOrEqual(1);
   await page.screenshot({ path: 'test-results/week-phone.png', fullPage: false });
 });
 
