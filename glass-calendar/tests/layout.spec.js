@@ -115,7 +115,8 @@ test('tasks and mini-calendar navigation work', async ({ page }) => {
   await expect(page.locator('#tasksPage')).toBeVisible();
   await page.locator('#newTask').click();
   await page.locator('#taskName').fill('Polish review');
-  await page.locator('#taskDue').fill('2026-11-01');
+  await page.locator('.task-due-button').click();
+  await page.locator('.task-date-panel [data-day]').first().click();
   await page.locator('#taskForm button[type="submit"]').click();
   await expect(page.locator('#tasksList')).toContainText('Polish review');
 });
@@ -384,7 +385,8 @@ test('wizard has four steps, skip buttons, and creation success',async({page})=>
  await expect(page.locator('#wizardCount')).toHaveText('STEP 3 OF 4');
  await page.locator('#wizardSkip').click();
  await expect(page.locator('#wizardCount')).toHaveText('STEP 4 OF 4');
- await page.locator('#wizardSkip').click();
+ await expect(page.locator('#wizardSkip')).toBeHidden();
+ await page.locator('#eventSave').click();
  await expect(page.locator('#wizardSuccess')).toBeVisible();
  await expect(page.locator('#eventDialog')).toBeHidden({timeout:5000});
 });
