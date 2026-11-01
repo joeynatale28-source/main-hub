@@ -442,3 +442,41 @@ test('dirty wizard asks to discard and draft offers resume on reload',async({pag
  await page.locator('#wizardDiscardButton').click();
  await expect(page.locator('#eventDialog')).toBeHidden();
 });
+
+test('release polish legal pages are reachable and describe local-only storage',async({page})=>{
+ const base=new URL(page.url());
+ await page.goto(new URL('privacy.html',base).href);
+ await expect(page.getByRole('heading',{name:'Privacy Policy'})).toBeVisible();
+ await expect(page.locator('body')).toContainText('local storage');
+ await expect(page.locator('body')).toContainText('Photon');
+ await page.goto(new URL('terms.html',base).href);
+ await expect(page.getByRole('heading',{name:'Terms of Service'})).toBeVisible();
+ await expect(page.locator('body')).toContainText('backups');
+ await page.getByRole('link',{name:'Back to calendar'}).click();
+ await expect(page.locator('#calendarView')).toBeVisible();
+});
+test('page transitions scroll to the top',async({page})=>{
+ await page.setViewportSize({width:1440,height:740});
+ await page.locator('#settingsHeaderButton').click();
+ await page.locator('#settingsAbout').scrollIntoViewIfNeeded();
+ await page.locator('#settingsBack').click();
+ await page.locator('#tasksNav').click();
+ await expect(page.locator('#tasksPage')).toBeVisible();
+ const positions=await page.evaluate(()=>({window:scrollY,main:document.querySelector('.main').scrollTop}));
+ expect(positions.window).toBe(0);expect(positions.main).toBe(0);
+});
+test('location search suggestions support manual typing without a network dependency',async({page})=>{
+ await page.locator('#addSide').click();
+ await page.locator('#eventName').fill('Dinner');
+ await page.locator('#eventSave').click();
+ await page.locator('#eventSave').click();
+ await page.route('https://photon.komoot.io/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({features:[{properties:{name:'Central Park',city:'New York',state:'New York',country:'United States'}}]})}));
+ await page.locator('#eventLocation').fill('Central Park');
+ await expect(page.locator('#locationSuggestions')).toBeVisible({timeout:5000});
+ await expect(page.locator('#locationSuggestions')).toContainText('Central Park');
+ await page.locator('#locationSuggestions button').first().click();
+ await expect(page.locator('#eventLocation')).toHaveValue(/Central Park/);
+ await expect(page.locator('.wizard-location>svg')).toBeHidden();
+ await page.locator('#eventLocation').fill('Private location');
+ await expect(page.locator('.wizard-location>svg')).toBeHidden();
+});
