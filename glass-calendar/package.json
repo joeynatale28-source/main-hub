@@ -1,0 +1,14 @@
+{
+  "name": "daylight-calendar",
+  "private": true,
+  "version": "0.3.1",
+  "description": "Local-first Daylight calendar and tasks",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "check": "node --check app.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0"
+  }
+}
