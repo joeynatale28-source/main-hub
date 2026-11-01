@@ -37,6 +37,21 @@ jobs:
         run: npm run check
       - name: Run browser regression tests
         run: npm test
+      - name: Verify public GitHub Pages calendar
+        run: |
+          url="https://joeynatale28-source.github.io/main-hub/glass-calendar/"
+          for attempt in $(seq 1 30); do
+            if curl --location --fail --silent --show-error --max-time 12 "$url" > /tmp/daylight-pages.html 2>/dev/null &&
+               grep -qi '<title>Daylight' /tmp/daylight-pages.html &&
+               curl --location --fail --silent --show-error --max-time 12 "${url}wizard.js" | grep -q 'wizard-progress'; then
+              echo "Live Daylight published at $url"
+              exit 0
+            fi
+            echo "Waiting for GitHub Pages ($attempt/30)"
+            sleep 5
+          done
+          echo "Public GitHub Pages site was not serving the current Daylight assets"
+          exit 1
       - name: Upload responsive screenshots
         if: always()
         uses: actions/upload-artifact@v4
