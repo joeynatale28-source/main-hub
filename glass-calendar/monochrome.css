@@ -240,3 +240,11 @@ dialog::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(5px)}
 .clear-inline-search{pointer-events:auto!important}
 .profile-menu-title{display:flex;flex-direction:column;gap:3px}
 .profile-menu-title::after{content:"Personal workspace · Local-first";font-size:10px;font-weight:400;color:var(--text-2)}
+
+/* Collapsed rail keeps the brand mark and navigation controls visible. */
+.sidebar-collapsed .brand{height:auto!important;min-height:72px;display:flex!important;flex-direction:column!important;gap:8px!important;align-items:center!important;justify-content:center!important}
+.sidebar-collapsed .brand .logo{display:grid!important;order:0!important;width:30px!important;height:30px!important;flex:0 0 30px}
+.sidebar-collapsed .brand .collapse-control{display:grid!important;order:1!important;margin:0!important;flex:0 0 28px}
+.sidebar-collapsed .brand>span{display:none!important}
+.sidebar-collapsed #addSide{min-width:50px;max-width:50px}
+@media(max-width:860px){.sidebar-collapsed .brand{min-height:32px!important;flex-direction:row!important;justify-content:flex-start!important}.sidebar-collapsed .brand>span{display:inline!important}}
