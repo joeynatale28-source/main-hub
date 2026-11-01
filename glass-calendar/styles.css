@@ -135,3 +135,31 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid currentColor;out
 .headline{padding-top:33px;padding-bottom:24px}.panel-header{min-height:70px}.calendar-panel{min-height:600px}
 .settings-page{animation:reveal-calendar .28s ease;max-width:1120px;margin:0 auto;min-height:78vh}.settings-intro{padding:50px 0 32px;border-bottom:1px solid var(--line)}.settings-intro h1{font-size:37px;margin:10px 0}.settings-layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:52px;padding-top:31px}.settings-sections{position:sticky;top:28px;align-self:start;display:flex;flex-direction:column;gap:6px}.settings-anchor{border:0;background:transparent;color:var(--muted);text-align:left;justify-content:flex-start;padding:12px 14px;border-radius:9px;font-weight:600;font-size:13px}.settings-anchor:hover{background:var(--surface2);color:var(--text)}.settings-anchor.active{background:var(--surface2);color:var(--text)}.settings-stack{min-width:0}.setting-group{padding:0 0 39px;margin:0 0 40px;border-bottom:1px solid var(--line);scroll-margin-top:22px}.setting-header{margin-bottom:23px}.setting-header h2{font-size:21px;letter-spacing:-.6px;margin:0 0 7px}.setting-header p{font-size:12px;color:var(--muted);margin:0}.setting-item{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:19px 0;min-height:76px;border-top:1px solid var(--line)}.setting-item strong,.setting-item small{display:block}.setting-item strong{font-size:13px;font-weight:700}.setting-item small{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.6;max-width:430px}.setting-item select,.setting-item input{background:var(--surface2);color:var(--text);border:1px solid var(--line);padding:10px 12px;border-radius:9px;font-size:12px}.setting-item select{min-width:135px}.setting-control{display:flex;gap:9px}.setting-control input{width:165px}.theme-previews{display:grid;grid-template-columns:repeat(2,minmax(0,185px));gap:14px;margin-top:9px}.theme-preview{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:14px;padding:14px;border-radius:12px;border:2px solid transparent;min-height:145px}.theme-preview[aria-pressed=true]{outline:2px solid var(--text);outline-offset:2px}.dark-preview{background:#0c0c0c;color:#fff;border-color:#333}.light-preview{background:#fff;color:#151515;border-color:#ddd}.preview-dots{font-size:8px;opacity:.5}.preview-lines{display:flex;gap:5px;flex:1}.preview-lines i{flex:1;background:currentColor;opacity:.12;border-radius:4px}.theme-preview strong{font-size:12px}.setting-group .coming{white-space:nowrap}
 @media(max-width:900px){.settings-layout{grid-template-columns:1fr;gap:25px}.settings-sections{position:static;flex-direction:row;overflow-x:auto}.settings-anchor{white-space:nowrap}.settings-intro{padding-top:30px}}@media(max-width:560px){.settings-intro h1{font-size:29px}.setting-item{align-items:flex-start;flex-direction:column;gap:12px}.setting-control{width:100%}.setting-control input{flex:1}.theme-previews{grid-template-columns:1fr 1fr}}
+
+/* Precision typography, neutral design tokens, focused calendar density */
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-feature-settings:"cv11","ss01";--surface:#101010;--surface2:#1a1a1a}
+body,button,input,select,textarea{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{font-size:13px;line-height:1.45;letter-spacing:-.013em}
+h1,h2,h3,.brand{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.04em}
+h1{font-size:clamp(27px,2.4vw,35px);font-weight:690}
+h2{font-weight:680}h3{font-weight:660}.brand{font-weight:750}
+.nav,.outline,.primary{font-weight:580;letter-spacing:-.013em}.eyebrow{font-weight:650;letter-spacing:.105em;font-size:10px}
+.main{padding-inline:24px}.headline{padding:21px 0 17px}.headline .subtitle{display:none}
+.topbar{height:57px}.content{grid-template-columns:minmax(0,1fr) 215px;gap:12px}.rightcolumn{gap:12px}
+.calendar-panel{min-height:690px}.panel-header{min-height:57px;padding:11px 16px}
+.daycell{height:112px;padding:7px}.daynum{font-size:12px}
+.todaycard,.upcomingcard{padding:17px}.quote-card{display:none}
+.calendar-filter{font-size:12px}.sidebar{width:230px}.app{grid-template-columns:230px minmax(0,1fr)}
+.primary,.outline,.iconbutton{border-radius:9px}.primary{min-height:38px}.view-switch{border-radius:9px}
+.view-switch button{min-height:29px}
+.dialog select,.setting-item select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23aaa' stroke-width='1.7' stroke-linecap='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:35px!important}
+.dialog{backdrop-filter:none!important}.dialog::backdrop{backdrop-filter:blur(12px)}
+.dialog .hint{font-size:11px;color:var(--muted);line-height:1.5}
+.subscription-list{display:flex;flex-direction:column;gap:6px}
+.subscription-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:13px 0}
+.subscription-row strong{font-size:12px}.subscription-row small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.subscription-actions{display:flex;gap:6px}
+.subscription-actions button{padding:8px 11px;font-size:11px}
+@media(max-width:1230px){.content{grid-template-columns:minmax(0,1fr)}.rightcolumn{display:none}}
+@media(max-width:800px){.app{grid-template-columns:1fr}.sidebar{width:auto}.main{padding-inline:12px}.headline{padding-top:18px}.daycell{height:82px}.topbar{height:51px}.panel-header{min-height:54px}}
+@media(prefers-reduced-motion:reduce){.daycell,#calendarView,dialog[open]{animation:none!important}}
