@@ -75,7 +75,7 @@ test('MCP delete switch is off and requires a danger confirmation',async({page})
  await expect(page.locator('#authGateway')).toBeHidden({timeout:10000});
  await page.locator('#v2SettingsNav').click();
  await expect(page.locator('#aiAllowDelete')).not.toBeChecked();
- await page.locator('#aiAllowDelete').check();
+ await page.locator('#aiAllowDelete').click();
  await expect(page.locator('#aiAccessDialog')).toBeVisible();
  await expect(page.locator('#aiAllowDelete')).not.toBeChecked();
  await page.locator('#aiCancel').click();
