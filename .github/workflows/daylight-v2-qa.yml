@@ -28,6 +28,11 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Check JavaScript syntax
         run: npm run check
+      - name: Build Vite application
+        env:
+          VITE_SUPABASE_URL: https://qrqemjgpzoqhtmsowmqv.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj
+        run: npm run build
       - name: Run browser tests against staging source
         run: npm test
       - name: Upload artifacts
