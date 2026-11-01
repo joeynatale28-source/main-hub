@@ -145,3 +145,31 @@ body{margin:0!important}
 @media(max-width:1100px){.main,.app .main{padding-inline:20px!important}#settingsPage .settings-layout{grid-template-columns:minmax(0,1fr)!important;gap:10px!important}.settings-sections{position:sticky!important;top:0;display:flex!important;flex-direction:row!important;gap:5px;white-space:nowrap;overflow-x:auto;min-height:52px;max-width:100%}.settings-stack{padding-right:0}}
 @media(max-width:720px){.app,.app.sidebar-collapsed{display:block!important;height:100dvh}.main,.app .main{height:100dvh;padding:0 10px!important}.sidebar,.sidebar.glass,.sidebar-collapsed .sidebar{position:fixed!important;width:min(282px,85vw)!important;max-width:282px!important;z-index:120;transform:translateX(-105%);transition:transform .2s ease!important}.sidebar.mobile-open,.sidebar-collapsed .sidebar.mobile-open{transform:translateX(0)!important}.sidebar-collapsed .sidebar .brand{flex-direction:row!important}.sidebar-collapsed .sidebar-middle>.mini-calendar,.sidebar-collapsed .sidebar-middle>.navlabel,.sidebar-collapsed .sidebar-middle>.calendar-list-head,.sidebar-collapsed .sidebar-middle>#calendars{display:block!important}.sidebar-collapsed .sidebar-middle>.nav{justify-content:flex-start!important;font-size:13px!important;width:100%!important}.sidebar-collapsed .sidebar-bottom .profile>div:not(.avatar),.sidebar-collapsed .sidebar-bottom .profile>#profileMenuBtn{display:block!important}.sidebar-collapsed .rail-calendar-dots{display:none!important}.week-board{min-width:540px!important}.week-board.day-board{min-width:100%!important}.week-board{--week-gutter:44px}.week-hours{min-width:44px}.week-hour-label{font-size:10px!important;right:5px!important}.compact-toolbar{flex:0 0 auto!important;min-height:96px!important}#calendarContent{padding:12px 0!important}#settingsPage .settings-layout{width:calc(100% - 28px)!important}#settingsPage .settings-intro{width:calc(100% - 28px)}#tasksPage .tasks-titlebar,#tasksPage .tasks-board{width:calc(100% - 28px)}.integration-grid{grid-template-columns:1fr!important}.integration-grid .provider-card:last-child:nth-child(odd){grid-column:span 1}#eventDialog{width:100vw!important;height:100dvh!important;max-height:100dvh!important;max-width:100vw!important;margin:0!important;border-radius:0!important;inset:0!important;box-sizing:border-box!important}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* final interaction alignment */
+.settings-name-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:1 1 300px;max-width:450px}
+.settings-name-fields label{font-size:11px;color:var(--text-2);font-weight:600;display:flex;flex-direction:column;gap:5px}
+.settings-name-fields input{width:100%;min-width:0;box-sizing:border-box}
+.provider-help{width:min(480px,calc(100vw - 24px));max-height:85dvh;overflow:auto}
+.provider-help ol{counter-reset:setup;padding-left:26px;margin:12px 0 22px}
+.provider-help li{font-size:13px;line-height:1.6;color:var(--text-2);padding:7px 0}
+.provider-help li::marker{color:var(--text);font-weight:650}
+.provider-help-note{font-size:12px;color:var(--text-2);line-height:1.6;padding:12px;border-radius:9px;background:var(--surface-hover)}
+.provider-help .dialogactions{display:flex;gap:10px;justify-content:flex-end}
+.provider-help .dialogactions button{min-height:38px;padding:9px 14px}
+.read-only-explanation{font-size:11px;color:var(--text-2);line-height:1.4;margin:12px 16px}
+#detailDelete{color:var(--text);min-height:30px}
+#profileMenu .account-menu-head>div{min-width:0}
+#profileMenu .account-menu-head strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-collapsed .sidebar .sidebar-middle .navlabel{display:none!important}
+.sidebar-collapsed .sidebar .sidebar-middle .calendar-list-head{display:none!important}
+.sidebar-collapsed .sidebar .sidebar-middle .mini-calendar{display:none!important}
+.sidebar-collapsed .sidebar .sidebar-middle #calendars{display:none!important}
+.sidebar-collapsed .sidebar .sidebar-bottom .profile>div:not(.avatar){display:none!important}
+.sidebar-collapsed .sidebar .sidebar-bottom .profile #profileMenuBtn{display:none!important}
+#calendarAddOptions{box-shadow:none!important}
+#settingsAbout .about-body .privacy-note{display:block;padding-left:0!important;line-height:1.7}
+#settingsAbout .about-body .privacy-note svg{display:inline-block;vertical-align:-3px;margin-right:7px}
+#settingsAbout .about-body a{text-decoration:underline;text-underline-offset:3px;color:var(--text)}
+#settingsAbout .about-body a:hover{color:var(--text-2)}
+@media(max-width:720px){.settings-name-fields{grid-template-columns:1fr;width:100%}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .mini-calendar{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .navlabel{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle .calendar-list-head{display:flex!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-middle #calendars{display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-bottom .profile>div:not(.avatar){display:block!important}.sidebar-collapsed .sidebar.mobile-open .sidebar-bottom .profile #profileMenuBtn{display:block!important}}
