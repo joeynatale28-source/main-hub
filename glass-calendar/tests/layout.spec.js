@@ -80,8 +80,10 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Calendar UI smoke test');
   const today = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); });
-  await page.locator('#eventDate').fill(today);
-  await page.locator('#eventTime').fill('14:15');
+  await expect(page.locator('#eventDate')).toHaveValue(today);
+  await page.locator('#startTimePicker').click();
+  await page.locator('#pickerTimeInput').fill('2:15 PM');
+  await page.locator('#pickerTimeInput').press('Enter');
   await page.locator('#eventForm button[type="submit"]').click();
   await page.locator('#todayBtn').click();
   await page.locator('[data-event]').filter({ hasText: 'Calendar UI smoke test' }).first().click();
@@ -93,8 +95,8 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await expect(page.locator('#eventDialog')).toBeVisible();
   await page.locator('#eventName').fill('Updated UI test');
   await page.locator('#eventForm button[type="submit"]').click();
-  await page.locator('#settingsHeaderButton').click();
-  await page.locator('#pageThemeSelect').selectOption('light');
+  await expect(page.locator('#eventDialog')).toBeHidden();
+  await page.locator('#quickThemeButton').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
 });
 
@@ -132,9 +134,11 @@ test('week schedule positions events by actual time and opens details', async ({
   const day = await page.locator('[data-week-track]').nth(2).getAttribute('data-week-track');
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Team planning');
-  await page.locator('#eventDate').fill(day);
-  await page.locator('#eventTime').fill('09:30');
-  await page.locator('#eventDuration').selectOption('60');
+  await page.locator('#startDatePicker').click();
+  await page.locator('[data-picker-date="'+day+'"]').click();
+  await page.locator('#startTimePicker').click();
+  await page.locator('#pickerTimeInput').fill('9:30 AM');
+  await page.locator('#pickerTimeInput').press('Enter');
   await page.locator('#eventForm button[type="submit"]').click();
   const event = page.locator('.week-event').filter({ hasText: 'Team planning' });
   await expect(event).toBeVisible();
@@ -225,7 +229,7 @@ test('precision shell shows one visible create action and day/week/month control
   await expect(page.locator('#addTop')).toBeHidden();
   await expect(page.locator('#newCalendar')).toBeHidden();
   await expect(page.locator('.toolbar-title h1')).toHaveCSS('font-size','19px');
-  await expect(page.locator('.view-toggle button')).toHaveCount(3);
+  await expect(page.locator('.view-toggle button')).toHaveCount(4);
   await page.locator('[data-switch="day"]').click();
   await expect(page.locator('.week-board.day-board')).toBeVisible();
   await expect(page.locator('.week-day-track')).toHaveCount(1);
@@ -235,7 +239,7 @@ test('precision shell shows one visible create action and day/week/month control
 });
 test('mini calendar dots, current week and today color use the shared palette', async ({page})=>{
   await page.setViewportSize({width:1440,height:900});
-  await expect(page.locator('.mini-day.today .mini-day-number')).toHaveCSS('background-color','rgb(59, 130, 246)');
+  await expect(page.locator('.mini-day.today .mini-day-number')).toHaveCSS('background-color','rgb(250, 250, 250)');
   await expect(page.locator('.mini-day.in-week').first()).toBeVisible();
 });
 test('welcome has dismissible close and backdrop without forced name entry', async ({browser})=>{
@@ -249,4 +253,70 @@ test('welcome has dismissible close and backdrop without forced name entry', asy
     await page.reload();
     await expect(page.locator('#welcomeDialog')).toBeHidden();
   }finally{await context.close()}
+});
+
+test('theme quick toggle cycles all modes and system reacts to OS scheme',async({page})=>{
+  await page.locator('#quickThemeButton').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.locator('#quickThemeButton').click();
+  await page.emulateMedia({colorScheme:'dark'});
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.emulateMedia({colorScheme:'light'});
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.locator('#quickThemeButton').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+});
+test('Settings is a separate page with sticky matching subnavigation',async({page})=>{
+  await page.locator('#settingsHeaderButton').click();
+  await expect(page.locator('#settingsPage')).toBeVisible();
+  await expect(page.locator('#calendarContent')).toBeHidden();
+  await expect(page.locator('.settings-sections')).toHaveCSS('position','sticky');
+  await expect(page.locator('.settings-anchor[data-target="settingsCalendar"]')).toHaveText('Calendar preferences');
+  await expect(page.locator('#settingsCalendar h2')).toHaveText('Calendar preferences');
+  await page.locator('#settingsBack').click();
+  await expect(page.locator('#calendarContent')).toBeVisible();
+  await expect(page.locator('#settingsPage')).toBeHidden();
+});
+test('provider logos are bounded, grey and not overlapping',async({page})=>{
+  await page.locator('#integrationsNav').click();
+  await expect(page.locator('#settingsIntegrations')).toBeVisible();
+  await expect(page.locator('#settingsGeneral')).toBeHidden();
+  for(const selector of ['.apple-brand','.google-brand','.microsoft-brand']){
+    const box=await page.locator(selector).boundingBox();expect(box.width).toBeLessThanOrEqual(37);expect(box.height).toBeLessThanOrEqual(37)
+  }
+  await expect(page.locator('.apple-brand svg')).toHaveCSS('width','22px');
+});
+test('monochrome colors, calendar shade, native controls and all-day switch',async({page})=>{
+  const vars=await page.evaluate(()=>{const css=getComputedStyle(document.documentElement);return ['--bg','--bg-sidebar','--surface','--border','--primary'].map(k=>css.getPropertyValue(k).trim())});
+  expect(vars).toEqual(['#0A0A0A','#050505','#131313','#262626','#FAFAFA']);
+  await page.locator('#addSide').click();
+  await expect(page.locator('#eventSave')).toBeDisabled();
+  await page.locator('#eventName').fill('Sample');
+  await expect(page.locator('#eventSave')).toBeEnabled();
+  await expect(page.locator('#eventAllDay')).toHaveCSS('appearance','none');
+  await page.locator('#eventAllDay').check();
+  await expect(page.locator('#startTimePicker')).toBeHidden();
+  await page.locator('#eventAllDay').uncheck();
+  await expect(page.locator('#startTimePicker')).toBeVisible();
+  await expect(page.locator('#eventRepeat')).toHaveCSS('opacity','0');
+  await page.locator('#eventDialog [data-close]').click();
+});
+test('search across dates resets completely on Escape and clear button',async({page})=>{
+  await page.locator('#addSide').click();
+  await page.locator('#eventName').fill('Unique puzzle appointment');
+  await page.locator('#eventSave').click();
+  await expect(page.locator('#eventDialog')).toBeHidden();
+  await page.locator('#searchButton').click();
+  await page.locator('#searchInput').fill('puzzle');
+  await expect(page.locator('#searchResults')).toContainText('Unique puzzle appointment');
+  await page.locator('#searchInput').press('Escape');
+  await expect(page.locator('#searchInput')).toHaveValue('');
+  await expect(page.locator('#searchResults')).toBeHidden();
+  await page.locator('#searchButton').click();
+  await page.locator('#searchInput').fill('noneexisting123');
+  await expect(page.locator('#searchResults')).toContainText('No results');
+  await page.locator('#searchClear').click();
+  await expect(page.locator('#searchResults')).toBeHidden();
 });
