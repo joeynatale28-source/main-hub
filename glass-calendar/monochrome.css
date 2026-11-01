@@ -248,3 +248,11 @@ dialog::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(5px)}
 .sidebar-collapsed .brand>span{display:none!important}
 .sidebar-collapsed #addSide{min-width:50px;max-width:50px}
 @media(max-width:860px){.sidebar-collapsed .brand{min-height:32px!important;flex-direction:row!important;justify-content:flex-start!important}.sidebar-collapsed .brand>span{display:inline!important}}
+
+/* Pixel QA: today is a circle, not a square background. */
+.mini-day.today,.mini-day.selected.today{background:var(--surface)!important;color:var(--text)!important;border-radius:8px!important}
+.mini-day.today .mini-day-number{background:var(--primary)!important;color:var(--on-primary)!important;border-radius:50%!important;width:24px!important;height:24px!important}
+.week-day-track:has(.week-event:hover)>.new-slot-hint{opacity:0!important}
+.integration-note svg{display:inline-block!important;width:16px!important;height:16px!important;flex:0 0 16px!important;color:var(--text-2)!important;stroke:currentColor!important}
+.privacy-note svg{display:inline-block!important;width:14px!important;height:14px!important;vertical-align:-2px;flex:none;stroke:currentColor;color:var(--text-2);margin-right:6px}
+.microsoft-brand svg{width:22px!important;height:22px!important;fill:var(--text)!important}
