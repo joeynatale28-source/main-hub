@@ -28,8 +28,8 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Install browser
-        run: npx playwright install --with-deps chromium
+      - name: Check installed browser
+        run: google-chrome --version
       - name: Check script syntax
         run: npm run check
       - name: Run browser regression tests
