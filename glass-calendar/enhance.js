@@ -10,7 +10,7 @@ const formatDate=s=>dayDate(s).toLocaleDateString('en-US',{month:'short',day:'nu
 const formatTime=t=>{const [h,m]=(t||'09:00').split(':').map(Number);return (h%12||12)+':'+String(m||0).padStart(2,'0')+(h<12?' AM':' PM')};
 const parseTime=s=>{if(/^\d\d:\d\d$/.test(s))return s;const match=s.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);if(!match)return null;let h=+match[1],m=+(match[2]||0);if(h>23||m>59)return null;if(match[3]){if(h<1||h>12)return null;h=(h%12)+(match[3].toLowerCase()==='pm'?12:0)}return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const savedTheme=()=>localStorage.getItem('daylight-theme')||'dark';
+const savedTheme=()=>window.DaylightStore.getItem('daylight-theme')||'dark';
 const icons={
  moon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>',
  sun:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
@@ -131,7 +131,7 @@ $('quickThemeButton').onclick=()=>{const modes=['dark','light','system'],next=mo
 themeChanged(savedTheme(),document.documentElement.dataset.theme);
 requestAnimationFrame(()=>document.body.dataset.loaded='1');
 function syncAvatar(name){const avatar=document.querySelector('.profile .avatar');if(!avatar)return;if(name?.trim())avatar.textContent=name.trim().charAt(0).toUpperCase();else avatar.innerHTML='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>';avatar.setAttribute('aria-label',name?.trim()?'Account '+name:'Guest account')}
-syncAvatar(localStorage.getItem('daylight-name')||'');
+syncAvatar(window.DaylightStore.getItem('daylight-name')||'');
 function detailExtras(e){
  const dialog=$('detailDialog');if(!dialog)return;
  let extra=$('detailExtras');if(!extra){extra=document.createElement('div');extra.id='detailExtras';extra.className='detail-extra';dialog.querySelector('.event-sheet-footer')?.before(extra)}
