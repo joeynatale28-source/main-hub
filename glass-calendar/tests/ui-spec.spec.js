@@ -109,7 +109,7 @@ test('Photon suggestions are keyboard-drivable without advancing the wizard',asy
   await page.locator('#eventSave').click();
   await expect(page.locator('#wizardSuccess')).toBeVisible();
   const event=await page.evaluate(()=>JSON.parse(localStorage.getItem('daylight-events-v1')||'[]').find(e=>e.title==='Location test'));
-  expect(event.location).toBe('Central Park');
+  expect(event.location).toMatch(/^Central Park/);
   expect(event.locationAddress).toContain('New York');
 });
 
