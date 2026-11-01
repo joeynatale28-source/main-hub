@@ -125,7 +125,7 @@ test('mobile month dates reveal their events and add-event shortcut', async ({ p
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('#selectedDayAgenda')).toBeHidden();
   const firstDate = await page.locator('#calendarView .daycell').nth(8).getAttribute('data-day');
-  await page.locator('#calendarView .daycell').nth(8).locator('[data-add-date]').click({force:true});
+  await page.locator('#calendarView .daycell').nth(8).locator('[data-add-date]').click();
   await expect(page.locator('#eventDialog')).toBeVisible();
   await expect(page.locator('#eventDate')).toHaveValue(firstDate);
 });
