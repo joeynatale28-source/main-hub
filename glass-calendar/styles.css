@@ -118,3 +118,9 @@ body.mobile-nav-open{overflow:hidden}
 @media(max-width:860px){.app .main{padding:0 12px}.week-board{min-width:760px}}
 @media(max-width:620px){.app .main{padding:0 7px}.week-board{min-width:740px}.week-scroll{height:calc(100dvh - 285px);min-height:410px}.week-day-name{font-size:10px}.week-day-number{font-size:13px}.week-event strong{font-size:10px}.page-range{font-size:11px}.panel-header{height:50px}}
 @media(prefers-reduced-motion:reduce){.week-event,.all-day-pill{transition:none}}
+
+/* Mobile month indicators: compact dots with no clipped text */
+@media(max-width:620px){
+ .calendar-panel .daycell .eventchip{display:inline-block!important;vertical-align:middle!important;width:7px!important;height:7px!important;min-height:7px!important;margin:2px 2px 0 1px!important;padding:0!important;border:0!important;border-radius:50%!important;background:var(--tone,var(--muted))!important;color:transparent!important;font-size:0!important;line-height:0!important;white-space:nowrap!important;overflow:hidden!important;box-shadow:none!important}
+ .calendar-panel .daycell .eventchip:nth-of-type(n+3){display:none!important}
+}
