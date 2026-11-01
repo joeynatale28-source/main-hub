@@ -82,7 +82,7 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Calendar UI smoke test');
-  const today = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); });
+  const today = await page.evaluate(() => { const d = new Date(); d.setHours(d.getHours()+1,0,0,0); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); });
   await expect(page.locator('#eventDate')).toHaveValue(today);
   await page.locator('#eventSave').click();
   await page.locator('#startTimePicker').click();
