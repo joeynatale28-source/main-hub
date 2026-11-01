@@ -32,7 +32,7 @@ function settingsTop(){const stack=document.querySelector('.settings-stack');if(
 for(const id of ['settingsHeaderButton','profileSettings','profileAbout','integrationsNav','tasksNav','settingsBack','tasksBack'])$(id)?.addEventListener('click',()=>{requestAnimationFrame(()=>{window.scrollTo(0,0);settingsTop();const list=$('tasksList');if(list)list.scrollTop=0})});
 const originalSettingsClick=$('settingsHeaderButton').onclick;
 const stack=document.querySelector('.settings-stack'),anchors=[...document.querySelectorAll('.settings-anchor')];
-const scrollspy=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);if(!visible.length)return;const id=visible[0].target.id;anchors.forEach(b=>{const active=b.dataset.target===id;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'location':'false')})},{root:stack,rootMargin:'-8px 0px -65% 0px',threshold:0});
+const scrollspy=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);if(!visible.length)return;const id=visible[0].target.id;anchors.forEach(b=>{const active=b.dataset.target===id;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'location':'false')})},{root:$('settingsPage'),rootMargin:'-8px 0px -65% 0px',threshold:0});
 document.querySelectorAll('.settings-stack>.setting-group').forEach(s=>scrollspy.observe(s));
 // Integrations uses its own main-region view.
 const back=()=>{if(!$('settingsPage').hidden)$('settingsBack').click();else if(!$('tasksPage').hidden)$('tasksBack').click()};
