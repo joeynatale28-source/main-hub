@@ -422,7 +422,7 @@ test('accent swatches, custom hex validation, and persistence',async({page})=>{
  await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
  await page.reload();
  await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
- await page.locator('#settingsHeaderButton').click();
+ if(!(await page.locator('#settingsPage').isVisible()))await page.locator('#settingsHeaderButton').click();
  await page.locator('[data-accent-choice="graphite"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-accent','graphite');
 });
