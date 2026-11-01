@@ -1,40 +1,33 @@
-# Daylight MCP server
+# daylight. MCP (local stdio server)
 
-A local stdio MCP server for Daylight v2. It uses Supabase's official JavaScript client and the MCP TypeScript SDK.
+This server connects an AI agent to the calendar belonging to a single manually created daylight. user. It does not expose Supabase Auth or public accounts. It checks the hashed Daylight MCP token **on every call**, filters **every** data query by that token's `user_id`, and refuses deletions unless that user enables AI deletes. Deletions use the database's atomic audit RPC.
 
-## Start
+## Setup
 
-```bash
-cd mcp
+```sh
 npm install
 npm run build
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DAYLIGHT_MCP_TOKEN=... node dist/index.js
+node dist/index.js
 ```
 
-Copy `.env.example` for environment variable names. Never commit a real service-role key or a raw MCP token. The service role bypasses RLS, so **every tool is explicitly scoped** to the user ID resolved from the stored SHA-256 token hash.
+Copy `.env.example` variable names into your agent configuration; use your real Supabase URL and **server-side-only** service role secret. Generate `DAYLIGHT_MCP_TOKEN` in Daylight → Settings → AI access, and store it securely.
 
-## Example stdio client configuration
+Example local MCP host configuration (replace placeholders in the host, never commit real values):
 
 ```json
 {
   "mcpServers": {
     "daylight": {
       "command": "node",
-      "args": ["/absolute/path/to/main-hub/mcp/dist/index.js"],
+      "args": ["/absolute/path/to/daylight-v2/mcp/dist/index.js"],
       "env": {
-        "SUPABASE_URL": "https://YOUR_PROJECT_REF.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "SET_THIS_SECRET_LOCALLY",
-        "DAYLIGHT_MCP_TOKEN": "PASTE_ONCE_FROM_DAYLIGHT_SETTINGS"
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "SET_SERVER_SECRET_LOCALLY",
+        "DAYLIGHT_MCP_TOKEN": "PASTE_ONE_TIME_TOKEN"
       }
     }
   }
 }
 ```
 
-Generate a token from Daylight → Settings → AI access. The original token is shown once, then only its hash is stored. By default, AI delete operations are rejected. The owner must explicitly enable them in Daylight Settings, and each successful delete is written to the audit log.
-
-This is a **local process**, not a publicly hosted HTTP MCP endpoint. Keep the service-role key on a trusted local machine. Running this with untrusted AI code or sharing its environment variables would compromise the account database.
-
-## Security and testing
-
-Tests should verify: unknown/revoked tokens fail; no operation accesses another user's rows; delete is blocked by default; enabling deletes permits a single-ID deletion and creates an audit log. No public test password is stored here.
+Never use the service role key in the web app. The `mcp_allow_delete` flag defaults to false. `delete_event` and `delete_task` refuse to run until the owner explicitly enables it.

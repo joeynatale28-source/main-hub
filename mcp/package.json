@@ -1,20 +1,14 @@
 {
-  "name": "@daylight/mcp",
-  "private": true,
+  "name": "daylight-mcp",
   "version": "2.0.0",
+  "private": true,
   "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "check": "tsc --noEmit"
-  },
+  "engines": { "node": ">=20" },
+  "scripts": { "build": "tsc", "start": "node dist/index.js" },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.0",
-    "@supabase/supabase-js": "^2.50.0",
-    "zod": "^3.25.0"
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@supabase/supabase-js": "2.49.10",
+    "zod": "4.1.12"
   },
-  "devDependencies": {
-    "@types/node": "^22.15.0",
-    "typescript": "^5.8.3"
-  }
+  "devDependencies": { "typescript": "5.9.3", "@types/node": "22.15.17" }
 }

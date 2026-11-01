@@ -1,30 +1,26 @@
-# Daylight Calendar
+# daylight. v2 — Manual account calendar
 
-Monochrome, responsive, browser-first calendar.
+Deployed as the `glass-calendar/` app inside `joeynatale28-source/main-hub` on GitHub Pages.
+The public site is at `https://joeynatale28-source.github.io/main-hub/glass-calendar/` when the repository Pages source is deployed from `main`.
 
-## Running locally
-Run a local static server from this directory for the interface. URL subscriptions use the Vercel Node.js endpoint at `api/feed.js` and require a Vercel deployment (or compatible functions host).
+## Frontend
 
-## Features
-- Month, week, and agenda views with event creation, editing and deletion.
-- Dark/light/system themes, settings page, keyboard navigation and onboarding.
-- Browser-local storage for events and preferences.
-- Import and export .ics files.
-- Read-only URL subscriptions using the server endpoint, with manual refresh and per-provider restrictions.
+The production static files are `index.html`, `main.js`, and `style.css` in this directory. The editable Vite source is in `web/`. Use `npm install && npm run build`; then copy `dist/` contents over the production files when releasing.
 
-## Integration limitations
-- **Feed subscriptions are not generic:** security restrictions currently permit Google Calendar, Microsoft Outlook, iCloud and Teamup hosts only, and only when the URL returns a public iCalendar file directly. Redirected or authenticated URLs do not work.
-- **CalDAV is not implemented.** A production CalDAV connector requires account authorization, discovery, REPORT/PROPFIND/PUT/DELETE, synchronization tokens or ETags, conflict management, timezone/recurrence support, and authenticated server storage.
-- **ICS parser is basic:** recurring events, time zone definitions, exceptions and some alternative date formats are not fully supported. Do not rely on it as a complete RFC 5545 implementation.
-- Events are not synchronized across browsers or devices; localStorage can be cleared.
-- This repository has not passed a full cross-browser accessibility/end-to-end test, and is not certified production-ready.
+Public configuration is compiled into the frontend. Never put password, claim code, PIN, MCP token, session token or service role key in the frontend source or GitHub.
 
-## Security
-The subscription endpoint uses HTTPS, denies redirects, restricts hostnames, limits response sizes and request time. It does not store credentials. Do not put passwords or tokens into URLs. Public calendar links can be sensitive: anyone who possesses a feed URL may be able to read that calendar.
+## Backend and security
 
-## Deployment
-Import `joeynatale28-source/main-hub` on Vercel with root directory `glass-calendar`. No build command is required. The project has not been deployed by this integration because Vercel returns HTTP 403 to project-creation requests.
+The web app talks only to the deployed Supabase `daylight-api` Edge Function. Manual accounts are stored in `public.users`, with owner `joeyn028` initially unclaimed. The old Supabase Auth-based `v2-*.js` sources are kept in the repository as historical source, but the new `index.html` does not load them.
 
-## Integrations interface
+**Initial owner claim:** You must enter the one-time owner invitation code from the separately provided private setup file. Do not commit that file. Setup generates a new password and PIN through the application.
 
-The current interface includes an **Integrations** navigation item and a Settings section for Google Calendar, Outlook, Apple Calendar, iCal/webcal, and CalDAV. Only public, compatible read-only calendar feeds and `.ics` import/export are implemented. Google/Microsoft OAuth and authenticated CalDAV remain planned. This project uses the `glass-calendar` root directory on Vercel.
+New workspace data is stored in RLS-locked `dl_*` tables, separately from older Auth-based tables. The Edge Function uses a server-side service-role key; access is checked per-session and owner-scoped.
+
+## Features and limitations
+
+The new app includes day/week/month/agenda navigation, calendar and task editing, preferences, theme, manual admin users, owner invitations, PIN lock, onboarding, and AI access. It is a new standalone implementation replacing the old UI entry point. Two-way CalDAV/Google/Apple synchronization and automatic ICS feed refresh are not implemented yet. See `QA.md` for tests and remaining limitations.
+
+## CI / GitHub Pages
+
+`main-hub/.github/workflows/daylight-pages.yml` builds a Pages artifact containing the existing hub homepage plus the new calendar, preserving the rest of the hub site. GitHub Pages must have its **Source: GitHub Actions** enabled for that workflow to publish.
