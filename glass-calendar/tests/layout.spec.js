@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+async function toDetails(page){await page.locator('#eventSave').click();await expect(page.locator('#wizardCount')).toHaveText('STEP 2 OF 4');await page.locator('#eventSave').click();await page.locator('#eventSave').click();await expect(page.locator('#wizardCount')).toHaveText('STEP 4 OF 4')}
+async function createWizardEvent(page){await toDetails(page);await page.locator('#eventSave').click();await expect(page.locator('#wizardSuccess')).toBeVisible();await expect(page.locator('#eventDialog')).toBeHidden({timeout:5000})}
+
 const sizes = [
   { name: 'desktop', width: 1440, height: 900 },
   { name: 'laptop', width: 1024, height: 768 },
@@ -81,10 +84,13 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await page.locator('#eventName').fill('Calendar UI smoke test');
   const today = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); });
   await expect(page.locator('#eventDate')).toHaveValue(today);
+  await page.locator('#eventSave').click();
   await page.locator('#startTimePicker').click();
   await page.locator('#pickerTimeInput').fill('2:15 PM');
   await page.locator('#pickerTimeInput').press('Enter');
-  await page.locator('#eventForm button[type="submit"]').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
   await page.locator('#todayBtn').click();
   await page.locator('[data-event]').filter({ hasText: 'Calendar UI smoke test' }).first().click();
   await expect(page.locator('#detailDialog')).toBeVisible();
@@ -94,7 +100,10 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await page.locator('#detailEdit').click();
   await expect(page.locator('#eventDialog')).toBeVisible();
   await page.locator('#eventName').fill('Updated UI test');
-  await page.locator('#eventForm button[type="submit"]').click();
+  await toDetails(page);
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
+  await page.locator('#eventSave').click();
   await expect(page.locator('#eventDialog')).toBeHidden();
   await page.locator('#quickThemeButton').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
@@ -134,6 +143,7 @@ test('week schedule positions events by actual time and opens details', async ({
   const day = await page.locator('[data-week-track]').nth(2).getAttribute('data-week-track');
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Team planning');
+  await page.locator('#eventSave').click();
   await page.locator('#startDatePicker').click();
   await page.locator('[data-picker-date="'+day+'"]').click();
   await page.locator('#startTimePicker').click();
@@ -215,6 +225,7 @@ test('integrations navigation displays providers and working subscription action
 test('event editor saves all-day events with a full-day duration', async ({ page }) => {
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('All-day planning');
+  await page.locator('#eventSave').click();
   await page.locator('#eventAllDay').check();
   await expect(page.locator('#eventTime')).toBeDisabled();
   await page.locator('#eventForm button[type="submit"]').click();
@@ -295,6 +306,7 @@ test('monochrome colors, calendar shade, native controls and all-day switch',asy
   await expect(page.locator('#eventSave')).toBeDisabled();
   await page.locator('#eventName').fill('Sample');
   await expect(page.locator('#eventSave')).toBeEnabled();
+  await page.locator('#eventSave').click();
   await expect(page.locator('#eventAllDay')).toHaveCSS('appearance','none');
   await page.locator('#eventAllDay').check();
   await expect(page.locator('#startTimePicker')).toBeHidden();
@@ -302,11 +314,12 @@ test('monochrome colors, calendar shade, native controls and all-day switch',asy
   await expect(page.locator('#startTimePicker')).toBeVisible();
   await expect(page.locator('#eventRepeat')).toHaveCSS('opacity','0');
   await page.locator('#eventDialog [data-close]').first().click();
+  await page.locator('#wizardDiscardButton').click();
 });
 test('search across dates resets completely on Escape and clear button',async({page})=>{
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Unique puzzle appointment');
-  await page.locator('#eventSave').click();
+  await createWizardEvent(page);
   await expect(page.locator('#eventDialog')).toBeHidden();
   await page.locator('#searchButton').click();
   await page.locator('#searchInput').fill('puzzle');
@@ -345,15 +358,82 @@ test('visual QA captures Settings, Integrations and event editor in both themes'
 test('event modal custom selects work inside dialog and save metadata',async({page})=>{
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Weekly swim');
-  await page.locator('#eventRepeat + .select-button').click();
-  await page.locator('.select-menu .select-option').filter({hasText:'Weekly'}).click();
+  await page.locator('#eventSave').click();
+  await page.locator('#wizardRepeatChips [data-value="weekly"]').click();
   await expect(page.locator('#eventRepeat')).toHaveValue('weekly');
+  await page.locator('#eventSave').click();
+  await page.locator('#eventLocation').fill('Community pool');
+  await page.locator('#eventSave').click();
   await page.locator('#eventReminder + .select-button').click();
   await page.locator('.select-menu .select-option').filter({hasText:'15 min before'}).click();
   await expect(page.locator('#eventReminder')).toHaveValue('15m');
-  await page.locator('#eventLocation').fill('Community pool');
   await page.locator('#eventSave').click();
-  await expect(page.locator('#eventDialog')).toBeHidden();
+  await expect(page.locator('#eventDialog')).toBeHidden({timeout:5000});
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('daylight-events-v1')||'[]').find(e=>e.title==='Weekly swim'));
   expect(saved).toMatchObject({repeat:'weekly',reminder:'15m',location:'Community pool'});
+});
+
+test('wizard has four steps, skip buttons, and creation success',async({page})=>{
+ await page.locator('#addSide').click();
+ await expect(page.locator('#wizardCount')).toHaveText('STEP 1 OF 4');
+ await expect(page.locator('#eventSave')).toBeDisabled();
+ await page.locator('#eventName').fill('My birthday');
+ await page.locator('#eventSave').click();
+ await expect(page.locator('#wizardCount')).toHaveText('STEP 2 OF 4');
+ await page.locator('#eventSave').click();
+ await expect(page.locator('#wizardCount')).toHaveText('STEP 3 OF 4');
+ await page.locator('#wizardSkip').click();
+ await expect(page.locator('#wizardCount')).toHaveText('STEP 4 OF 4');
+ await page.locator('#wizardSkip').click();
+ await expect(page.locator('#wizardSuccess')).toBeVisible();
+ await expect(page.locator('#eventDialog')).toBeHidden({timeout:5000});
+});
+test('theme treatments respond live and holiday banner uses dates',async({page})=>{
+ await page.locator('#addSide').click();
+ await page.locator('#eventName').fill('Halloween party');
+ await expect(page.locator('#wizardThemeIcon')).toBeVisible();
+ await expect(page.locator('#wizardThemeIcon svg')).toBeVisible();
+ await page.locator('#eventName').fill('General plans');
+ await expect(page.locator('#wizardThemeIcon')).toBeHidden();
+ await page.locator('#eventSave').click();
+ await page.locator('#startDatePicker').click();
+ await page.locator('.picker-header').toBeVisible();
+ await page.locator('#pickerPanel [data-picker-date="2026-10-31"]').count().then(async n=>{if(!n){await page.locator('#startDatePicker').click()}});
+ await page.evaluate(()=>{const x=document.querySelector('#eventDate');x.value='2026-10-31';x.dispatchEvent(new Event('change',{bubbles:true}))});
+ await expect(page.locator('#wizardHoliday')).toContainText('Halloween');
+ await page.locator('#wizardHoliday button').click();
+ await expect(page.locator('#wizardHoliday')).toBeHidden();
+});
+test('accent swatches, custom hex validation, and persistence',async({page})=>{
+ await page.locator('#settingsHeaderButton').click();
+ await page.locator('#settingsAppearance').scrollIntoViewIfNeeded();
+ await expect(page.locator('html')).toHaveAttribute('data-accent','graphite');
+ await page.locator('[data-accent-choice="#3B82F6"]').click();
+ await expect(page.locator('html')).toHaveAttribute('data-accent','custom');
+ await expect(page.locator('html')).toHaveCSS('--accent','#3B82F6');
+ await page.locator('#accentHex').fill('oops');
+ await expect(page.locator('#accentError')).toBeVisible();
+ await page.locator('#accentHex').fill('#8B7CFF');
+ await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
+ await page.reload();
+ await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
+ await page.locator('#settingsHeaderButton').click();
+ await page.locator('[data-accent-choice="graphite"]').click();
+ await expect(page.locator('html')).toHaveAttribute('data-accent','graphite');
+});
+test('dirty wizard asks to discard and draft offers resume on reload',async({page})=>{
+ await page.locator('#addSide').click();
+ await page.locator('#eventName').fill('Unfinished future plan');
+ await page.reload();
+ await page.locator('#addSide').click();
+ await expect(page.locator('#wizardResume')).toBeVisible();
+ await page.locator('#wizardResumeButton').click();
+ await expect(page.locator('#eventName')).toHaveValue('Unfinished future plan');
+ await page.locator('#eventDialog [data-close]').first().click();
+ await expect(page.locator('#wizardDiscard')).toBeVisible();
+ await page.locator('#wizardKeepEditing').click();
+ await expect(page.locator('#eventDialog')).toBeVisible();
+ await page.locator('#eventDialog [data-close]').first().click();
+ await page.locator('#wizardDiscardButton').click();
+ await expect(page.locator('#eventDialog')).toBeHidden();
 });
