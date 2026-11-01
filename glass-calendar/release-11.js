@@ -31,7 +31,7 @@ function closeSettings(force=false){
  if(!force&&getDirty()&&!confirm('Discard the unfinished subscription?'))return;
  dlg.close();opener?.focus?.({preventScroll:true});opener=null;
 }
-function openSettings(event,which){
+function openSettings(event,which){panel.hidden=false;
  if(dlg.open){if(which)section(which);return}
  opener=event?.target?.closest?.('button')||document.activeElement;
  $('settingsName').value=localStorage.getItem('daylight-name')||'';
@@ -39,9 +39,9 @@ function openSettings(event,which){
  $('defaultViewSelect').value=localStorage.getItem('daylight-default-view')||'week';
  section(which||'settingsGeneral');dlg.showModal();
 }
-close.onclick=()=>closeSettings();dlg.addEventListener('click',e=>{if(e.target===dlg)closeSettings()});
+bridge.openSettings=()=>openSettings({target:document.activeElement});close.onclick=()=>closeSettings();dlg.addEventListener('click',e=>{if(e.target===dlg)closeSettings()});
 dlg.addEventListener('cancel',e=>{e.preventDefault();closeSettings()});
-window.DaylightRelease={openSettings,closeSettings,confirmRemoveSubscription:removeSub};
+window.DaylightRelease={openSettings,closeSettings,confirmRemoveSubscription:(id)=>{requestDelete('subscription-'+id)}};
 function captureSettings(e){
  const target=e.target.closest?.('#settingsNav,#settingsHeaderButton,#profileSettings,#profileAbout,#aboutNav,#footerAbout,#settingsBack');
  if(!target)return;
