@@ -48,3 +48,19 @@ body.mobile-nav-open{overflow:hidden}
 .mobilebar .mobile-add:hover,.mobilebar button:hover{filter:brightness(.91)}
 @media(max-width:860px){.sidebar-collapsed .mini-calendar{display:block!important}.sidebar-collapsed .mini-cal-header{display:flex}.sidebar-collapsed .mini-cal-grid{display:grid}.sidebar-collapsed .calendar-list-head{display:flex!important}.sidebar-collapsed #calendars{display:grid!important}.sidebar-collapsed .navlabel{display:block!important}.sidebar-collapsed .logo{display:grid!important}.sidebar-collapsed .brand>span{display:inline!important}.sidebar-collapsed .nav kbd{display:block}.sidebar-collapsed .profile .avatar{display:grid!important}.sidebar-collapsed .profile>div:nth-child(2){display:block!important}}
 @media(min-width:861px){.mobileBackdrop,.mobilebar{display:none!important}}
+
+/* Apple-style selected-day agenda beneath the mobile month grid */
+.small-link{display:inline-flex;align-items:center;gap:7px}.small-link svg,.calendar-list-head button svg{height:15px;width:15px}
+.selected-day-section{display:none}
+@media(max-width:620px){
+ .selected-day-section:not([hidden]){display:block;padding:16px 14px 20px;border-top:1px solid var(--line);background:var(--panel)}
+ .selected-day-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+ .selected-day-header span{font-size:11px;color:var(--muted);display:block}
+ .selected-day-header strong{font-size:17px;font-weight:650;display:block;margin-top:3px}
+ .selected-day-header button{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--strong-line);border-radius:9px;background:var(--panel-raised)}
+ .selected-day-event{width:100%;display:flex;align-items:center;gap:11px;text-align:left;border:1px solid var(--line);border-radius:10px;background:var(--panel-raised);padding:11px;margin:7px 0}
+ .selected-day-event:hover{background:var(--panel-hover)}
+ .day-event-indicator{height:25px;width:3px;border-radius:3px;background:var(--muted);flex:none}
+ .day-event-copy{flex:1;min-width:0}.day-event-copy strong{display:block;font-size:12px;line-height:1.35;overflow-wrap:anywhere}.day-event-copy small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+ .day-event-chevron{color:var(--muted);font-size:20px}.selected-day-empty{color:var(--muted);font-size:12px;padding:6px 0;margin:0}
+}
