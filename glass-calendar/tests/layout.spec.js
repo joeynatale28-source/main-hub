@@ -169,3 +169,23 @@ test('US holidays appear as all-day events in week view', async ({ page }) => {
   await expect(page.locator('.week-all-day')).toContainText('Thanksgiving Day');
   await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
 });
+
+test('fresh installs open the new weekly schedule while saved preferences win', async ({ page }) => {
+  await page.evaluate(() => localStorage.removeItem('daylight-default-view'));
+  await page.reload();
+  await expect(page.locator('.week-board')).toBeVisible();
+  await expect(page.locator('#viewSelect')).toHaveValue('week');
+  await page.locator('#viewSelect').selectOption('month');
+  await expect(page.locator('#viewSelect')).toHaveValue('month');
+});
+
+test('clicking an empty week slot pre-fills date and rounded start time', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('#viewSelect').selectOption('week');
+  const track = page.locator('[data-week-track]').nth(3);
+  const key = await track.getAttribute('data-week-track');
+  await track.click({ position: { x: 40, y: 660 } });
+  await expect(page.locator('#eventDialog')).toBeVisible();
+  await expect(page.locator('#eventDate')).toHaveValue(key);
+  await expect(page.locator('#eventTime')).toHaveValue('10:00');
+});
