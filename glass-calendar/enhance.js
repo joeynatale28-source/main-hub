@@ -105,9 +105,9 @@ function searchChanged(query){
  const term=String(query||'').trim().toLowerCase(),hits=bridge()?.getEvents().filter(e=>(e.title+' '+(e.notes||'')).toLowerCase().includes(term)).slice(0,40)||[];
  results.hidden=!term;
  if(!term){results.innerHTML='';return}
- results.innerHTML=hits.length?hits.map(e=>'<button type="button" class="search-result" data-search-id="'+esc(e.id)+'"><strong>'+esc(e.title)+'</strong><span>'+esc(formatDate(e.date))+(e.holiday||e.allDay?' · All day':' · '+esc(formatTime(e.time)))+'</span></button>').join(''):'<div class="search-empty">No results for &ldquo;'+esc(query)+'&rdquo;<button id="searchClearEmpty" type="button">Clear search</button></div>';
+ results.innerHTML=hits.length?hits.map(e=>'<button type="button" class="search-result" data-search-id="'+esc(e.id)+'"><strong>'+esc(e.title)+'</strong><span>'+esc(formatDate(e.date))+(e.holiday||e.allDay?' · All day':' · '+esc(formatTime(e.time)))+'</span></button>').join(''):'<div class="search-empty">No results for &ldquo;'+esc(query)+'&rdquo;</div>';
  results.querySelectorAll('[data-search-id]').forEach(b=>b.onclick=()=>{const e=hits.find(x=>x.id===b.dataset.searchId);if(e){bridge().jumpTo(e);closeSearch()}});
- $('searchClearEmpty')?.addEventListener('click',clearSearch);
+
 }
 function clearSearch(){bridge()?.setSearch('');$('searchInput').value='';results.hidden=true;closeSearch()}
 $('searchClear').onclick=clearSearch;
@@ -117,7 +117,6 @@ if(originalSearchClick){$('searchButton').onclick=e=>{originalSearchClick(e);if(
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.activeElement===$('searchInput')){e.preventDefault();clearSearch()}});
 function afterRender(shown){
  document.querySelectorAll('select').forEach(enhanceSelect);
- if(bridge()?.getSearch()){const term=bridge().getSearch();const empty=document.querySelector('.calendar-empty-state,.agenda .empty');if(empty){empty.innerHTML='No results for &ldquo;'+esc(term)+'&rdquo; <button type="button" class="outline clear-inline-search">Clear search</button>';empty.querySelector('button')?.addEventListener('click',clearSearch)}}
  const legend=$('miniLegend');if(legend)legend.hidden=!document.querySelector('.mini-event-dot');
  // Sync flyout after calendar visibility rerenders.
  const flyout=$('collapsedCalendarList');if(flyout)flyout.innerHTML=$('calendars').innerHTML;
