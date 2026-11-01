@@ -155,7 +155,7 @@
     const nameOf=p=>[p.name||(p.housenumber&&p.street?[p.housenumber,p.street].join(' '):p.street)||p.city||'Location',p.name&&p.street?[p.housenumber,p.street].filter(Boolean).join(' '):null,p.city,p.state].filter((v,i,a)=>v&&a.indexOf(v)===i).join(', ');
     const fullOf=p=>[p.name||p.street,p.housenumber&&p.street?[p.housenumber,p.street].join(' '):p.street,p.postcode,p.city,p.state,p.country].filter((v,i,a)=>v&&a.indexOf(v)===i).join(', ');
     const secondaryOf=p=>[p.city,p.state,p.country].filter(Boolean).join(', ');
-    const hide=()=>{resultList.hidden=true;active=-1;location.setAttribute('aria-expanded','false')};const note=()=>{addressNote.hidden=!selected;addressNote.textContent=selected?'Full address saved: '+selected.address:''};
+    const hide=()=>{resultList.hidden=true;resultList.replaceChildren();active=-1;location.setAttribute('aria-expanded','false')};const note=()=>{addressNote.hidden=!selected;addressNote.textContent=selected?'Full address saved: '+selected.address:''};
     const highlight=()=>resultList.querySelectorAll('[data-address-index]').forEach((el,i)=>{el.classList.toggle('active',i===active);el.setAttribute('aria-selected',String(i===active))});
     const choose=i=>{const item=results[i];if(!item)return;selected={label:item.label,address:item.address};location.value=item.label;hide();note();location.dispatchEvent(new Event('change',{bubbles:true}));location.focus()};
     const draw=()=>{
