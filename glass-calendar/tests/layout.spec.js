@@ -77,7 +77,7 @@ test('mobile navigation is an accessible dismissible drawer', async ({ page }) =
 
 test('create event, open compact details, edit it, and change theme', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#addTop').click();
+  await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Calendar UI smoke test');
   const today = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); });
   await page.locator('#eventDate').fill(today);
@@ -93,7 +93,8 @@ test('create event, open compact details, edit it, and change theme', async ({ p
   await expect(page.locator('#eventDialog')).toBeVisible();
   await page.locator('#eventName').fill('Updated UI test');
   await page.locator('#eventForm button[type="submit"]').click();
-  await page.locator('#themeToggle').click();
+  await page.locator('#settingsHeaderButton').click();
+  await page.locator('#pageThemeSelect').selectOption('light');
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
 });
 
@@ -127,9 +128,9 @@ test('week schedule positions events by actual time and opens details', async ({
   await page.locator('#viewSelect').selectOption('week');
   await expect(page.locator('.week-days-head .week-day-button')).toHaveCount(7);
   await expect(page.locator('.week-day-track')).toHaveCount(7);
-  await expect(page.locator('.week-hour-label')).toHaveCount(24);
+  await expect(page.locator('.week-hour-label')).toHaveCount(48);
   const day = await page.locator('[data-week-track]').nth(2).getAttribute('data-week-track');
-  await page.locator('#addTop').click();
+  await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Team planning');
   await page.locator('#eventDate').fill(day);
   await page.locator('#eventTime').fill('09:30');
@@ -138,8 +139,8 @@ test('week schedule positions events by actual time and opens details', async ({
   const event = page.locator('.week-event').filter({ hasText: 'Team planning' });
   await expect(event).toBeVisible();
   const top = await event.evaluate(el => parseFloat(el.style.top));
-  expect(top).toBeGreaterThan(600);
-  expect(top).toBeLessThan(650);
+  expect(top).toBeGreaterThan(555);
+  expect(top).toBeLessThan(605);
   await event.click();
   await expect(page.locator('#detailTitle')).toHaveText('Team planning');
   await page.screenshot({ path: 'test-results/week-desktop.png', fullPage: false });
@@ -157,7 +158,7 @@ test('week layout is scrollable inside calendar on mobile without page overflow'
   }));
   expect(result.document).toBeLessThanOrEqual(result.viewport + 2);
   expect(result.week).toBeGreaterThan(result.scrollArea);
-  expect(result.hours).toBe(24);
+  expect(result.hours).toBe(48);
   await expect.poll(async () => (await page.locator('.sidebar').boundingBox()).x + (await page.locator('.sidebar').boundingBox()).width, { timeout: 3000 }).toBeLessThanOrEqual(1);
   await page.screenshot({ path: 'test-results/week-phone.png', fullPage: false });
 });
@@ -190,7 +191,7 @@ test('clicking an empty week slot pre-fills date and rounded start time', async 
   await page.locator('#viewSelect').selectOption('week');
   const track = page.locator('[data-week-track]').nth(3);
   const key = await track.getAttribute('data-week-track');
-  await track.click({ position: { x: 40, y: 660 } });
+  await track.click({ position: { x: 40, y: 600 } });
   await expect(page.locator('#eventDialog')).toBeVisible();
   await expect(page.locator('#eventDate')).toHaveValue(key);
   await expect(page.locator('#eventTime')).toHaveValue('10:00');
@@ -208,7 +209,7 @@ test('integrations navigation displays providers and working subscription action
   await expect(page.locator('#subscribeDialog')).toBeHidden();
 });
 test('event editor saves all-day events with a full-day duration', async ({ page }) => {
-  await page.locator('#addTop').click();
+  await page.locator('#addSide').click();
   await page.locator('#eventName').fill('All-day planning');
   await page.locator('#eventAllDay').check();
   await expect(page.locator('#eventTime')).toBeDisabled();
@@ -216,4 +217,36 @@ test('event editor saves all-day events with a full-day duration', async ({ page
   await expect(page.locator('#eventDialog')).toBeHidden();
   await page.locator('#viewSelect').selectOption('week');
   await expect(page.locator('.week-all-day')).toContainText('All-day planning');
+});
+
+test('precision shell shows one visible create action and day/week/month controls', async ({ page }) => {
+  await page.setViewportSize({width:1440,height:900});
+  await expect(page.locator('#addSide')).toBeVisible();
+  await expect(page.locator('#addTop')).toBeHidden();
+  await expect(page.locator('#newCalendar')).toBeHidden();
+  await expect(page.locator('.toolbar-title h1')).toHaveCSS('font-size','19px');
+  await expect(page.locator('.view-toggle button')).toHaveCount(3);
+  await page.locator('[data-switch="day"]').click();
+  await expect(page.locator('.week-board.day-board')).toBeVisible();
+  await expect(page.locator('.week-day-track')).toHaveCount(1);
+  await page.locator('[data-switch="month"]').click();
+  await expect(page.locator('.monthgrid')).toBeVisible();
+  await expect(page.locator('.daycell .daynum').first()).toBeVisible();
+});
+test('mini calendar dots, current week and today color use the shared palette', async ({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await expect(page.locator('.mini-day.today .mini-day-number')).toHaveCSS('background-color','rgb(59, 130, 246)');
+  await expect(page.locator('.mini-day.in-week').first()).toBeVisible();
+});
+test('welcome has dismissible close and backdrop without forced name entry', async ({browser})=>{
+  const context=await browser.newContext();
+  const page=await context.newPage();
+  try {
+    await page.goto('http://127.0.0.1:4173/');
+    await expect(page.locator('#welcomeDialog')).toBeVisible();
+    await page.locator('#welcomeClose').click();
+    await expect(page.locator('#welcomeDialog')).toBeHidden();
+    await page.reload();
+    await expect(page.locator('#welcomeDialog')).toBeHidden();
+  }finally{await context.close()}
 });
