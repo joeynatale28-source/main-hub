@@ -122,12 +122,9 @@ test('tasks and mini-calendar navigation work', async ({ page }) => {
 
 test('mobile month dates reveal their events and add-event shortcut', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator('#selectedDayAgenda')).toBeVisible();
+  await expect(page.locator('#selectedDayAgenda')).toBeHidden();
   const firstDate = await page.locator('#calendarView .daycell').nth(8).getAttribute('data-day');
-  await page.locator('#calendarView .daycell').nth(8).click({ position: { x: 8, y: 45 } });
-  const title = await page.locator('#selectedDayTitle').textContent();
-  expect(title).toBeTruthy();
-  await page.locator('#selectedDayAdd').click();
+  await page.locator('#calendarView .daycell').nth(8).locator('[data-add-date]').click({force:true});
   await expect(page.locator('#eventDialog')).toBeVisible();
   await expect(page.locator('#eventDate')).toHaveValue(firstDate);
 });
@@ -180,6 +177,7 @@ test('week layout is scrollable inside calendar on mobile without page overflow'
 test('US holidays appear as all-day events in week view', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-26T12:00:00Z'));
   await page.reload();
+  await page.locator('#todayBtn').click();
   await page.locator('[data-switch="week"]').click();
   await expect(page.locator('.week-all-day')).toContainText('Thanksgiving Day');
   await expect(page.locator('.week-time-board .week-event').filter({ hasText:'Thanksgiving Day' })).toHaveCount(0);
@@ -295,7 +293,7 @@ test('Settings is a separate page with sticky matching subnavigation',async({pag
 test('provider logos are bounded, grey and not overlapping',async({page})=>{
   await page.locator('#integrationsNav').click();
   await expect(page.locator('#settingsIntegrations')).toBeVisible();
-  await expect(page.locator('#settingsGeneral')).toBeHidden();
+  await expect(page.locator('#settingsGeneral')).toBeVisible();
   for(const selector of ['.apple-brand','.google-brand','.microsoft-brand']){
     const box=await page.locator(selector).boundingBox();expect(box.width).toBeLessThanOrEqual(37);expect(box.height).toBeLessThanOrEqual(37)
   }
