@@ -195,3 +195,25 @@ test('clicking an empty week slot pre-fills date and rounded start time', async 
   await expect(page.locator('#eventDate')).toHaveValue(key);
   await expect(page.locator('#eventTime')).toHaveValue('10:00');
 });
+
+test('integrations navigation displays providers and working subscription action', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('#integrationsNav').click();
+  await expect(page.locator('#settingsIntegrations')).toBeVisible();
+  await expect(page.locator('.provider-card')).toHaveCount(5);
+  await expect(page.locator('.provider-card').filter({hasText:'Google Calendar'})).toBeVisible();
+  await page.locator('#integrationSubscribe').click();
+  await expect(page.locator('#subscribeDialog')).toBeVisible();
+  await page.locator('#subscribeDialog [data-close]').first().click();
+  await expect(page.locator('#subscribeDialog')).toBeHidden();
+});
+test('event editor saves all-day events with a full-day duration', async ({ page }) => {
+  await page.locator('#addTop').click();
+  await page.locator('#eventName').fill('All-day planning');
+  await page.locator('#eventAllDay').check();
+  await expect(page.locator('#eventTime')).toBeDisabled();
+  await page.locator('#eventForm button[type="submit"]').click();
+  await expect(page.locator('#eventDialog')).toBeHidden();
+  await page.locator('#viewSelect').selectOption('week');
+  await expect(page.locator('.week-all-day')).toContainText('All-day planning');
+});
