@@ -39,6 +39,7 @@ test('subscription fetches ICS TEXT, keeps chosen name, expands and refreshes wi
  await expect.poll(()=>requests).toBe(2);
  expect(await read()).toEqual(entries);
  await page.locator('.nav[data-view="month"]').click();
+ await page.evaluate(()=>window.DaylightBridge.changeView('month'));
  await expect(page.locator('.daycell[data-day="2026-11-03"]')).toContainText('Swim Practice');
  await page.locator('.daycell[data-day="2026-11-03"] [data-event]').first().click();
  await expect(page.locator('#detailCalendar')).toHaveText('My Swim Calendar');
