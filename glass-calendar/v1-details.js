@@ -8,7 +8,7 @@ if(settingsName&&save){
  const field=document.createElement('div');field.className='settings-name-fields';
  field.innerHTML='<label>First name<input id="settingsFirst" autocomplete="given-name" maxlength="35" placeholder="First name"></label><label>Last name<input id="settingsLast" autocomplete="family-name" maxlength="35" placeholder="Last name"></label>';
  container.insertBefore(field,save);
- function sync(){const n=localStorage.getItem('daylight-name')||'';const words=n.trim().split(/\s+/);$('settingsFirst').value=words.shift()||'';$('settingsLast').value=words.join(' ')}
+ function sync(){const n=window.DaylightStore.getItem('daylight-name')||'';const words=n.trim().split(/\s+/);$('settingsFirst').value=words.shift()||'';$('settingsLast').value=words.join(' ')}
  sync();$('settingsHeaderButton')?.addEventListener('click',()=>requestAnimationFrame(sync));$('profileSettings')?.addEventListener('click',()=>requestAnimationFrame(sync));
  save.addEventListener('click',()=>{settingsName.value=[$('settingsFirst').value.trim(),$('settingsLast').value.trim()].filter(Boolean).join(' ')},true);
 }
