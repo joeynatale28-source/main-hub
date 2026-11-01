@@ -14,7 +14,7 @@
   integrationsPage.innerHTML='<div class="workspace-title"><div><h1>Integrations</h1><p>Bring your calendars together with secure, read-only subscriptions.</p></div></div>';
   integrationsPage.append(integrations);
   $('settingsPage').after(integrationsPage);
-  integrationsPage.hidden=location.hash!=='#integrations';
+  integrationsPage.hidden=window.location.hash!=='#integrations';
   $('settingsPage').classList.add('workspace-view');
   $('tasksPage').classList.add('workspace-view');
   $('calendarContent').classList.add('workspace-view');
