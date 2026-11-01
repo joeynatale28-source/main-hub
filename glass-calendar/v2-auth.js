@@ -7,13 +7,13 @@
 const URL='https://qrqemjgpzoqhtmsowmqv.supabase.co';
 const PUBLISHABLE='sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj';
 const TOKEN='daylight-supabase-session-v2',BACKUP='daylight-v1-local-backup-v2';
-const KEYS=['daylight-events-v1','daylight-calendars-v1','daylight-tasks-v1','daylight-theme','daylight-accent','daylight-name','daylight-default-view','daylight-last-view','daylight-last-date','daylight-week-start','daylight-subscriptions-v1'];
+const KEYS=['daylight-events-v1','daylight-calendars-v1','daylight-tasks-v1','daylight-theme','daylight-accent','daylight-name','daylight-default-view','daylight-last-view','daylight-last-date','daylight-week-start','daylight-subscriptions-v1','daylight-holidays','daylight-onboarded','daylight-task-reminders','daylight-sidebar-collapsed'];
 const AUTH_EVENTS=['daylight:ready','daylight:synced'];
 const $=id=>document.getElementById(id);
 const root=document.documentElement;
 const safeParse=s=>{try{return JSON.parse(s)}catch{return null}};
-const token=()=>safeParse(sessionStorage.getItem(TOKEN));
-const storeSession=s=>s?sessionStorage.setItem(TOKEN,JSON.stringify(s)):sessionStorage.removeItem(TOKEN);
+const token=()=>safeParse(localStorage.getItem(TOKEN));
+const storeSession=s=>s?localStorage.setItem(TOKEN,JSON.stringify(s)):localStorage.removeItem(TOKEN);
 let active=null,dirty=false,syncTimer=null,lastPayload='',syncBusy=false;
 const toSnapshot=()=>{const payload={};for(const k of KEYS){const v=localStorage.getItem(k);if(v!==null)payload[k]=v}return payload};
 const hasMeaningfulLocal=()=>KEYS.some(k=>{const v=localStorage.getItem(k);if(v===null)return false;if(k==='daylight-events-v1'||k==='daylight-tasks-v1'||k==='daylight-subscriptions-v1')return Array.isArray(safeParse(v))&&safeParse(v).length>0;if(k==='daylight-calendars-v1')return Array.isArray(safeParse(v))&&safeParse(v).some(c=>!['personal','work','life','us-holidays'].includes(c.id));return false});
@@ -62,6 +62,7 @@ function enterApp(payload){if(payload)hydrate(payload);sessionStorage.setItem('d
 async function bootstrap(){
  const s=await getSession();
  if(!s?.user){showGate();return}
+ if(!localStorage.getItem('daylight-name')&&s.user.user_metadata){const data=s.user.user_metadata;localStorage.setItem('daylight-name',[data.first_name,data.last_name].filter(Boolean).join(' '))}
  $('authGateway').hidden=false;root.dataset.daylightAuthenticated='false';
  try{
  const row=await readCloud();const snapshot=row?.payload||null;
@@ -79,7 +80,7 @@ async function bootstrap(){
    $('authChoice').hidden=false;authView('choice');$('authHeading').textContent='Choose your calendar data';$('authImport').dataset.existing='true';return;
  }
  enterApp(snapshot);
- }catch(e){message('Could not load cloud data: '+e.message+'. Your local data has not been overwritten.');authView('error')}
+ }catch(e){authView('error');message('Could not load cloud data: '+e.message+'. Your local data has not been overwritten.')}
 }
 async function sync(){
  if(!active||syncBusy)return;
@@ -101,7 +102,7 @@ function bindAuth(){
  try{const result=await request('/auth/v1/signup',{method:'POST',body:JSON.stringify({email,password:String(form.get('password')),data:{username,first_name:String(form.get('first_name')||'').trim(),last_name:String(form.get('last_name')||'').trim()}})});if(result.access_token){storeSession(result);await bootstrap()}else{authView('login');message('Check your email for a confirmation link, then sign in.')}}catch(err){message(err.message)}finally{button.disabled=false}});
  $('authRecover').addEventListener('submit',async e=>{e.preventDefault();message('');const button=e.target.querySelector('[type=submit]');button.disabled=true;try{const email=String(new FormData(e.target).get('email')||'').trim();await request('/auth/v1/recover',{method:'POST',body:JSON.stringify({email})});authView('login');message('If the address has an account, a recovery email has been sent.')}catch(err){message(err.message)}finally{button.disabled=false}});
  $('authImport').onclick=async()=>{const existing=$('authImport').dataset.existing==='true';$('authImport').disabled=true;try{preserveLocalOnce();if(existing)await upload(toSnapshot());else await upload(toSnapshot());enterApp()}catch(e){message(e.message)}finally{$('authImport').disabled=false}};
- $('authUseCloud').onclick=async()=>{try{const row=await readCloud();if(row)enterApp(row.payload);else{clearLocal();await upload({});enterApp()}}catch(e){message(e.message)}};
+ $('authUseCloud').onclick=async()=>{try{const row=await readCloud();if(row)enterApp(row.payload);else{preserveLocalOnce();clearLocal();await upload({});enterApp()}}catch(e){message(e.message)}};
  $('cloudSignOut')?.addEventListener('click',signOut);
  $('cloudSyncNow')?.addEventListener('click',sync);
 }
