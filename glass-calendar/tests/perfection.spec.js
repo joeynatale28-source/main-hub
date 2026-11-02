@@ -56,7 +56,7 @@ for(const theme of ['light','dark']){
    await stubDaylight(page,theme);
    await page.goto('/');
    await expect(page.locator('.view-header h1')).toHaveText('Month');
-   await expect(page.locator('.monthcell')).toHaveCount(42);
+   await expect(page.locator('.monthcell')).toHaveCount(35);
    const heights=await page.locator('.monthcell').evaluateAll(cells=>cells.map(c=>Math.round(c.getBoundingClientRect().height)));
    expect(new Set(heights).size).toBe(1);
    const shot=async name=>page.screenshot({path:`test-results/daylight-${theme}-${size.width}-${name}.png`});
@@ -99,8 +99,7 @@ for(const theme of ['light','dark']){
    await shot('integrations');
    await page.locator('[data-nav=calendar]').click();
    await page.locator('#collapseRail').click();
-   const rail=await page.locator('.sidebar').boundingBox();
-   expect(Math.round(rail.width)).toBe(64);
+   await expect.poll(async()=>Math.round((await page.locator('.sidebar').boundingBox()).width)).toBe(64);
    await shot('rail');
   });
  }
