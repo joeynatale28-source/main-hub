@@ -142,30 +142,84 @@ function renderAgenda(){
 function bindEventButtons(){$$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});$$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});$$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});$$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=state.events.find(e=>e.id===x.dataset.detail);if(ev)details(ev)})}
 
 function modal(html,wide=false){
- const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');dlg.innerHTML='<div class="dialog-body">'+html+'</div>';document.body.append(dlg);dlg.showModal();
+ const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');
+ dlg.innerHTML='<div class="dialog-body">'+html+'</div><button type="button" class="dialog-close icon" data-close aria-label="Close dialog">'+icon('x',16)+'</button>';
+ document.body.append(dlg);dlg.showModal();
  $$('[data-close]',dlg).forEach(b=>b.onclick=()=>dlg.close());
  dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close()});
  dlg.addEventListener('close',()=>dlg.remove());
  return dlg;
 }
-function confirmAction(title,body,act){const dlg=modal('<h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
+function confirmAction(title,body,act){const dlg=modal('<div class="warning-circle">'+icon('warning')+'</div><h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
 function promptForm(title,placeholder,cb,value=''){
  const dlg=modal('<h2>'+h(title)+'</h2><input class="text-input" id="promptValue" placeholder="'+h(placeholder)+'" value="'+h(value)+'" maxlength="120"><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="promptSave">Save</button></footer>');
  const field=$('#promptValue',dlg);field.focus();field.select();
  const save=async()=>{if(!field.value.trim())return field.classList.add('shake');const val=field.value.trim();dlg.close();await cb(val)};
  $('#promptSave',dlg).onclick=save;field.onkeydown=e=>{if(e.key==='Enter')save()};
 }
-function menu(button,items){
- $('#floatingMenu')?.remove();const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
- el.innerHTML=items.map((x,i)=>'<button class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('');
+function menu(button,items,filterable=false){
+ $('#floatingMenu')?.remove();
+ const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
+ const search=filterable?'<div class="menu-search"><span>'+icon('search',16)+'</span><input aria-label="Search time zones" placeholder="Search time zones..." type="search"></div>':'';
+ el.innerHTML=search+'<div class="menu-options">'+items.map((x,i)=>'<button type="button" class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('')+'</div>';
  (button.closest('dialog[open]')||document.body).append(el);
- const rect=button.getBoundingClientRect();el.style.top=Math.min(innerHeight-180,rect.bottom+6)+'px';el.style.left=Math.max(5,Math.min(innerWidth-204,rect.right-194))+'px';
- $$('[data-item]',el).forEach(b=>b.onclick=()=>{const fn=items[+b.dataset.item][1];el.remove();fn()});
- const dismiss=e=>{if(!el.contains(e.target)&&e.target!==button){el.remove();document.removeEventListener('pointerdown',dismiss,true)}};setTimeout(()=>document.addEventListener('pointerdown',dismiss,true),0);
- el.onkeydown=e=>{if(e.key==='Escape'){el.remove();button.focus()}};
+ const rect=button.getBoundingClientRect(),inSidebar=!!button.closest('#calList'),width=Math.min(Math.max(220,rect.width),innerWidth-12);
+ el.style.width=width+'px';
+ const availableBelow=innerHeight-rect.bottom-12,needed=Math.min(filterable?390:285,items.length*38+20);
+ const top=availableBelow>=Math.min(needed,185)?rect.bottom+5:Math.max(7,rect.top-Math.min(needed,innerHeight-18)-5);
+ el.style.top=top+'px';
+ const x=inSidebar?rect.right+7:rect.left;
+ el.style.left=Math.max(6,Math.min(innerWidth-width-6,x))+'px';
+ const close=(restore=false)=>{el.remove();document.removeEventListener('pointerdown',dismiss,true);if(restore)button.focus()};
+ $$('[data-item]',el).forEach(b=>b.onclick=()=>{const fn=items[+b.dataset.item][1];close();fn()});
+ const dismiss=e=>{if(!el.contains(e.target)&&!button.contains(e.target))close()};
+ setTimeout(()=>{if(el.isConnected)document.addEventListener('pointerdown',dismiss,true)},0);
+ if(filterable){
+  const input=el.querySelector('input');
+  input.oninput=()=>{const q=input.value.trim().toLowerCase();$$('[data-item]',el).forEach(b=>b.hidden=!b.textContent.toLowerCase().includes(q))};
+  input.focus();
+ }
+ el.onkeydown=e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);return}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+   const buttons=$$('[data-item]:not([hidden])',el);if(!buttons.length)return;
+   e.preventDefault();const i=buttons.indexOf(document.activeElement);
+   buttons[(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();
+  }
+ };
+ upgradeIcons();
 }
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&document.querySelector('#floatingMenu')){
+  e.preventDefault();e.stopImmediatePropagation();
+  const menuEl=$('#floatingMenu');menuEl?.remove();
+ }
+},true);
+
+let settingsWrites=Promise.resolve();
 async function saveSetting(field,value){
- try{const result=await api('data_update',{entity:'settings',data:{[field]:value}});state.settings=result.item;applyTheme();render();settings(state.setting)}catch{toast("Couldn't save — check your connection")}
+ const updates=typeof field==='object'?field:{[field]:value};
+ const previous={...state.settings};
+ state.settings={...state.settings,...updates};
+ applyTheme();renderSettings();upgradeIcons();
+ // Serialize writes, so swatch and theme clicks cannot complete out of order.
+ const task=settingsWrites.then(async()=>{
+  try{
+   const result=await api('data_update',{entity:'settings',data:updates});
+   if(!result?.item)throw Error('Server did not confirm save');
+   // Keep newer optimistic values rather than replacing with an older response.
+   return result.item;
+  }catch(e){
+   for(const k of Object.keys(updates)){
+    if(state.settings[k]===updates[k])state.settings[k]=previous[k];
+   }
+   applyTheme();renderSettings();upgradeIcons();
+   toast("Couldn't save — check your connection");
+   return null;
+  }
+ });
+ settingsWrites=task.then(()=>{});
+ return task;
 }
 const switches={
  calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Include events that you declined']],
@@ -176,12 +230,13 @@ const selectOptions={
  default_view:[['day','Day'],['week','Week'],['month','Month'],['agenda','Agenda']],
  start_of_week:[['sunday','Sunday'],['monday','Monday']],
  default_reminder_minutes:[['-1','None'],['5','5 minutes'],['15','15 minutes'],['30','30 minutes'],['60','1 hour'],['1440','1 day']],
- time_zone:[[Intl.DateTimeFormat().resolvedOptions().timeZone,'Device time zone']]
+ time_zone:[['auto','Device time zone ('+Intl.DateTimeFormat().resolvedOptions().timeZone+')'],...(Intl.supportedValuesOf?.('timeZone')||[]).map(tz=>[tz,tz.replaceAll('_',' ')])]
 };
+const readableTime=v=>{const [hour,minute]=String(v||'09:00').split(':').map(Number);return (hour%12||12)+':'+String(minute||0).padStart(2,'0')+' '+(hour>=12?'PM':'AM')};
 const row=(title,description,control)=>'<div class="setting-row"><div><strong>'+h(title)+'</strong><small>'+h(description||'')+'</small></div><div class="row-control">'+control+'</div></div>';
 function switchHtml(key,value){return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'"><span></span></button>'}
-function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'">'+h(text)+' <span>⌄</span></button>'}
-function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span></button>').join('')+'</div>'}
+function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'"><span class="select-value">'+h(text)+'</span>'+icon('chevron-down',16)+'</button>'}
+function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
  const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
  if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account','@'+u.username,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||Intl.DateTimeFormat().resolvedOptions().timeZone,selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
