@@ -103,7 +103,7 @@ async function loadLocal(){
   localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"})]);
  const s=st.items[0]||{},prefs=readUIPrefs();
  state.firstName=ur.user?.first_name||"Joey";state.lastName=ur.user?.last_name||"";
- state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false}));
+ state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local"}));
  state.events=ev.items.map(eventFromData);
  state.settings=s;state.themeMode=s.theme||"dark";
  state.view=s.default_view||"week";state.weekNumbers=!!s.show_week_numbers;
@@ -119,6 +119,7 @@ async function updateSetting(changes){
 async function updateName(){try{await localApi("user_update",{first_name:state.firstName,last_name:state.lastName})}catch(e){toast("Name could not be saved")}}
 async function saveCalendar(c,method){
  const data={name:c.name,shade:c.color,is_visible:!c.hidden};
+ if(c.subscribed&&method==="update"){delete data.name}
  try{
   const saved=await localApi("data_"+method,{entity:"calendars",id:method==="create"?null:c.id,data});
   if(method==="create")c.id=saved.item.id;
@@ -231,7 +232,7 @@ function calRow(cal){
 }
 function openCalMenu(anchor,cal,row){
  const actions=[
-  {icon:"pencil",label:"Rename",fn:()=>startRename(row,cal)},
+  ...(cal.subscribed?[]:[{icon:"pencil",label:"Rename",fn:()=>startRename(row,cal)}]),
   {icon:cal.hidden?"eye":"eyeOff",label:cal.hidden?"Show calendar":"Hide calendar",fn:async()=>{cal.hidden=!cal.hidden;renderSidebar();renderView(false);await saveCalendar(cal,"update")}},
   {sep:true},{label2:"Appearance · Color"}
  ];
@@ -245,7 +246,7 @@ function openCalMenu(anchor,cal,row){
  });
  menu.append(el('<div class="menu-sep"></div>'),current,sw,el('<div class="menu-sep"></div>'));
  const del=el('<button class="menu-item danger">'+icon("trash",16)+'<span>Delete calendar</span></button>');
- del.onclick=()=>{closeMenu();confirmDeleteCalendar(cal)};menu.append(del);
+ if(!cal.subscribed){del.onclick=()=>{closeMenu();confirmDeleteCalendar(cal)};menu.append(del)}
  // Reposition after color picker expands, so it stays within the viewport.
  const b=anchor.getBoundingClientRect(),top=Math.min(innerHeight-menu.offsetHeight-8,b.bottom+6);
  menu.style.top=Math.max(8,top)+"px";
@@ -489,6 +490,7 @@ function openPopover(occ,anchor){
   '<button class="icon-btn" data-close title="Close">'+icon("x",15)+'</button></span></div><div class="pop-rows">'+rows+'</div></div>');
  positionFloat(pop,anchor,308);popEl=pop;
  $("[data-close]",pop).onclick=closePopover;
+ if(cal.subscribed){$("[data-edit]",pop).remove();$("[data-delete]",pop).remove();return}
  $("[data-edit]",pop).onclick=()=>{closePopover();openEventForm(e,null,occ)};
  $("[data-delete]",pop).onclick=()=>{
   closePopover();
@@ -577,8 +579,9 @@ function openDatePicker(anchor,current,onPick){
 }
 function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null){
  closePopover();closeMenu();closeDatePicker();
+ if(existing&&calOf(existing.cal).subscribed){toast("Subscribed events are read-only");return}
  const src=existing,base=occ||src,now=TODAY(),nextHour=Math.min(23,now.getHours()+1);
- const defaultCal=state.calendars.find(c=>!c.hidden)||state.calendars[0];
+ const defaultCal=state.calendars.find(c=>!c.hidden&&!c.subscribed)||state.calendars.find(c=>!c.subscribed);
  if(!src&&!defaultCal){toast("Create a calendar first");openNewCalendar();return}
  const rawEnd=base?.end||null;
  const f={
