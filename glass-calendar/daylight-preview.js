@@ -654,3 +654,236 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
   }else button.disabled=false;
  };
 }
+
+/* === Search, Settings and genuine local backup === */
+function openSearch(){
+ closeMenu();closePopover();if($("#paletteBd"))return;
+ const bd=el('<div class="palette-backdrop" id="paletteBd"><div class="palette" role="dialog" aria-modal="true" aria-label="Search events"><div class="palette-input-row">'+icon("search",18)+
+  '<input class="palette-input" id="palInput" placeholder="Search events"><button class="palette-clear" id="palClear" title="Clear search" aria-label="Clear search">'+icon("x",13)+'</button>'+
+  '<button class="palette-close" id="palClose" title="Close search" aria-label="Close search">'+icon("x",16)+'</button></div><div class="palette-results" id="palResults"></div></div></div>');
+ document.body.append(bd);const input=$("#palInput",bd),results=$("#palResults",bd),clear=$("#palClear",bd);
+ input.focus();let active=0;
+ const close=()=>{bd.remove();if(paletteCloseFn===close)paletteCloseFn=null};
+ paletteCloseFn=close;$("#palClose",bd).onclick=close;
+ bd.onmousedown=e=>{if(e.target===bd)close()};
+ clear.onclick=()=>{input.value="";draw();input.focus()};
+ function draw(){
+  const query=input.value.trim().toLowerCase();clear.classList.toggle("show",!!query);results.innerHTML="";
+  if(!query){results.append(el('<div class="empty-state" style="padding:30px 20px">'+icon("search",26)+'<p>Start typing to search your events</p></div>'));return}
+  const found=occsInRange(addDays(TODAY(),-730),addDays(TODAY(),1095))
+   .filter(o=>o.ev.title.toLowerCase().includes(query)||o.ev.loc.toLowerCase().includes(query))
+   .sort((a,b)=>a.start-b.start).slice(0,80);
+  if(!found.length){results.append(el('<div class="empty-state" style="padding:30px 20px">'+icon("search",26)+'<p>No results for “'+esc(input.value.trim())+'”</p></div>'));return}
+  const groups=new Map();
+  found.forEach(o=>{if(!groups.has(o.ev.cal))groups.set(o.ev.cal,[]);groups.get(o.ev.cal).push(o)});
+  groups.forEach((items,calId)=>{
+   const cal=calOf(calId);results.append(el('<div class="pal-group">'+esc(cal.name)+'</div>'));
+   items.forEach(o=>{
+    const detail=fmtDateShort(o.start)+" · "+(o.ev.allDay?"All day":fmtTimeRange(o.start,o.end));
+    const item=el('<button class="pal-item"><span class="pop-dot" style="background:'+dotOf(cal)+';margin:0"></span><span class="pi-text"><span class="pi-title">'+esc(o.ev.title)+'</span><br><span class="pi-sub">'+esc(detail)+'</span></span>'+icon("chevR",15)+'</button>');
+    item.onclick=()=>{close();state.selected=sod(o.start);drillToDay(o.start)};
+    results.append(item);
+   });
+  });active=0;
+ }
+ input.oninput=draw;
+ input.onkeydown=e=>{
+  const items=$$(".pal-item",results);
+  if(e.key==="Escape"){e.preventDefault();close()}
+  if((e.key==="ArrowDown"||e.key==="ArrowUp")&&items.length){e.preventDefault();active=(active+(e.key==="ArrowDown"?1:-1)+items.length)%items.length;items.forEach((x,i)=>x.classList.toggle("active",i===active));items[active].scrollIntoView({block:"nearest"})}
+  if(e.key==="Enter"&&items.length){e.preventDefault();items[active].click()}
+ };
+ draw();
+}
+const settingsState={section:"general",pendingView:null};
+function switchHTML(id,checked){return '<label class="switch"><input type="checkbox" id="'+id+'"'+(checked?" checked":"")+'><span class="track"></span><span class="knob"></span></label>'}
+function paneHead(pane,title,sub){
+ pane.append(el('<h2>'+esc(title)+'</h2>'));if(sub)pane.append(el('<p class="pane-sub">'+esc(sub)+'</p>'));
+}
+function openSettings(section="general"){
+ closeMenu();closePopover();
+ settingsState.section=section||settingsState.section;settingsState.pendingView=state.view;
+ const bd=el('<div class="backdrop"></div>'),dlg=el('<div class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings"></div>');
+ const rail=el('<div class="settings-rail"><div class="sr-title">Settings</div></div>');
+ const sections=[
+  ["general","sliders","General"],["appearance","droplet","Appearance"],["calendar","calendar","Calendar"],
+  ["notifications","bell","Notifications"],["data","download","Local data"],["about","info","About"]
+ ];
+ const pane=el('<div class="settings-pane"></div>');
+ const close=()=>{bd.remove();renderAll(false)};
+ sections.forEach(([key,ico,label])=>{
+  const button=el('<button class="sr-item'+(settingsState.section===key?" active":"")+'" data-section="'+key+'">'+icon(ico,17)+'<span>'+label+'</span></button>');
+  button.onclick=()=>{settingsState.section=key;$$(".sr-item",rail).forEach(x=>x.classList.remove("active"));button.classList.add("active");draw();pane.scrollTop=0};
+  rail.append(button);
+ });
+ dlg.append(rail,pane);bd.append(dlg);overlayRoot.append(bd);
+ bd.onmousedown=e=>{if(e.target===bd)close()};
+ function draw(){
+  pane.innerHTML='';
+  const x=el('<button class="icon-btn settings-close" title="Close settings" data-x>'+icon("x",17)+'</button>');
+  x.onclick=close;pane.append(x);
+  ({general:paneGeneral,appearance:paneAppearance,calendar:paneCalendar,notifications:paneNotifications,data:paneData,about:paneAbout}[settingsState.section]||paneGeneral)(pane,close);
+ }
+ draw();
+}
+function paneGeneral(pane){
+ paneHead(pane,"General","Personal preferences for this local calendar.");
+ const profile=el('<div class="set-group"><div class="set-group-title">Profile</div>'+
+  '<div class="field"><label for="gsName">First name</label><input class="text-input" id="gsName" style="max-width:300px" value="'+esc(state.firstName)+'"><p class="inline-note">Used in the greeting at the top of your calendar.</p></div>'+
+  '<div class="field"><label for="gsLast">Last name</label><input class="text-input" id="gsLast" style="max-width:300px" value="'+esc(state.lastName)+'"></div>'+
+  '<p class="inline-note">This is a local workspace. No user account or login is required.</p></div>');
+ pane.append(profile);
+ $("#gsName",profile).onchange=e=>{state.firstName=e.target.value.trim()||"Joey";updateName();renderGreeting();renderSidebar()};
+ $("#gsLast",profile).onchange=e=>{state.lastName=e.target.value.trim();updateName();renderSidebar()};
+ const prefs=el('<div class="set-group"><div class="set-group-title">Preferences</div>'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Time zone</span><div class="sw-sub">Uses your device’s current time zone.</div></span><span style="color:var(--muted);font-size:13px">'+esc(Intl.DateTimeFormat().resolvedOptions().timeZone)+'</span></div>'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Reduce motion</span><div class="sw-sub">Makes view transitions and popups appear instantly.</div></span>'+switchHTML("gsRM",state.reduceMotion)+'</div></div>');
+ pane.append(prefs);
+ $("#gsRM",prefs).onchange=e=>{state.reduceMotion=e.target.checked;applyTheme();updateSetting({reduce_motion:state.reduceMotion})};
+}
+function paneAppearance(pane){
+ paneHead(pane,"Appearance","Pick a theme. Each calendar’s color lives in its menu in the sidebar.");
+ const g=el('<div class="set-group"><div class="set-group-title">Theme</div><div class="theme-cards"></div></div>');
+ const cards=$(".theme-cards",g);
+ [["light","sun","Light","tc-light"],["dark","moon","Dark","tc-dark"],["system","monitor","System","tc-system"]].forEach(([mode,ico,label,preview])=>{
+  const button=el('<button class="theme-card'+(state.themeMode===mode?" sel":"")+'" data-theme="'+mode+'"><span class="tc-preview '+preview+'" style="display:block"></span><span class="tc-name">'+icon(ico,15)+label+'</span></button>');
+  button.onclick=()=>{
+   state.themeMode=mode;updateSetting({theme:mode});applyTheme();
+   $$(".theme-card",cards).forEach(c=>c.classList.remove("sel"));button.classList.add("sel");
+   renderSidebar();renderView(false);
+  };cards.append(button);
+ });
+ pane.append(g);
+ pane.append(el('<div class="set-group"><div class="set-group-title">Calendar colors</div><p class="pane-sub" style="margin:0">Open any calendar’s menu in the sidebar and choose a color under Appearance · Color. Changes apply immediately.</p></div>'));
+}
+function paneCalendar(pane){
+ paneHead(pane,"Calendar","How your calendar opens and what it shows.");
+ const g=el('<div class="set-group">'+
+  '<div class="field"><label for="csView">Default Calendar View</label><select class="set-select" id="csView">'+
+  '<option value="month">Month</option><option value="week">Week</option><option value="day">Day</option><option value="agenda">Agenda</option></select>'+
+  '<p class="inline-note">The calendar uses this view when it opens. It changes immediately.</p></div>'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Week numbers</span><div class="sw-sub">Show ISO week numbers at the left of Month view.</div></span>'+switchHTML("csWN",state.weekNumbers)+'</div>'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Show declined events</span><div class="sw-sub">Include declined events in your calendar views.</div></span>'+switchHTML("csSD",state.showDeclined)+'</div></div>');
+ pane.append(g);
+ const select=$("#csView",g);select.value=settingsState.pendingView||state.view;
+ select.onchange=()=>{
+  state.view=select.value;state.prevView=null;settingsState.pendingView=state.view;
+  updateSetting({default_view:state.view});renderHeader();renderView(true,1);renderSidebar();
+ };
+ $("#csWN",g).onchange=e=>{state.weekNumbers=e.target.checked;updateSetting({show_week_numbers:state.weekNumbers});renderView(false)};
+ $("#csSD",g).onchange=e=>{state.showDeclined=e.target.checked;updateSetting({show_declined_events:state.showDeclined});renderView(false);renderSidebar()};
+}
+function paneNotifications(pane){
+ paneHead(pane,"Notifications","Browser reminders while Daylight is open.");
+ const permission="Notification" in window?Notification.permission:"unsupported";
+ const g=el('<div class="set-group">'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Browser notifications</span><div class="sw-sub" id="ntStatus">'+esc(permission==="granted"?"Notifications are enabled.":permission==="denied"?"Notifications are blocked by your browser.":permission==="unsupported"?"Notifications are not supported here.":"Permission has not been requested.")+'</div></span>'+
+  '<button class="btn-ghost" id="ntBtn">Enable notifications</button></div>'+
+  '<div class="set-row switch-row"><span><span class="sw-label">Remind me 15 minutes before</span><div class="sw-sub">Show a reminder while this tab is running.</div></span>'+switchHTML("nt15",!!state.settings.event_reminders)+'</div>'+
+  '<p class="inline-note">Browsers do not deliver reminders at scheduled times after this tab closes. Daylight does not claim background delivery.</p></div>');
+ pane.append(g);
+ $("#ntBtn",g).onclick=async()=>{
+  if(!("Notification" in window)){toast("Notifications are unavailable");return}
+  try{const value=await Notification.requestPermission();$("#ntStatus",g).textContent=value==="granted"?"Notifications are enabled.":value==="denied"?"Notifications are blocked by your browser.":"Permission not granted.";
+   if(value==="granted")toast("Notifications enabled");
+  }catch{toast("Permission could not be requested")}
+ };
+ $("#nt15",g).onchange=e=>updateSetting({event_reminders:e.target.checked});
+}
+function downloadBlob(contents,filename,mime="application/json"){
+ const url=URL.createObjectURL(new Blob([contents],{type:mime})),a=document.createElement("a");
+ a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function exportData(){
+ try{
+  const data=JSON.parse(localStorage.getItem("daylight-local-ui-v1")||"null");
+  if(!data)throw Error();
+  downloadBlob(JSON.stringify({kind:"daylight-local-backup",version:1,exported:new Date().toISOString(),data},null,2),"daylight-calendar-backup.json");toast("Local data exported");
+ }catch{toast("Could not export local data")}
+}
+function paneData(pane,close){
+ paneHead(pane,"Local data","Your calendars and events are saved in this browser only.");
+ const g=el('<div class="set-group">'+
+ '<div class="set-group-title">Browser storage</div>'+
+ '<div class="feed-row">'+icon("download",18)+'<div style="flex:1"><strong>'+state.calendars.length+' calendars · '+state.events.length+' events</strong><div class="inline-note">No account, database, sync, or MCP tokens are used.</div></div></div>'+
+ '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">'+
+ '<button class="btn-primary" id="exportData" style="margin-left:0">'+icon("download",16)+'Export data</button>'+
+ '<button class="btn-ghost" id="importData">Import data</button>'+
+ '<input type="file" id="localImport" accept=".json,application/json" hidden>'+
+ '</div><p class="inline-note">Export regularly if you want a backup or to move to another device.</p></div>'+
+ '<div class="set-group"><div class="set-group-title">Reset</div><button class="btn-ghost" id="resetData">Reset local workspace</button><p class="inline-note">This affects only Daylight data in this browser.</p></div>');
+ pane.append(g);
+ $("#exportData",g).onclick=exportData;
+ $("#importData",g).onclick=()=>$("#localImport",g).click();
+ $("#localImport",g).onchange=async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+   const content=JSON.parse(await file.text()),data=content.kind==="daylight-local-backup"?content.data:content;
+   if(!data||!Array.isArray(data.events)||!Array.isArray(data.calendars)||!Array.isArray(data.tasks)||!data.settings||!data.user)throw Error("Invalid backup format.");
+   openConfirm({title:"Import calendar backup?",body:"This replaces the existing local calendars, events, tasks, and preferences in this browser.",confirmLabel:"Import",fn:async()=>{
+    try{localStorage.setItem("daylight-local-ui-v1",JSON.stringify(data));close();await loadLocal();toast("Local data imported")}
+    catch{toast("Import failed. Check browser storage.")}
+   }});
+  }catch(err){toast(err.message||"Invalid backup file")}
+ };
+ $("#resetData",g).onclick=()=>openConfirm({title:"Reset local workspace?",body:"All calendars, events and preferences stored in this browser will be replaced with sample data. Export a backup first if needed.",confirmLabel:"Reset",danger:true,fn:async()=>{
+  localReset();close();state.cursor=sod(TODAY());state.selected=sod(TODAY());await loadLocal();toast("Local workspace reset");
+ }});
+}
+function paneAbout(pane){
+ paneHead(pane,"About","");
+ const g=el('<div><div class="about-logo"><span class="logo-tile">'+icon("sunrise",25)+'</span><span><span style="font-size:17px;font-weight:700;display:block">daylight.</span><span style="color:var(--muted);font-size:13px">UI Preview · Personal calendar</span></span></div>'+
+ '<div class="set-group"><div class="set-group-title">What’s new</div><ul class="changelog">'+
+ '<li>The supplied SquareUi-style HTML is now Daylight’s complete interface.</li>'+
+ '<li>Month, Week, Day, and Agenda use the same flat styling.</li>'+
+ '<li>Calendars and events persist locally between reloads.</li>'+
+ '<li>Settings opens in a fixed-size popup from anywhere in the app.</li>'+
+ '<li>Online accounts, synchronization, and server tokens are removed.</li>'+
+ '</ul></div><div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:6px">'+
+ '<button class="btn-primary" style="margin-left:0" id="abExport">'+icon("download",15)+'Export UI code</button>'+
+ '<button class="btn-ghost" id="abCheck">Check for updates</button></div>'+
+ '<p class="inline-note">Daylight is your calendar, kept simple on purpose.</p></div>');
+ pane.append(g);$("#abExport",g).onclick=exportUI;
+ $("#abCheck",g).onclick=()=>toast("You’re viewing the installed local UI preview");
+}
+async function exportUI(){
+ try{
+  // Bundle the real CSS and real local application code into a standalone HTML file.
+  const cssUrl=new URL("./daylight-preview.css",import.meta.url),jsUrl=new URL("./daylight-preview.js",import.meta.url),storeUrl=new URL("./secure-app/src/local-store.js",import.meta.url);
+  const response=await Promise.all([fetch(cssUrl),fetch(jsUrl),fetch(storeUrl)]);
+  if(response.some(r=>!r.ok))throw Error();
+  const [css,script,store]=await Promise.all(response.map(r=>r.text()));
+  const module=store.replace(/\\bexport\\s+(?=(?:async\\s+)?function|const|let)/g,"")+"\n"+script.replace(/^import\s+\{localApi,localReset\}[^;]*;\s*/,"");
+  const page='<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>daylight — Local UI</title>'+
+   '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>'+css.replace(/<\\/style/gi,"<\\\\/style")+'</style></head>'+
+   '<body><div id="app"><aside id="sidebar" aria-label="Sidebar"></aside><main id="main"><div id="greeting"></div><header id="headerBand"></header><div id="viewWrap"></div></main></div><div id="overlayRoot"></div><div id="toastRoot" aria-live="polite"></div>'+
+   '<script type="module">'+module.replace(/<\\/script/gi,"<\\\\/script")+'<\\/script></body></html>';
+  downloadBlob(page,"daylight-calendar-ui.html","text/html;charset=utf-8");toast("UI code exported");
+ }catch(err){console.error(err);toast("Could not export UI code")}
+}
+const seenReminders=new Set();
+function checkLocalReminders(){
+ if(!state.settings.event_reminders||!window.Notification||Notification.permission!=="granted")return;
+ const now=TODAY(),windowStart=new Date(now.getTime()-60000),windowEnd=new Date(now.getTime()+60000);
+ occsInRange(now,new Date(now.getTime()+86400000)).forEach(o=>{
+  if(o.ev.allDay)return;
+  const due=new Date(o.start.getTime()-15*60000),key=o.ev.id+"|"+dateKey(o.start)+"|"+o.start.getHours()+":"+o.start.getMinutes();
+  if(due>=windowStart&&due<=windowEnd&&!seenReminders.has(key)){
+   seenReminders.add(key);new Notification(o.ev.title,{body:"Starts in 15 minutes"});
+  }
+ });
+}
+document.addEventListener("keydown",e=>{
+ const mod=e.metaKey||e.ctrlKey;
+ if(mod&&e.key===","){e.preventDefault();if(!overlayRoot.children.length)openSettings("general");else closeTopmostOverlay()}
+ if(mod&&(e.key==="k"||e.key==="K")){e.preventDefault();openSearch()}
+ if(e.key==="Escape"&&closeTopmostOverlay())e.preventDefault();
+},true);
+document.addEventListener("pointerdown",e=>{
+ if(openMenuEl&&!openMenuEl.contains(e.target)&&!e.target.closest(".menu-swatches"))closeMenu();
+ if(popEl&&!popEl.contains(e.target)&&!e.target.closest(".ev-card,.chip,.allday-bar,.agenda-card"))closePopover();
+ if(closeDatePickerFn&&!e.target.closest("#datePop,.picker-btn"))closeDatePickerFn();
+},true);
+matchMedia("(prefers-color-scheme:light)").addEventListener?.("change",()=>{if(state.themeMode==="system"){applyTheme();renderAll(false)}});
+setInterval(checkLocalReminders,30000);
+loadLocal().catch(error=>{console.error("Daylight local startup",error);$("#main").innerHTML='<div class="empty-state">'+icon("alert",30)+'<p>Local browser storage is unavailable. Enable site storage and reload.</p></div>'});
