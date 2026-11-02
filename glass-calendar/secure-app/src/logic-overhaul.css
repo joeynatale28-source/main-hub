@@ -1,0 +1,15 @@
+/* Daylight logic-only calendar span and pointer interactions. */
+.monthcells{isolation:isolate}
+.month-span-bar{grid-column:var(--span-col)/span var(--span-length);grid-row:var(--week-row);align-self:start;z-index:4;margin:31px 1px 0;height:21px;transform:translateY(calc(var(--span-lane)*24px));padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;border:0;border-left:3px solid var(--event-color);border-radius:6px;background:color-mix(in srgb,var(--event-color) 19%,var(--surface));color:var(--text);cursor:grab;font-size:11px}
+.month-span-bar.continue-left{border-radius:0 6px 6px 0;border-left:0}.month-span-bar.continue-right{border-radius:6px 0 0 6px}.month-span-bar.continue-left.continue-right{border-radius:0}
+.month-more{grid-column:var(--span-col);grid-row:var(--week-row);align-self:start;margin-top:104px;z-index:5;font-size:10px;text-align:left;background:var(--surface);color:var(--sub);border:0}
+.day-spans{grid-column:2/-1;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));align-items:center;min-width:0;padding:4px 0}
+.all-day-span{grid-column:var(--span-col)/span var(--span-length);width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;height:26px;text-align:left;background:color-mix(in srgb,var(--event-color) 18%,var(--surface));border:0;border-left:3px solid var(--event-color);color:var(--text);border-radius:6px;cursor:grab;padding:4px 9px}
+.all-day-span.continue-left{border-radius:0 6px 6px 0;border-left:0}.all-day-span.continue-right{border-radius:6px 0 0 6px}.all-day-span.continue-left.continue-right{border-radius:0}
+.resize-edge{position:absolute;left:0;right:0;height:7px;cursor:ns-resize;z-index:2}.resize-edge.top{top:0}.resize-edge.bottom{bottom:0}
+.event-drag-ghost{position:fixed;z-index:2147483000;pointer-events:none;color:white;border-radius:7px;box-shadow:0 6px 26px #0005;padding:8px 11px;font-size:12px;max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.daylight-dragging,body.daylight-dragging *{user-select:none!important;touch-action:none!important;scroll-behavior:auto!important}
+.scope-options{display:flex;flex-direction:column;gap:8px;margin:18px 0}.scope-options button{min-height:40px;text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--surface2);color:var(--text);padding:8px 12px}.scope-options button:hover{border-color:var(--primary)}
+.link-action{display:block;border:0;background:transparent;color:var(--text);font-size:12px;margin:8px auto;cursor:pointer;text-decoration:underline}
+.notification-disabled{opacity:.45;pointer-events:none}
+.sub-inline-error{font-size:12px;color:var(--danger);margin:8px 0}
