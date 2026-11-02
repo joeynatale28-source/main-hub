@@ -406,7 +406,7 @@ function bindDragEvents(){
   el.onpointerup=event=>{if(dragState?.source===el){dragState.lastX=event.clientX;dragState.lastY=event.clientY;stopDrag()}};
   el.onpointercancel=()=>stopDrag(true);
  });
- if(month)$('.monthcell').forEach(cell=>{
+ if(month)$$('.monthcell').forEach(cell=>{
   cell.onpointerdown=event=>{
    if(event.button!==0||event.target.closest('button'))return;
    dragState={view:'month',create:true,day:cell.dataset.cell,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,moved:false,source:cell};
@@ -443,7 +443,7 @@ function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
- $('[data-detail]').forEach(x=>x.onclick=e=>{if(Date.now()-dragJustFinished<500)return;e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
+ $$('[data-detail]').forEach(x=>x.onclick=e=>{if(Date.now()-dragJustFinished<500)return;e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
 }
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
