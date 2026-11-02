@@ -106,11 +106,11 @@
   let tipTimer=0;
   const hideTip=()=>{clearTimeout(tipTimer);tip.hidden=true};
   sidebar.addEventListener('pointerover',e=>{
-    const button=e.target.closest('button, .nav');
+    const button=e.target.closest('button, .nav, .calendar-filter');
     hideTip();if(!button||!document.querySelector('.app').classList.contains('sidebar-collapsed'))return;
     tipTimer=setTimeout(()=>{
       if(!document.querySelector('.app').classList.contains('sidebar-collapsed'))return;
-      const rect=button.getBoundingClientRect();tip.textContent=button.getAttribute('aria-label')||button.title||'';
+      const rect=button.getBoundingClientRect();tip.textContent=button.getAttribute('aria-label')||button.title||button.querySelector('.cal-name')?.textContent||'';
       if(!tip.textContent)return;tip.hidden=false;tip.style.left=(rect.right+12)+'px';tip.style.top=(rect.top+Math.max(0,(rect.height-30)/2))+'px';
     },300);
   });
