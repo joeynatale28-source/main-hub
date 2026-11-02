@@ -191,7 +191,8 @@ test('Month today highlight and all-day event edit preserves a one-day date',asy
  await expect(page.locator('#endDate')).toHaveValue(original);
  await expect(page.locator('#quickSave')).toHaveText('Save');
  await page.locator('#editorClose').click();
- await page.locator('#confirmYes').click();
+ await expect(page.locator('#quickForm')).toBeHidden();
+ await expect(page.locator('#confirmYes')).toHaveCount(0);
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();
