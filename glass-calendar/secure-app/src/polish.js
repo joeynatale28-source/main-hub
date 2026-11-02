@@ -32,11 +32,12 @@ export function expandEvents(events,from,to){
   const until=r.ends==='on'&&r.until?noon(r.until).getTime()+43200000:Infinity;
   for(let i=0;i<(native?Math.min(1500,count):1)&&out.length<3000;i++){
    const st=native?nextDate(start,freq,i*interval):start;
+   if(Array.isArray(original.exdates)&&original.exdates.includes(daykey(st)))continue;
    if(st.getTime()>upper+86400000||st.getTime()>until)break;
    const en=new Date(st.getTime()+span);
    if(en.getTime()<lower-86400000)continue;
    const civil=!native&&original.source_subscription_id&&original.all_day?String(original.starts_at).slice(0,10):daykey(st);
-   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=original.source_subscription_id&&original.all_day?1:Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
+   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
    for(let j=0;j<Math.min(366,days)&&out.length<3000;j++){
     const key=daykey(addDays(noon(civil),j));
     if(noon(key).getTime()<lower-86400000||noon(key).getTime()>upper+86400000)continue;
@@ -78,3 +79,25 @@ export function makeDateGrid(trigger,value,onPick,icon,weekStart=0){
  holder.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();holder.remove();trigger.focus()}});
  setTimeout(()=>{const dismiss=e=>{if(!holder.isConnected){document.removeEventListener('pointerdown',dismiss,true);return}if(!holder.contains(e.target)&&e.target!==trigger){holder.remove();document.removeEventListener('pointerdown',dismiss,true)}};document.addEventListener('pointerdown',dismiss,true)},0);
 }
+
+/** Consolidate day-by-day display segments into one event/occurrence range. */
+export const uniqueInstances=segments=>{
+ const map=new Map();
+ for(const e of segments){
+  const key=e.id+'|'+(e._occurrence||e.starts_at);
+  if(!map.has(key))map.set(key,{...e,_firstCivil:e._civilDate,_lastCivil:e._civilDate});
+  else{
+   const x=map.get(key);if(e._civilDate<x._firstCivil)x._firstCivil=e._civilDate;
+   if(e._civilDate>x._lastCivil)x._lastCivil=e._civilDate;
+  }
+ }
+ return [...map.values()];
+};
+export const rangeLabel=(e,long=false)=>{
+ const start=e.all_day&&e.source_subscription_id?String(e.starts_at).slice(0,10):daykey(new Date(e.starts_at));
+ const exclusiveEnd=new Date(new Date(e.ends_at).getTime()-1);
+ const end=e.all_day&&e.source_subscription_id?daykey(new Date(e.ends_at.slice(0,10)+'T12:00:00Z').getTime()-86400000):daykey(exclusiveEnd);
+ if(start===end)return new Date(start+'T12:00:00').toLocaleDateString('en-US',long?{weekday:'long',month:'long',day:'numeric',year:'numeric'}:{month:'short',day:'numeric'});
+ const fmt=long?{weekday:'long',month:'long',day:'numeric'}:{month:'short',day:'numeric'};
+ return new Date(start+'T12:00:00').toLocaleDateString('en-US',fmt)+' – '+new Date(end+'T12:00:00').toLocaleDateString('en-US',{...fmt,...(long?{year:'numeric'}:{})});
+};
