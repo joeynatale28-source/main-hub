@@ -53,7 +53,16 @@ async function setCalendarView(page,view){
  await page.locator('#settingsButton').click();
  await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();
- await page.locator('#floatingMenu [data-item]').filter({hasText:new RegExp('^'+view+'
+ await page.locator('#floatingMenu [data-item]').filter({hasText:new RegExp('^'+view+'$','i')}).click();
+ await page.locator('#settingsModal .dialog-close').click();
+ await expect(page.locator('.view-header h1')).toHaveText(/November 2026|Agenda/);
+}
+async function workspacePage(page,destination){
+ await page.locator('#workspaceMenu').click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:new RegExp('^'+destination+'$','i')}).click();
+}
+
+test.use({timezoneId:'America/New_York'});
 for(const theme of ['light','dark']){
  for(const size of [{width:1920,height:1080},{width:1366,height:768}]){
   test(`Daylight UI ${theme} ${size.width}×${size.height}: all screens and overlays`,async({page})=>{
@@ -104,151 +113,6 @@ for(const theme of ['light','dark']){
    await shot('integrations');
    await workspacePage(page,'Calendar');
    await page.locator('.side-header').hover();
-   await page.locator('#collapseRail').click();
-   await expect.poll(async()=>Math.round((await page.locator('.sidebar').boundingBox()).width)).toBe(64);
-   await shot('rail');
-  });
- }
-}
-test('Login shows custom field errors and high contrast primary action',async({page})=>{
- await page.setViewportSize({width:1366,height:768});
- await stubDaylight(page,'dark',true);
- await page.goto('/');
- await expect(page.locator('.login')).toBeVisible();
- const color=await page.locator('#loginBtn').evaluate(e=>({bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}));
- expect(color.bg).not.toBe(color.color);
- await page.locator('#loginBtn').click();
- await expect(page.locator('#emailHelp')).toContainText('Enter a valid email');
- await expect(page.locator('#passwordHelp')).toContainText('Enter your password');
- await page.screenshot({path:'test-results/daylight-dark-1366-login.png'});
-});
-,'i')}).click();
- await page.locator('#settingsModal .dialog-close').click();
- await expect(page.locator('.view-header h1')).toHaveText(/November 2026|Agenda/);
-}
-async function workspacePage(page,destination){
- await page.locator('#workspaceMenu').click();
- await page.locator('#floatingMenu [data-item]').filter({hasText:new RegExp('^'+destination+'
-for(const theme of ['light','dark']){
- for(const size of [{width:1920,height:1080},{width:1366,height:768}]){
-  test(`Daylight UI ${theme} ${size.width}×${size.height}: all screens and overlays`,async({page})=>{
-   await page.setViewportSize(size);
-   await stubDaylight(page,theme);
-   await page.goto('/');
-   await expect(page.locator('.view-header h1')).toHaveText('Month');
-   await expect(page.locator('.monthcell')).toHaveCount(35);
-   const heights=await page.locator('.monthcell').evaluateAll(cells=>cells.map(c=>Math.round(c.getBoundingClientRect().height)));
-   expect(new Set(heights).size).toBe(1);
-   const shot=async name=>page.screenshot({path:`test-results/daylight-${theme}-${size.width}-${name}.png`});
-   await shot('month');
-   await page.locator('[data-view-switch=week]').click();
-   await expect(page.locator('.now-line')).toBeVisible();
-   await expect(page.locator('.now-gutter-dot')).toBeVisible();
-   await shot('week');
-   await page.locator('[data-view-switch=day]').click();
-   await expect(page.locator('.view-range')).toContainText('Monday');
-   await shot('day');
-   await page.locator('[data-view-switch=agenda]').click();
-   await expect(page.locator('.agenda-item')).toHaveCount(3);
-   await shot('agenda');
-   await page.locator('[data-view-switch=month]').click();
-   await page.locator('#settingsButton').click();
-   const bounds=await page.locator('#settingsModal').boundingBox();
-   await expect(page.locator('#settingsModal')).toBeVisible();
-   for(const section of ['general','calendar','appearance','data','notifications','ai','about']){
-    await page.locator(`[data-sec="${section}"]`).click();
-    const next=await page.locator('#settingsModal').boundingBox();
-    expect(Math.abs(bounds.width-next.width)).toBeLessThan(1);
-    expect(Math.abs(bounds.height-next.height)).toBeLessThan(1);
-    if(section==='about')await shot('settings-about');
-   }
-   await page.locator('#settingsModal .dialog-close').click();
-   await page.locator('#newEvent').click();
-   await expect(page.locator('#quickForm')).toBeVisible();
-   await page.locator('#startDateBtn').click();
-   await expect(page.locator('.dl-month-button')).toBeVisible();
-   await shot('event-picker');
-   await page.keyboard.press('Escape');
-   await page.locator('#quickSave').click();
-   await expect(page.locator('#titleError')).toBeVisible();
-   await shot('event-validation');
-   await page.locator('#editorClose').click();
-   await page.locator('[data-nav=tasks]').click();
-   await shot('tasks');
-   await page.locator('[data-nav=integrations]').click();
-   await shot('integrations');
-   await page.locator('[data-nav=calendar]').click();
-   await page.locator('#collapseRail').click();
-   await expect.poll(async()=>Math.round((await page.locator('.sidebar').boundingBox()).width)).toBe(64);
-   await shot('rail');
-  });
- }
-}
-test('Login shows custom field errors and high contrast primary action',async({page})=>{
- await page.setViewportSize({width:1366,height:768});
- await stubDaylight(page,'dark',true);
- await page.goto('/');
- await expect(page.locator('.login')).toBeVisible();
- const color=await page.locator('#loginBtn').evaluate(e=>({bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}));
- expect(color.bg).not.toBe(color.color);
- await page.locator('#loginBtn').click();
- await expect(page.locator('#emailHelp')).toContainText('Enter a valid email');
- await expect(page.locator('#passwordHelp')).toContainText('Enter your password');
- await page.screenshot({path:'test-results/daylight-dark-1366-login.png'});
-});
-,'i')}).click();
-}
-
-test.use({timezoneId:'America/New_York'});
-for(const theme of ['light','dark']){
- for(const size of [{width:1920,height:1080},{width:1366,height:768}]){
-  test(`Daylight UI ${theme} ${size.width}×${size.height}: all screens and overlays`,async({page})=>{
-   await page.setViewportSize(size);
-   await stubDaylight(page,theme);
-   await page.goto('/');
-   await expect(page.locator('.view-header h1')).toHaveText('Month');
-   await expect(page.locator('.monthcell')).toHaveCount(35);
-   const heights=await page.locator('.monthcell').evaluateAll(cells=>cells.map(c=>Math.round(c.getBoundingClientRect().height)));
-   expect(new Set(heights).size).toBe(1);
-   const shot=async name=>page.screenshot({path:`test-results/daylight-${theme}-${size.width}-${name}.png`});
-   await shot('month');
-   await page.locator('[data-view-switch=week]').click();
-   await expect(page.locator('.now-line')).toBeVisible();
-   await expect(page.locator('.now-gutter-dot')).toBeVisible();
-   await shot('week');
-   await page.locator('[data-view-switch=day]').click();
-   await expect(page.locator('.view-range')).toContainText('Monday');
-   await shot('day');
-   await page.locator('[data-view-switch=agenda]').click();
-   await expect(page.locator('.agenda-item')).toHaveCount(3);
-   await shot('agenda');
-   await page.locator('[data-view-switch=month]').click();
-   await page.locator('#settingsButton').click();
-   const bounds=await page.locator('#settingsModal').boundingBox();
-   await expect(page.locator('#settingsModal')).toBeVisible();
-   for(const section of ['general','calendar','appearance','data','notifications','ai','about']){
-    await page.locator(`[data-sec="${section}"]`).click();
-    const next=await page.locator('#settingsModal').boundingBox();
-    expect(Math.abs(bounds.width-next.width)).toBeLessThan(1);
-    expect(Math.abs(bounds.height-next.height)).toBeLessThan(1);
-    if(section==='about')await shot('settings-about');
-   }
-   await page.locator('#settingsModal .dialog-close').click();
-   await page.locator('#newEvent').click();
-   await expect(page.locator('#quickForm')).toBeVisible();
-   await page.locator('#startDateBtn').click();
-   await expect(page.locator('.dl-month-button')).toBeVisible();
-   await shot('event-picker');
-   await page.keyboard.press('Escape');
-   await page.locator('#quickSave').click();
-   await expect(page.locator('#titleError')).toBeVisible();
-   await shot('event-validation');
-   await page.locator('#editorClose').click();
-   await page.locator('[data-nav=tasks]').click();
-   await shot('tasks');
-   await page.locator('[data-nav=integrations]').click();
-   await shot('integrations');
-   await page.locator('[data-nav=calendar]').click();
    await page.locator('#collapseRail').click();
    await expect.poll(async()=>Math.round((await page.locator('.sidebar').boundingBox()).width)).toBe(64);
    await shot('rail');
