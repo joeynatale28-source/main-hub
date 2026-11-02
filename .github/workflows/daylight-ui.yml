@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   secure-ui:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: glass-calendar/secure-app
@@ -65,7 +65,7 @@ jobs:
 
   visual-regression:
     name: Screenshots — Midnight and Daylight at desktop/laptop sizes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: glass-calendar
