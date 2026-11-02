@@ -325,3 +325,11 @@ body.reduce-motion *,body.reduce-motion *:before,body.reduce-motion *:after{anim
 .task-title.completed{text-decoration:line-through;color:var(--muted)}
 .task-title small{display:block;color:var(--muted);font-size:12px;margin-top:3px;font-weight:400}
 @media(max-width:700px){.tasks-scroll{padding:16px 12px}.task-entry{padding:12px 10px}.tasks-filters{gap:4px}.task-filter{padding:8px 9px}}
+
+/* Dragging keeps the exact reference event-card treatment; this edge only
+   appears on editable cards and uses the same muted hairline. */
+.ev-card{touch-action:pan-y}
+.ev-card .resize-handle{position:absolute;bottom:0;left:12px;right:12px;height:9px;cursor:ns-resize;touch-action:none;display:flex;align-items:center;justify-content:center;opacity:0}
+.ev-card .resize-handle:after{content:"";width:24px;height:2px;border-radius:2px;background:currentColor;opacity:.55}
+.ev-card:hover .resize-handle,.ev-card:focus-within .resize-handle{opacity:1}
+@media(hover:none){.ev-card .resize-handle{opacity:1}}
