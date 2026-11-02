@@ -37,14 +37,13 @@ function register(server:McpServer,name:string,description:string,schema:z.ZodRa
  });
 }
 async function deleteOne(uid:string,entity:'events'|'tasks',id:string){
- await guarded(uid);
- const table=entity==='events'?'dl_events':'dl_tasks';
- const existing=await query(sb.from(table).select('id').eq('user_id',uid).eq('id',id).maybeSingle());
- if(!existing)throw new Error('Not found');
- // Service-role bypasses RLS, so both the delete AND audit must be user-scoped.
- const removed=await query(sb.from(table).delete().eq('user_id',uid).eq('id',id).select('id').single());
- await query(sb.from('dl_mcp_audit_log').insert({user_id:uid,tool:'delete_'+(entity==='events'?'event':'task'),action:'delete',target_id:id}).select('id').single());
- if(!removed)throw new Error('Delete failed');return{deleted:removed.id};
+ // The SQL function enforces mcp_allow_delete, deletes one row, and writes an audit
+ // entry in the SAME transaction. Never use non-atomic delete+insert calls here.
+ const kind=entity==='events'?'event':'task';
+ const {data,error}=await sb.rpc('dl_mcp_delete_owned',{p_user_id:uid,p_kind:kind,p_target:id});
+ if(error)throw new Error(error.message.includes('Deletes are disabled')?disabled:error.message);
+ if(!data)throw new Error('Not found');
+ return{deleted:id};
 }
 const createServer=()=>{
  const server=new McpServer({name:'daylight',version:'1.1.0'});
