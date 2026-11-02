@@ -252,7 +252,7 @@ function settings(which){
  const existing=$('#settingsModal');existing?.remove();
  const sections=[['general','General','⚙'],['calendar','Calendar','▦'],['appearance','Appearance','◈'],['data','Data & sync','▤'],['notifications','Notifications','♧'],['ai','AI access','✳'],['about','About','ⓘ']];
  const dlg=modal('<div class="settings-grid"><nav class="settings-nav"><h2>Settings</h2>'+sections.map(x=>'<button data-sec="'+x[0]+'" class="'+(x[0]===state.setting?'selected':'')+'"><span class="glyph">'+x[2]+'</span>'+x[1]+'</button>').join('')+'</nav><div class="settings-pane" id="settingsPane"></div></div>',true);dlg.id='settingsModal';
- $$('[data-sec]',dlg).forEach(b=>b.onclick=()=>{state.setting=b.dataset.sec;localStorage.setItem('daylight-settings-section',state.setting);$('[data-sec]',dlg).forEach(x=>x.classList.toggle('selected',x===b));renderSettings()});
+ $$('[data-sec]',dlg).forEach(b=>b.onclick=()=>{state.setting=b.dataset.sec;localStorage.setItem('daylight-settings-section',state.setting);$$('[data-sec]',dlg).forEach(x=>x.classList.toggle('selected',x===b));renderSettings()});
  renderSettings();
 }
 function renderSettings(){
