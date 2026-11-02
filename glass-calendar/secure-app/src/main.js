@@ -471,11 +471,81 @@ function renderIntegrations(){
  $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
  $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
+const nativeRecurring=e=>!e.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(e.repeat_rule?.frequency||e.repeat_rule?.freq);
+function chooseOccurrence(e,action){
+ return new Promise(resolve=>{
+  if(!nativeRecurring(e)){resolve('all');return}
+  const dlg=modal('<h2>'+h(action)+' recurring event</h2><p>Choose which events this change affects.</p><div class="scope-options"><button type="button" data-scope="only">Only this event</button><button type="button" data-scope="following">This and following events</button><button type="button" data-scope="all">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
+  let finished=false;const finish=value=>{if(finished)return;finished=true;dlg.close();resolve(value)};
+  $$('[data-scope]',dlg).forEach(b=>b.onclick=()=>finish(b.dataset.scope));
+  dlg.addEventListener('close',()=>{if(!finished){finished=true;resolve(null)}});
+ });
+}
+const occurrenceDate=e=>daykey(new Date(e._occurrence||e.starts_at));
+async function changeOccurrence(e,action,data={}){
+ const origin=e._origin||e,scope=await chooseOccurrence(e,action);if(!scope)return false;
+ const when=occurrenceDate(e),r={...(origin.repeat_rule||{})};
+ if(scope==='all'){
+  if(action==='delete')await change('events',origin.id,null,'delete');
+  else await change('events',origin.id,data,'update');
+ }else if(scope==='only'){
+  await change('events',origin.id,{exdates:[...new Set([...(origin.exdates||[]),when])]},'update');
+  if(action==='update')await change('events',null,{...Object.fromEntries(['calendar_id','title','description','location_name','location_address','all_day','reminder_offset_minutes','status'].map(k=>[k,origin[k]])),starts_at:e.starts_at,ends_at:e.ends_at,repeat_rule:{frequency:'never'},recurrence_parent_id:origin.id,...data},'create');
+ }else{
+  const yesterday=daykey(new Date(new Date(e._occurrence||e.starts_at).getTime()-86400000));
+  await change('events',origin.id,{repeat_rule:{...r,ends:'on',until:yesterday}},'update');
+  if(action==='update'){
+   const originalCopy=Object.fromEntries(['calendar_id','title','description','location_name','location_address','all_day','reminder_offset_minutes','status'].map(k=>[k,origin[k]]));
+   await change('events',null,{...originalCopy,starts_at:e.starts_at,ends_at:e.ends_at,repeat_rule:{...r,ends:r.ends==='count'?'never':r.ends,until:r.ends==='on'?r.until:undefined},recurrence_parent_id:origin.id,...data},'create');
+  }
+ }
+ toast(action==='delete'?'Event deleted':'Event updated');return true;
+}
+function enableCalendarDrag(){
+ const grid=$('#grid');if(!grid)return;let drag=null;
+ const cleanup=()=>{drag?.ghost?.remove();drag=null;document.body.classList.remove('daylight-dragging')};
+ grid.onpointerdown=e=>{
+  if(e.button!==0)return;
+  const item=e.target.closest('[data-drag-event]'),cell=e.target.closest('[data-cell]');
+  if(!item&&!cell)return;
+  if(item&&state.subscriptions.some(s=>s.calendar_id===getOccurrence(item.dataset.detail,item.dataset.occ)?.calendar_id))return;
+  const original=item?getOccurrence(item.dataset.detail,item.dataset.occ):null;
+  const startCell=cell?.dataset.cell;
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,item,original,startCell,edge:e.target.dataset.resize||null,started:false};
+ };
+ grid.onpointermove=e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
+  if(!drag.started){drag.started=true;document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
+  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';
+  e.preventDefault();
+ };
+ grid.onpointerup=async e=>{
+  if(!drag||e.pointerId!==drag.id)return;const d=drag;if(!d.started){cleanup();return}
+  const target=document.elementFromPoint(e.clientX,e.clientY),toCell=target?.closest('[data-cell]')?.dataset.cell,toTrack=target?.closest('[data-slot]'),endCell=toCell||toTrack?.dataset.slot;
+  cleanup();
+  if(!d.original&&d.startCell&&endCell){
+   const dates=[d.startCell,endCell].sort();openEditor(null,dates[0]);const frm=$('#quickForm');if(frm){$('#endDate',frm).value=dates[1];$('[data-pick="end"]',frm).textContent=label(date(dates[1]))}return;
+  }
+  if(!d.original)return;
+  const ev=d.original,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
+  let nextStart=new Date(start),nextEnd=new Date(end);
+  if(endCell){const delta=date(endCell)-date(daykey(start));nextStart=new Date(start.getTime()+delta);nextEnd=new Date(end.getTime()+delta)}
+  else if(d.item?.classList.contains('weekevent')){
+   const minutes=Math.round((e.clientY-d.y)/15/15)*15;
+   if(d.edge==='start')nextStart=new Date(Math.min(end-900000,start.getTime()+minutes*60000));
+   else if(d.edge==='end')nextEnd=new Date(Math.max(start.getTime()+900000,end.getTime()+minutes*60000));
+   else {nextStart=new Date(start.getTime()+minutes*60000);nextEnd=new Date(nextStart.getTime()+duration)}
+  }else return;
+  await changeOccurrence(ev,'update',{starts_at:nextStart.toISOString(),ends_at:nextEnd.toISOString()});
+ };
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&drag?.started){cleanup();e.stopImmediatePropagation();e.preventDefault()}},{signal:undefined});
+}
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
- const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
- $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e)});
- $('#deleteEvent',dlg)?.addEventListener('click',()=>confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()}));
+ const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=isLong(e)?rangeLabel(e,true):e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
+ $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e,null,null,'event',e)});
+ $('#deleteEvent',dlg)?.addEventListener('click',()=>(async()=>{if(nativeRecurring(e)){dlg.close();await changeOccurrence(e,'delete')}else confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()})})());
  upgradeIcons();
 }
 
@@ -490,7 +560,7 @@ function openCustomRepeat(current,done){
  q('saveRepeat').onclick=()=>{const frequency=q('repeatFrequency').value,interval=Math.max(1,Math.min(365,Number(q('repeatInterval').value)||1)),ends=q('repeatEnds').value,count=Math.max(1,Math.min(1000,Number(q('repeatCount').value)||10)),until=q('repeatUntil').value;done({frequency,interval,ends,...(ends==='on'?{until}:{}),...(ends==='count'?{count}:{})});dlg.close()};
 }
 
-function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
+function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',instance=null){
  state.edit=existing;state.mode=kind;state.timed=!!chosenTime||(!!existing&&!existing.all_day);state.allDay=kind==='event'&&!state.timed;
  selectedLocation=existing?.location_address?{display:existing.location_name,address:existing.location_address}:null;
  const first=existing?(kind==='task'?(existing.due_date?date(existing.due_date):now()):new Date(existing.starts_at)):chosenDate?date(chosenDate):now();
@@ -568,7 +638,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
   const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
-  try{loading($('#quickSave',form),true,'Saving…');await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
+  try{loading($('#quickSave',form),true,'Saving…');if(existing&&instance&&nativeRecurring(instance)){const changed=await changeOccurrence(instance,'update',data);if(!changed){loading($('#quickSave',form),false);return}}else await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
 startIcons();
