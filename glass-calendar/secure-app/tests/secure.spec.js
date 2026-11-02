@@ -1,7 +1,7 @@
 import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
-const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',username:'example',is_admin:true};
+const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',email:'example@example.com',is_admin:true};
 const calendar={id:'22222222-2222-4222-8222-222222222222',name:'Personal',client_id:'personal',shade:'gray-1',sort_order:0,is_visible:true};
 function makeSettings(){return{theme:'dark',default_view:'week',start_of_week:'sunday',accent:'graphite',custom_accent_hex:null,show_weekends:true,compact_mode:false,reduce_motion:false,mcp_allow_delete:false,default_reminder_minutes:15}}
 async function setup(page,{loggedIn=true,failLogin=false}={}){
@@ -9,7 +9,6 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
  await page.route('https://mock.supabase.co/functions/v1/daylight-release',async route=>{
   const req=route.request().postDataJSON(),action=req.action;
   const success=(obj)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(obj)});
-  if(action==='auth_login')return failLogin?route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:"That username and password don't match"})}):success({token:'temporary-test-token',user:account});
   if(action==='auth_session')return success({user});
   if(action==='user_update'){user={...user,first_name:req.first_name,last_name:req.last_name};return success({user})}
   if(action==='auth_logout')return success({ok:true});
@@ -19,6 +18,7 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
   if(action==='data_list'){const map={calendars,events,tasks,subscriptions,settings:[settings]};return success({items:map[req.entity]||[]})}
   if(action==='data_update'&&req.entity==='settings'){settings={...settings,...req.data};return success({item:settings})}
   if(action==='data_create'){
+   if(req.entity==='subscriptions'&&subscriptions.some(x=>x.url===req.data.url))return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'That feed is already added.'})});
    const item={id:'33333333-3333-4333-8333-'+String((events.length+tasks.length+1)).padStart(12,'0'),...req.data};const entity=req.entity;
    if(entity==='events')events.push(item);if(entity==='tasks')tasks.push(item);if(entity==='calendars')calendars.push(item);if(entity==='subscriptions')subscriptions.push(item);return success({item});
   }
@@ -31,18 +31,31 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
   if(action==='sub_refresh')return success({count:0,item:subscriptions.find(x=>x.id===req.id)});
   return success({ok:true});
  });
- if(loggedIn)await page.addInitScript(()=>localStorage.setItem('dl-release-session','temporary-test-token'));
+ await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({status:200,contentType:'text/javascript',body:'/* sdk stub */'}));
+ await page.addInitScript(({loggedIn,failLogin})=>{
+  if(loggedIn)localStorage.setItem('qa-auth-session','1');else localStorage.removeItem('qa-auth-session');
+  const listeners=[];
+  const auth={
+   getSession:async()=>({data:{session:localStorage.getItem('qa-auth-session')?{access_token:'mock.jwt.token',user:{id:'11111111-1111-4111-8111-111111111111',email:'example@example.com'}}:null},error:null}),
+   signInWithPassword:async()=>{if(failLogin)return{error:new Error('Invalid login credentials'),data:{session:null}};localStorage.setItem('qa-auth-session','1');return{data:{session:{access_token:'mock.jwt.token'}},error:null}},
+   signOut:async()=>{localStorage.removeItem('qa-auth-session');listeners.forEach(fn=>fn('SIGNED_OUT',null));return{error:null}},
+   resetPasswordForEmail:async()=>({data:{},error:null}),
+   updateUser:async()=>({data:{},error:null}),
+   onAuthStateChange:fn=>{listeners.push(fn);return{data:{subscription:{unsubscribe:()=>{}}}}}
+  };
+  window.supabase={createClient:()=>({auth})};
+ },{loggedIn,failLogin});
  await page.goto('/');
  return{get:()=>({settings,calendars,events,tasks,subscriptions,tokens,user})};
 }
 test('no session shows only login and no signup',async({page})=>{
  await setup(page,{loggedIn:false,failLogin:true});
  await expect(page.locator('#login')).toBeVisible();
- await expect(page.getByText("Accounts are created by Joey")).toBeVisible();
+ await expect(page.locator('#forgotPassword')).toBeVisible();await expect(page.locator('input[type=email]')).toBeVisible();await expect(page.locator('[href*=signup]')).toHaveCount(0);
  await expect(page.locator('#newEvent')).toHaveCount(0);
- await page.locator('#username').fill('nonexistent');await page.locator('#password').fill('anything');
+ await page.locator('#email').fill('nonexistent@example.com');await page.locator('#password').fill('anything');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toHaveText("That username and password don't match.");
+ await expect(page.locator('#authError')).toHaveText('Email or password is incorrect.');
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
