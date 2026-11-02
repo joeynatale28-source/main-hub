@@ -271,7 +271,7 @@ function renderMonth(){
    let lane=0;while(lanes[lane]?.some(([a,b])=>a<=e._right&&e._left<=b))lane++;
    if(lane>=3)continue;
    (lanes[lane]??=[]).push([e._left,e._right]);
-   html+='<button class="month-span-bar '+(e._left===0?'continue-left ':'')+(e._right===6?'continue-right ':'')+'" '+eventAttr(e)+' data-drag-event="'+h(e.id)+'" style="'+eventStyle(e)+';--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';" title="'+h(e.title)+'">'+h(e.title)+'</button>';
+   html+='<button class="month-span-bar '+(e._left===0?'continue-left ':'')+(e._right===6?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'">'+h(e.title)+'</button>';
   }
   for(let i=0;i<7;i++){
    const day=iso(days[i]),extra=items.filter(e=>eventOn(e,day)).length-3;
@@ -285,7 +285,7 @@ function renderWeek(){
  let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
  const all=spansFor(events.filter(e=>e.all_day||isLong(e)),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
- for(const e of all)html+='<button class="all-day-span '+(e._left===0?'continue-left ':'')+(e._right===days.length-1?'continue-right ':'')+'" '+eventAttr(e)+' data-drag-event="'+h(e.id)+'" style="'+eventStyle(e)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+'" >'+h(e.title)+'</button>';
+ for(const e of all)html+='<button class="all-day-span '+(e._left===0?'continue-left ':'')+(e._right===days.length-1?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
  html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
@@ -564,7 +564,7 @@ function enableCalendarDrag(){
 }
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
- const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=isLong(e)?rangeLabel(e,true):e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
+ const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=isLong(e)?rangeLabel(e,true):e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_address||e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
  $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e,null,null,'event',e)});
  $('#deleteEvent',dlg)?.addEventListener('click',()=>(async()=>{if(nativeRecurring(e)){dlg.close();await changeOccurrence(e,'delete')}else confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()})})());
  upgradeIcons();
