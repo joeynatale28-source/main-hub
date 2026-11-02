@@ -453,11 +453,27 @@ function renderIntegrations(){
  $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
  $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
+const isNativeRepeat=e=>!e?.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(String(e?.repeat_rule?.frequency||'').toLowerCase());
+function occurrenceChoice(event,action,callback){
+ const dlg=modal('<h2>'+(action==='delete'?'Delete recurring event':'Change recurring event')+'</h2><p>Which occurrences should this change affect?</p><div class="occurrence-options"><button type="button" data-occurrence="only">Only this event</button><button type="button" data-occurrence="following">This and following events</button><button type="button" data-occurrence="all">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
+ $('[data-occurrence]',dlg).forEach(b=>b.onclick=()=>{const which=b.dataset.occurrence;dlg.close();callback(which)});
+}
+async function mutateOccurrence(event,scope,mode,changes=null){
+ const base=event._origin||event;
+ const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,...(changes?{changes}:{})});
+ await refreshData();toast(mode==='delete'?'Event deleted':'Event updated');return result;
+}
+function deleteEventSafely(e,closeDetail){
+ const event=e._origin||e;
+ if(event.source_subscription_id)return toast('Subscribed events are read-only');
+ if(isNativeRepeat(event)){occurrenceChoice(e,'delete',async scope=>{try{await mutateOccurrence(e,scope,'delete');closeDetail?.()}catch(ex){toast(ex.message||'Could not delete event.')}});return}
+ confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',event.id,null,'delete');closeDetail?.();toast('Event deleted')});
+}
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
  const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
- $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e)});
- $('#deleteEvent',dlg)?.addEventListener('click',()=>confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()}));
+ $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e)});
+ $('#deleteEvent',dlg)?.addEventListener('click',()=>deleteEventSafely(e,()=>dlg.close()));
  upgradeIcons();
 }
 
@@ -541,7 +557,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
  field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
  field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
  upgradeIcons();
- $('#quickDelete',form)?.addEventListener('click',()=>confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()}));
+ $('#quickDelete',form)?.addEventListener('click',()=>{if(state.mode==='event')return deleteEventSafely(existing,()=>dlg.close());confirmAction('Delete task?','This task will be permanently deleted.',async()=>{await safeChange('tasks',existing.id,null,'delete');dlg.close();toast('Task deleted')})});
  form.onsubmit=async e=>{
   e.preventDefault();if(!title.value.trim()){title.classList.add('shake','invalid');$('#titleError',form).hidden=false;title.focus();setTimeout(()=>title.classList.remove('shake'),300);return}
   const startD=$('#startDate',form).value,endD=$('#endDate',form).value;
@@ -550,7 +566,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
   const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
-  try{loading($('#quickSave',form),true,'Saving…');await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
+  try{loading($('#quickSave',form),true,'Saving…');if(existing&&state.mode==='event'&&isNativeRepeat(existing._origin||existing)){loading($('#quickSave',form),false);occurrenceChoice(existing,'update',async scope=>{try{await mutateOccurrence(existing,scope,'update',data);dlg.close()}catch(ex){toast(ex.message||'Could not save event.')}});return}await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
 startIcons();
