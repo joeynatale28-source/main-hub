@@ -410,7 +410,7 @@ const selectOptions={
 };
 const readableTime=v=>{const [hour,minute]=String(v||'09:00').split(':').map(Number);return (hour%12||12)+':'+String(minute||0).padStart(2,'0')+' '+(hour>=12?'PM':'AM')};
 const row=(title,description,control)=>'<div class="setting-row"><div><strong>'+h(title)+'</strong><small>'+h(description||'')+'</small></div><div class="row-control">'+control+'</div></div>';
-function switchHtml(key,value){return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'"><span></span></button>'}
+function switchHtml(key,value){const dis=['task_reminders','event_reminders','notification_sound'].includes(key)&&!(typeof Notification!=='undefined'&&Notification.permission==='granted');return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'" '+(dis?'disabled title="Enable browser notifications first"':'')+'><span></span></button>'}
 function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'"><span class="select-value">'+h(text)+'</span>'+icon('chevron-down',16)+'</button>'}
 function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
@@ -502,7 +502,12 @@ async function changeOccurrence(e,action,data={}){
  const when=occurrenceDate(e),r={...(origin.repeat_rule||{})};
  if(scope==='all'){
   if(action==='delete')await change('events',origin.id,null,'delete');
-  else await change('events',origin.id,data,'update');
+  else {
+   const occurrenceStart=new Date(e.starts_at).getTime(),baseStart=new Date(origin.starts_at).getTime();
+   const adjusted={...data};
+   if(adjusted.starts_at){const delta=Date.parse(adjusted.starts_at)-occurrenceStart;adjusted.starts_at=new Date(baseStart+delta).toISOString();if(adjusted.ends_at)adjusted.ends_at=new Date(Date.parse(origin.ends_at)+delta).toISOString()}
+   await change('events',origin.id,adjusted,'update');
+  }
  }else if(scope==='only'){
   await change('events',origin.id,{exdates:[...new Set([...(origin.exdates||[]),when])]},'update');
   if(action==='update')await change('events',null,{...Object.fromEntries(['calendar_id','title','description','location_name','location_address','all_day','reminder_offset_minutes','status'].map(k=>[k,origin[k]])),starts_at:e.starts_at,ends_at:e.ends_at,repeat_rule:{frequency:'never'},recurrence_parent_id:origin.id,...data},'create');
@@ -644,7 +649,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',i
  field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
  field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
  upgradeIcons();
- $('#quickDelete',form)?.addEventListener('click',()=>confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()}));
+ $('#quickDelete',form)?.addEventListener('click',()=>{if(instance&&nativeRecurring(instance))return changeOccurrence(instance,'delete').then(ok=>{if(ok)dlg.close()});confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()})});
  form.onsubmit=async e=>{
   e.preventDefault();if(!title.value.trim()){title.classList.add('shake','invalid');$('#titleError',form).hidden=false;title.focus();setTimeout(()=>title.classList.remove('shake'),300);return}
   const startD=$('#startDate',form).value,endD=$('#endDate',form).value;
@@ -656,6 +661,26 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',i
   try{loading($('#quickSave',form),true,'Saving…');if(existing&&instance&&nativeRecurring(instance)){const changed=await changeOccurrence(instance,'update',data);if(!changed){loading($('#quickSave',form),false);return}}else await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
+const remindersSeen=new Set();
+function checkReminders(){
+ if(!state.user||typeof Notification==='undefined'||Notification.permission!=='granted')return;
+ const time=Date.now(),windowMs=60000;
+ if(state.settings.event_reminders){
+  for(const e of uniqueInstances(occurrences(add(now(),-2),add(now(),3)))){
+   const offset=Number.isFinite(e.reminder_offset_minutes)?e.reminder_offset_minutes:state.settings.default_reminder_minutes;
+   if(offset===-1||offset==null)continue;
+   const due=Date.parse(e.starts_at)-offset*60000,key='event:'+e.id+':'+e.starts_at+':'+offset;
+   if(due<=time&&due>time-windowMs&&!remindersSeen.has(key)){remindersSeen.add(key);new Notification(e.title,{body:'Daylight event reminder',tag:key})}
+  }
+ }
+ if(state.settings.task_reminders){
+  for(const t of state.tasks.filter(x=>!x.completed&&x.due_date)){
+   const due=new Date(t.due_date+'T09:00:00').getTime(),key='task:'+t.id+':'+t.due_date;
+   if(due<=time&&due>time-windowMs&&!remindersSeen.has(key)){remindersSeen.add(key);new Notification(t.title,{body:'Daylight task due today',tag:key})}
+  }
+ }
+}
+setInterval(checkReminders,30000);
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();if(state.user)settings()}});
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
