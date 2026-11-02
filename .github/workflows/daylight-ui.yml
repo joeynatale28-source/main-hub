@@ -15,7 +15,7 @@ concurrency:
   group: daylight-pages-ui-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  secure-ui:
+  local-ui:
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -27,22 +27,25 @@ jobs:
           node-version: '22'
       - name: Install
         run: npm install --no-audit --no-fund
-      - name: Build authenticated Daylight
+      - name: Build local-only Daylight
         run: npm run build
-      - name: Test login, Settings, event creation and Tasks
-        run: npm test
-      - name: Verify GitHub Pages files are self-hosted and configured
+      - name: Install browser for local UI tests
+        run: npx playwright install --with-deps chromium
+      - name: Verify local workspace, Settings, events and Tasks
+        run: npx playwright test tests/local.spec.js --reporter=line --workers=1
+      - name: Verify site is independent of Supabase
         working-directory: .
         run: |
-          test -s glass-calendar/site-config.js
-          test -s glass-calendar/secure-app/src/main.js
-          test -s glass-calendar/secure-app/src/style.css
+          test -s glass-calendar/secure-app/src/local-store.js
+          test -s glass-calendar/secure-app/src/local-ui.css
+          grep -q 'local-ui.css' glass-calendar/index.html
           grep -q 'secure-app/src/main.js' glass-calendar/index.html
-          grep -q 'site-config.js' glass-calendar/index.html
-          grep -q '__DAYLIGHT_CONFIG' glass-calendar/secure-app/src/main.js
+          ! grep -q 'site-config.js' glass-calendar/index.html
+          ! grep -q 'supabase-js' glass-calendar/secure-app/src/main.js
+          grep -q "localApi" glass-calendar/secure-app/src/main.js
   deployed-page:
     if: github.event_name == 'push'
-    needs: secure-ui
+    needs: local-ui
     runs-on: ubuntu-latest
     steps:
       - name: Verify new app is available on GitHub Pages
@@ -53,8 +56,8 @@ jobs:
           for attempt in $(seq 1 40); do
             if curl --location --fail --silent --max-time 12 "$url?check=${{ github.sha }}" > /tmp/daylight-pages.html &&
                grep -q 'secure-app/src/main.js' /tmp/daylight-pages.html &&
-               curl --location --fail --silent --max-time 12 "${url}secure-app/src/main.js" | grep -q '__DAYLIGHT_CONFIG'; then
-              echo "New authenticated Daylight is served by GitHub Pages"
+               curl --location --fail --silent --max-time 12 "${url}secure-app/src/main.js" | grep -q 'localApi'; then
+              echo "Local-only Daylight is served by GitHub Pages"
               exit 0
             fi
             echo "Waiting for Pages release ($attempt/40)"
@@ -79,7 +82,7 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
       - name: Render and assert both themes at 1920px and 1366px
-        run: CI= npx playwright test tests/perfection.spec.js --reporter=line --workers=1
+        run: CI= npx playwright test tests/local-ui.spec.js --reporter=line --workers=1
       - name: Preserve screenshot captures and trace on failures
         if: always()
         uses: actions/upload-artifact@v4
