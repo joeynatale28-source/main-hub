@@ -379,7 +379,7 @@ function renderWeek(){
   const key=iso(t);html+='<div class="daytrack '+([0,6].includes(t.getDay())?'weekend':'')+'" data-slot="'+key+'">';
   for(const e of events.filter(x=>!x.all_day&&!isLong(x)&&eventOn(x,key))){
    const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e,'top:'+(minute*80/60)+'px;height:'+(height*80/60)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><small class="event-card-time">'+h(compactRange(e))+'</small>'+(height>=60&&(e.location_name||e.location_address)?'<small class="event-card-location">'+h(e.location_name||e.location_address)+'</small>':'')+'<span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
+   html+='<button class="weekevent '+(height<=30?'short-event':'')+'" '+eventAttr(e,'top:'+(minute*80/60)+'px;height:'+(height*80/60)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><small class="event-card-time">'+h(compactRange(e))+'</small>'+(height>=60&&(e.location_name||e.location_address)?'<small class="event-card-location">'+h(e.location_name||e.location_address)+'</small>':'')+'<span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
   }html+='</div>';
  }
  $('#grid').innerHTML=html+'</div></div>';
