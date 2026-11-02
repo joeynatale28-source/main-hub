@@ -66,12 +66,12 @@ test('Settings opens over calendar, theme changes inside modal, closes cleanly',
 });
 test('per-calendar actions support rename, hide, delete confirmation and Undo',async({page})=>{
  await page.locator('#addCalendarMenu').click();await page.locator('#createCalendarOption').click();await page.locator('#calendarName').fill('To rename');await page.locator('#calendarForm button[type=submit]').click();
- let row=page.locator('.calendar-filter').filter({hasText:'To rename'});
+ let row=page.locator('#calendars .calendar-filter').filter({hasText:'To rename'});
  await row.locator('.calendar-actions-button').click();
  await page.locator('#calendarActionsMenu [data-command="rename"]').click();
  await row.locator('.calendar-rename-input').fill('Renamed calendar');
  await row.locator('.calendar-rename-input').press('Enter');
- row=page.locator('.calendar-filter').filter({hasText:'Renamed calendar'});
+ row=page.locator('#calendars .calendar-filter').filter({hasText:'Renamed calendar'});
  await row.locator('.calendar-actions-button').click();
  await page.locator('#calendarActionsMenu [data-command="visibility"]').click();
  await expect(row).toHaveClass(/calendar-hidden/);
