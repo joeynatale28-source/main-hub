@@ -1,4 +1,4 @@
-import {localApi,localReset,bootAuth,signOut,feedAction} from './daylight-backend.js';
+import {localApi,localReset,bootAuth,signOut,feedAction,mcpAction} from './daylight-backend.js';
 "use strict";
 /* Daylight: working implementation of the user's supplied one-page UI.
  * A browser-only application. All CRUD is through localApi; no logins, syncing or MCP. */
@@ -710,7 +710,7 @@ function openSettings(section="general"){
  const rail=el('<div class="settings-rail"><div class="sr-title">Settings</div></div>');
  const sections=[
   ["general","sliders","General"],["appearance","droplet","Appearance"],["calendar","calendar","Calendar"],
-  ["notifications","bell","Notifications"],["data","download","Data & sync"],["about","info","About"]
+  ["notifications","bell","Notifications"],["data","download","Data & sync"],["ai","cpu","AI access"],["about","info","About"]
  ];
  const pane=el('<div class="settings-pane"></div>');
  const close=()=>{bd.remove();renderAll(false)};
@@ -725,7 +725,7 @@ function openSettings(section="general"){
   pane.innerHTML='';
   const x=el('<button class="icon-btn settings-close" title="Close settings" data-x>'+icon("x",17)+'</button>');
   x.onclick=close;pane.append(x);
-  ({general:paneGeneral,appearance:paneAppearance,calendar:paneCalendar,notifications:paneNotifications,data:paneData,about:paneAbout}[settingsState.section]||paneGeneral)(pane,close);
+  ({general:paneGeneral,appearance:paneAppearance,calendar:paneCalendar,notifications:paneNotifications,data:paneData,ai:paneAI,about:paneAbout}[settingsState.section]||paneGeneral)(pane,close);
  }
  draw();
 }
@@ -831,6 +831,30 @@ function paneData(pane,close){
   finally{button.disabled=false}
  };
  $("#signout",g).onclick=async()=>{close();await signOut();location.reload()};
+}
+function paneAI(pane){
+ paneHead(pane,"AI access","Generate, review and revoke MCP tokens for this account.");
+ const g=el('<div class="set-group"><div class="set-group-title">MCP endpoint</div><p class="inline-note" id="endpointValue" style="word-break:break-all">https://qrqemjgpzoqhtmsowmqv.supabase.co/functions/v1/daylight-mcp</p>'+
+ '<div class="set-row switch-row"><span><span class="sw-label">Allow AI deletes</span><div class="sw-sub">Off by default. Prevents MCP event deletion server-side.</div></span>'+switchHTML("allowAIDeletes",!!state.settings.mcp_allow_delete)+'</div>'+
+ '<div class="set-group-title" style="margin-top:24px">Access tokens</div><div id="tokenList"><p class="inline-note">Loading tokens…</p></div>'+
+ '<button class="btn-primary" id="newToken" style="margin-left:0">'+icon("plus",16)+' Generate token</button>'+
+ '<div id="newTokenResult" style="display:none;margin-top:12px"><label for="rawToken" class="inline-note">Copy this token now. It will not be shown again.</label><input class="text-input" readonly id="rawToken" autocomplete="off"><button class="btn-ghost" id="copyToken">Copy token</button></div></div>');
+ pane.append(g);
+ $("#allowAIDeletes",g).onchange=async e=>{try{const r=await mcpAction("delete_permission",{enabled:e.target.checked});state.settings.mcp_allow_delete=r.enabled;toast(r.enabled?"AI deletes enabled":"AI deletes disabled")}catch(err){e.target.checked=!e.target.checked;toast(err.message)}};
+ const list=$("#tokenList",g);
+ const draw=async()=>{
+  try{const r=await mcpAction("token_list");list.innerHTML="";
+   if(!r.tokens.length)list.append(el('<div class="empty-state" style="padding:18px"><p>No MCP tokens yet.</p></div>'));
+   for(const t of r.tokens){
+    const row=el('<div class="token-row"><span style="flex:1;min-width:0"><b>'+esc(t.name)+'</b><br><small style="color:var(--muted)">Created '+esc(new Date(t.created_at).toLocaleDateString())+'</small></span><button class="btn-ghost" data-revoke>Revoke</button></div>');
+    $("[data-revoke]",row).onclick=()=>openConfirm({title:"Revoke this token?",body:"Any agent using this token will immediately lose access.",confirmLabel:"Revoke",danger:true,fn:async()=>{try{await mcpAction("token_revoke",{id:t.id});await draw();toast("Token revoked")}catch(e){toast(e.message)}}});
+    list.append(row);
+   }
+  }catch(e){list.textContent=e.message}
+ };
+ $("#newToken",g).onclick=async()=>{try{const name="Daylight token "+new Date().toLocaleDateString();const r=await mcpAction("token_create",{name});$("#newTokenResult",g).style.display="block";$("#rawToken",g).value=r.token;await draw();toast("Token created")}catch(e){toast(e.message)}};
+ $("#copyToken",g).onclick=async()=>{try{await navigator.clipboard.writeText($("#rawToken",g).value);toast("Token copied")}catch{toast("Select the token to copy it manually.")}};
+ draw();
 }
 function paneAbout(pane){
  paneHead(pane,"About","");
