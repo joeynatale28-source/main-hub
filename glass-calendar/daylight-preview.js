@@ -889,18 +889,26 @@ function openSearch(){
  function draw(){
   const query=input.value.trim().toLowerCase();clear.classList.toggle("show",!!query);results.innerHTML="";
   if(!query){results.append(el('<div class="empty-state" style="padding:30px 20px">'+icon("search",26)+'<p>Start typing to search your events</p></div>'));return}
-  const found=occsInRange(addDays(TODAY(),-730),addDays(TODAY(),1095))
-   .filter(o=>o.ev.title.toLowerCase().includes(query)||o.ev.loc.toLowerCase().includes(query))
-   .sort((a,b)=>a.start-b.start).slice(0,80);
+  const rangeStart=addDays(TODAY(),-730),rangeEnd=addDays(TODAY(),1095);
+  const found=state.events.flatMap(e=>occurrences(e,rangeStart,rangeEnd))
+   .filter(o=>[o.ev.title,o.ev.loc,o.ev.description].some(v=>String(v||"").toLowerCase().includes(query)))
+   .sort((a,b)=>a.start-b.start).slice(0,150);
   if(!found.length){results.append(el('<div class="empty-state" style="padding:30px 20px">'+icon("search",26)+'<p>No results for “'+esc(input.value.trim())+'”</p></div>'));return}
-  const groups=new Map();
-  found.forEach(o=>{if(!groups.has(o.ev.cal))groups.set(o.ev.cal,[]);groups.get(o.ev.cal).push(o)});
-  groups.forEach((items,calId)=>{
-   const cal=calOf(calId);results.append(el('<div class="pal-group">'+esc(cal.name)+'</div>'));
+  const now=new Date(),groups=new Map([["Upcoming",found.filter(o=>o.start>=now)],["Past",found.filter(o=>o.start<now)]]);
+  groups.forEach((items,label)=>{
+   if(!items.length)return;
+   results.append(el('<div class="pal-group">'+label+'</div>'));
    items.forEach(o=>{
-    const detail=fmtDateShort(o.start)+" · "+(o.ev.allDay?"All day":fmtTimeRange(o.start,o.end));
+    const cal=calOf(o.ev.cal);
+    const detail=cal.name+" · "+fmtDateShort(o.start)+" · "+(o.ev.allDay?"All day":fmtTimeRange(o.start,o.end))+(cal.hidden?" · Hidden calendar":"");
     const item=el('<button class="pal-item"><span class="pop-dot" style="background:'+dotOf(cal)+';margin:0"></span><span class="pi-text"><span class="pi-title">'+esc(o.ev.title)+'</span><br><span class="pi-sub">'+esc(detail)+'</span></span>'+icon("chevR",15)+'</button>');
-    item.onclick=()=>{close();state.selected=sod(o.start);drillToDay(o.start)};
+    item.onclick=()=>{
+     close();state.selected=sod(o.start);drillToDay(o.start);
+     requestAnimationFrame(()=>{
+      const card=[...document.querySelectorAll(".ev-card,.allday-bar")].find(x=>x.getAttribute("aria-label")===o.ev.title||x.dataset.eventId===o.ev.id)||$("#headerBand");
+      openPopover(o,card);
+     });
+    };
     results.append(item);
    });
   });active=0;
