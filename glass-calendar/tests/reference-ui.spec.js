@@ -45,6 +45,8 @@ for(const theme of ['dark','light']){
    await expect(page.locator('.agenda-scroll')).toBeVisible();
    await screenshot('agenda');
    await page.locator('.head-right [title="Settings"]').click();
+   // The reference dialog begins at scale(.98); measure after its 160ms entrance.
+   await page.locator('.settings-dialog').evaluate(el=>el.getAnimations().forEach(anim=>anim.finish()));
    const initial=await page.locator('.settings-dialog').boundingBox();
    for(const name of ['general','appearance','calendar','notifications','data','about']){
     await page.locator('[data-section="'+name+'"]').click();
