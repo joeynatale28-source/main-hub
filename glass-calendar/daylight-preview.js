@@ -1,4 +1,5 @@
 import {localApi,localReset,bootAuth,signOut,feedAction,mcpAction} from './daylight-backend.js';
+import {rrulestr} from 'https://esm.sh/rrule@2.8.1';
 "use strict";
 /* Daylight: working implementation of the user's supplied one-page UI.
  * A browser-only application. All CRUD is through localApi; no logins, syncing or MCP. */
@@ -71,7 +72,7 @@ const id=()=>globalThis.crypto?.randomUUID?.()||"local-"+Date.now()+"-"+Math.ran
 let state={
  view:"week",prevView:null,cursor:sod(TODAY()),selected:sod(TODAY()),miniCursor:dt(TODAY().getFullYear(),TODAY().getMonth(),1),
  themeMode:"dark",firstName:"Joey",lastName:"",tzLabel:"",weekNumbers:false,showDeclined:true,
- reduceMotion:false,sidebarRail:false,calendars:[],events:[],tasks:[],page:"calendar",taskFilter:"all",settings:{}
+ reduceMotion:false,sidebarRail:false,calendars:[],events:[],tasks:[],exceptions:[],page:"calendar",taskFilter:"all",settings:{}
 };
 const effectiveTheme=()=>state.themeMode==="system"?(matchMedia("(prefers-color-scheme:light)").matches?"light":"dark"):state.themeMode;
 const applyTheme=()=>{document.documentElement.dataset.theme=effectiveTheme();document.body.classList.toggle("reduce-motion",state.reduceMotion)};
@@ -88,23 +89,23 @@ function eventFromData(x){
  const end=x.all_day?new Date(rawEnd.getTime()-1000):rawEnd;
  return {id:x.id,title:x.title||"Untitled",cal:x.calendar_id,start,end,allDay:!!x.all_day,
  loc:x.location_address||x.location_name||"",description:x.description||"",repeat:((x.repeat_rule||{}).frequency||"never")==="never"?null:x.repeat_rule.frequency,
- declined:["declined","cancelled"].includes(x.status),exdates:x.exdates||[]};
+ declined:["declined","cancelled"].includes(x.status),exdates:(x.extra?.exdates||[]).map(d=>dateKey(new Date(d))),rrule:x.rrule||null};
 }
 function eventToData(e){
  let end=e.end;
  if(e.allDay)end=addDays(sod(e.end),1);
  return {title:e.title,calendar_id:e.cal,starts_at:e.start.toISOString(),ends_at:end.toISOString(),all_day:e.allDay,
  description:e.description||"",location_name:e.loc,location_address:e.loc,
- repeat_rule:{frequency:e.repeat||"never"},status:e.declined?"declined":"confirmed",exdates:e.exdates||[]};
+ repeat_rule:{frequency:e.repeat||"never"},rrule:e.rrule||null,status:e.declined?"declined":"confirmed",exdates:e.exdates||[]};
 }
 async function loadLocal(){
- const [ur,ca,ev,st,tasks]=await Promise.all([
+ const [ur,ca,ev,st,tasks,exceptions]=await Promise.all([
   localApi("auth_session"),localApi("data_list",{entity:"calendars"}),
-  localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"}),localApi("data_list",{entity:"tasks"})]);
+  localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"}),localApi("data_list",{entity:"tasks"}),localApi("data_list",{entity:"exceptions"})]);
  const s=st.items[0]||{},prefs=readUIPrefs();
  state.firstName=ur.user?.first_name||"Joey";state.lastName=ur.user?.last_name||"";
  state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local",feedUrl:c.source_url||null}));
- state.events=ev.items.map(eventFromData);state.tasks=tasks.items;
+ state.events=ev.items.map(eventFromData);state.tasks=tasks.items;state.exceptions=exceptions.items;
  state.settings=s;state.themeMode=s.theme||"dark";
  state.view=s.default_view||"week";state.weekNumbers=!!s.show_week_numbers;
  state.showDeclined=s.show_declined_events!==false;state.reduceMotion=!!s.reduce_motion;
@@ -133,19 +134,34 @@ async function saveEvent(e,method){
 }
 async function removeEvent(e){try{await localApi("data_delete",{entity:"events",id:e.id});return true}catch(error){toast("Event could not be deleted");return false}}
 function occurrences(ev,rs,re){
- const out=[],duration=ev.end-ev.start;let cur=new Date(ev.start),guard=0;
- while(guard++<600){
-  const end=new Date(cur.getTime()+Math.max(60000,duration));
-  if(cur>=re)break;
-  if(end>rs&&!ev.exdates?.includes(dateKey(cur)))out.push({ev,start:new Date(cur),end});
-  if(!ev.repeat)break;
-  if(ev.repeat==="weekly")cur=dt(cur.getFullYear(),cur.getMonth(),cur.getDate()+7,cur.getHours(),cur.getMinutes());
-  else if(ev.repeat==="daily")cur=dt(cur.getFullYear(),cur.getMonth(),cur.getDate()+1,cur.getHours(),cur.getMinutes());
-  else if(ev.repeat==="monthly")cur=dt(cur.getFullYear(),cur.getMonth()+1,cur.getDate(),cur.getHours(),cur.getMinutes());
-  else if(ev.repeat==="yearly")cur=dt(cur.getFullYear()+1,cur.getMonth(),cur.getDate(),cur.getHours(),cur.getMinutes());
-  else break;
+ const duration=Math.max(60000,ev.end-ev.start),startDates=[];
+ if(ev.rrule||ev.repeat){
+  const rule=ev.rrule||"FREQ="+ev.repeat.toUpperCase();
+  try{
+   const r=rrulestr(rule,{dtstart:new Date(ev.start)});
+   startDates.push(...r.between(new Date(rs.getTime()-duration),re,true));
+  }catch(error){console.warn("Invalid RRULE",error)}
+ }else startDates.push(new Date(ev.start));
+ const all=[];
+ const found=new Set();
+ for(const original of startDates){
+  const originalISO=original.toISOString(),exception=state.exceptions.find(e=>e.event_id===ev.id&&new Date(e.original_start).getTime()===original.getTime());
+  found.add(originalISO);
+  if(exception?.exception_type==="skipped"||ev.exdates?.includes(dateKey(original)))continue;
+  let start=new Date(original),end=new Date(start.getTime()+duration),effective=ev;
+  if(exception&&["moved","edited"].includes(exception.exception_type)){
+   const changes=exception.replacement||{};
+   if(changes.starts_at)start=new Date(changes.starts_at);
+   if(changes.ends_at)end=new Date(changes.ends_at);
+   effective={...ev,title:changes.title||ev.title,loc:changes.location||ev.loc,description:changes.description??ev.description};
+  }
+  if(start<re&&end>rs)all.push({ev:effective,start,end,originalStart:original});
  }
- return out;
+ for(const exception of state.exceptions.filter(e=>e.event_id===ev.id&&["moved","edited"].includes(e.exception_type)&&!found.has(new Date(e.original_start).toISOString()))){
+  const changes=exception.replacement||{},start=new Date(changes.starts_at||exception.original_start),end=new Date(changes.ends_at||new Date(start.getTime()+duration));
+  if(start<re&&end>rs)all.push({ev:{...ev,title:changes.title||ev.title,loc:changes.location||ev.loc,description:changes.description??ev.description},start,end,originalStart:new Date(exception.original_start)});
+ }
+ return all;
 }
 const visibleEvents=()=>state.events.filter(ev=>!calOf(ev.cal).hidden&&(state.showDeclined||!ev.declined));
 function occsInRange(rs,re){return visibleEvents().flatMap(e=>occurrences(e,rs,re))}
