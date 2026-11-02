@@ -125,6 +125,43 @@ async function handle(req:Request){
   const {data,error}=await db.from('dl_mcp_tokens').delete().eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
   if(error)throw error;return data?json({ok:true}):fail('Token not found',404);
  }
+ if(action==='recurrence_mutate'){
+  const id=plain(body.id),scope=plain(body.scope),mode=plain(body.mode),occ=plain(body.occurrence_start);
+  if(!['only','following','all'].includes(scope)||!['update','delete'].includes(mode)||!Number.isFinite(Date.parse(occ)))return fail('Invalid recurrence operation.',400);
+  const {data:original,error:readError}=await db.from('dl_events').select('*').eq('id',id).eq('user_id',uid).maybeSingle();
+  if(readError)throw readError;if(!original||original.source_subscription_id)return fail('Event not found or read-only.',403);
+  const freq=plain(original.repeat_rule?.frequency||'never');if(!['daily','weekly','monthly','yearly'].includes(freq))return fail('Event is not recurring.',400);
+  const eventDate=occ.slice(0,10),originalDate=String(original.starts_at).slice(0,10);
+  if(Date.parse(occ)<Date.parse(original.starts_at)-60000)return fail('Occurrence precedes series.',400);
+  const changes=mode==='update'?pick('events',body.changes&&typeof body.changes==='object'?body.changes as Record<string,unknown>:{}):{};
+  if(changes.calendar_id)await calendarOwner(uid,String(changes.calendar_id));
+  if(scope==='all'){
+   const query=mode==='delete'?db.from('dl_events').delete():db.from('dl_events').update(changes);
+   const {error}=await query.eq('id',id).eq('user_id',uid);if(error)throw error;
+   return json({ok:true});
+  }
+  if(scope==='only'){
+   const excluded=[...new Set([...(Array.isArray(original.excluded_dates)?original.excluded_dates:[]),eventDate])];
+   if(mode==='update'){
+    const duration=Date.parse(original.ends_at)-Date.parse(original.starts_at);
+    const detached={calendar_id:original.calendar_id,title:original.title,description:original.description,location_name:original.location_name,location_address:original.location_address,starts_at:occ,ends_at:new Date(Date.parse(occ)+duration).toISOString(),all_day:original.all_day,repeat_rule:{frequency:'never'},reminder_offset_minutes:original.reminder_offset_minutes,...changes};
+    detached.repeat_rule={frequency:'never'};
+    const {error:ce}=await db.from('dl_events').insert({...detached,user_id:uid});if(ce)throw ce;
+   }
+   const {error}=await db.from('dl_events').update({excluded_dates:excluded}).eq('id',id).eq('user_id',uid);if(error)throw error;
+   return json({ok:true});
+  }
+  const until=new Date(Date.parse(occ)-86400000).toISOString().slice(0,10);
+  const trimmed={...original.repeat_rule,ends:'on',until};
+  if(mode==='update'){
+   const duration=Date.parse(original.ends_at)-Date.parse(original.starts_at);
+   const continuation={calendar_id:original.calendar_id,title:original.title,description:original.description,location_name:original.location_name,location_address:original.location_address,starts_at:occ,ends_at:new Date(Date.parse(occ)+duration).toISOString(),all_day:original.all_day,repeat_rule:{...original.repeat_rule,ends:original.repeat_rule?.ends==='on'?'on':'never'},reminder_offset_minutes:original.reminder_offset_minutes,...changes};
+   const {error:ce}=await db.from('dl_events').insert({...continuation,user_id:uid});if(ce)throw ce;
+  }
+  if(eventDate===originalDate){const {error}=await db.from('dl_events').delete().eq('id',id).eq('user_id',uid);if(error)throw error}
+  else{const {error}=await db.from('dl_events').update({repeat_rule:trimmed}).eq('id',id).eq('user_id',uid);if(error)throw error}
+  return json({ok:true});
+ }
  if(action==='sub_refresh'){
   const id=plain(body.id);if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Invalid subscription');
   const result=await refreshSub(uid,id);
