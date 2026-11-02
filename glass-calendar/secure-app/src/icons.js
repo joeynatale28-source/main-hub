@@ -60,7 +60,7 @@ function decorateOne(scope){
  pick('#searchButton','search');pick('#themeButton',()=>document.documentElement.dataset.theme==='dark'?'sun':'moon');
  pick('#settingsButton,#settings .glyph','settings');pick('#miniPrev,#prev','chevron-left');pick('#miniNext,#next','chevron-right');
  pick('#searchClose,#editorClose','x',16);
- pick('#profileMenu','more-horizontal');pick('[data-menu]','more-vertical',16);
+ pick('#profileMenu','more-horizontal');pick('#collapseRail',()=>document.querySelector('#root')?.classList.contains('collapsed')?'chevron-right':'chevron-left',16);if(document.querySelector('#root')?.classList.contains('collapsed'))pick('#newEvent','plus',18);pick('[data-menu]','more-vertical',16);
  pick('[data-nav="calendar"] .glyph','calendar');pick('[data-nav="integrations"] .glyph','plug');pick('[data-nav="tasks"] .glyph','tasks');
  pick('#about .glyph','info');pick('#newCalendar','plus',16);
  pick('.settings-nav [data-sec="general"] .glyph','settings');pick('.settings-nav [data-sec="calendar"] .glyph','calendar');
@@ -83,7 +83,7 @@ function decorateOne(scope){
   el.insertAdjacentHTML('afterbegin','<span class="toast-icon">'+icon(bad?'alert-circle':'check-circle',16)+'</span>');
  });
  scope.querySelectorAll('.pill-select,.repeat-line').forEach(el=>{
-  if(el.querySelector('.dl-caret'))return;
+  if(el.querySelector('.dl-caret')||[...el.children].some(x=>x.classList.contains('dl-icon-slot')))return;
   const caret=document.createElement('span');caret.className='dl-caret';caret.innerHTML=icon('chevron-down',16);
   const old=el.querySelector('span:not(.dl-icon-slot)');if(old&&/⌄|▾/.test(old.textContent))old.remove();
   if(/⌄|▾/.test(el.lastChild?.textContent||''))el.lastChild.textContent=el.lastChild.textContent.replace(/[⌄▾]/g,'');
@@ -96,7 +96,7 @@ function decorateOne(scope){
  });
  scope.querySelectorAll('.integration-card').forEach(card=>{
   if(card.querySelector('.integration-icon'))return;
-  const h3=card.querySelector('h3');if(h3)h3.insertAdjacentHTML('afterbegin','<span class="integration-icon">'+icon('calendar')+'</span>');
+  const h3=card.querySelector('h3');if(h3)h3.insertAdjacentHTML('afterbegin','<span class="integration-icon">'+icon('calendar')+'</span>');const link=card.querySelector('.secondary');if(link){const last=link.lastChild;if(last?.nodeType===3)last.textContent=last.textContent.replace(/↗/g,'');if(!link.querySelector('.external-icon'))link.insertAdjacentHTML('beforeend','<span class="external-icon">'+icon('external-link',16)+'</span>')}
  });
  scope.querySelectorAll('.theme-card.picked').forEach(card=>{
   if(!card.querySelector('.theme-check'))card.insertAdjacentHTML('beforeend','<span class="theme-check">'+icon('check',16)+'</span>');
