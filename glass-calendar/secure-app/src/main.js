@@ -339,12 +339,12 @@ const shiftTime=(value,dayDelta,minuteDelta)=>{const d=new Date(value);d.setDate
 const minutesText=minute=>String(Math.floor(minute/60)%24).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');
 function droppedDay(x,y,view){
  if(view==='month'){
-  const row=document.elementFromPoint(x,y)?.closest('.monthweek')||[...$('.monthweek')].find(w=>{const r=w.getBoundingClientRect();return y>=r.top&&y<r.bottom});
+  const row=document.elementFromPoint(x,y)?.closest('.monthweek')||[...$$('.monthweek')].find(w=>{const r=w.getBoundingClientRect();return y>=r.top&&y<r.bottom});
   if(!row)return null;
   const rect=row.getBoundingClientRect(),col=Math.max(0,Math.min(6,Math.floor((x-rect.left)/(rect.width/7))));
   return row.querySelectorAll('.monthcell')[col]?.dataset.cell||null;
  }
- const tracks=$('.daytrack'),col=tracks.find(t=>{const r=t.getBoundingClientRect();return x>=r.left&&x<r.right});
+ const tracks=$$('.daytrack'),col=tracks.find(t=>{const r=t.getBoundingClientRect();return x>=r.left&&x<r.right});
  return col?.dataset.slot||null;
 }
 function stopDrag(cancel=false){
@@ -370,7 +370,7 @@ function stopDrag(cancel=false){
   changes={starts_at:shiftTime(ev.starts_at,shift,0),ends_at:shiftTime(ev.ends_at,shift,0)};
  }else{
   const targetDay=newDay||bounds(ev).first;
-  const track=$('.daytrack').find(x=>x.dataset.slot===targetDay);
+  const track=$$('.daytrack').find(x=>x.dataset.slot===targetDay);
   if(!track)return;
   const r=track.getBoundingClientRect(),t=snap15((y-r.top)/r.height*1440),orig=start.getHours()*60+start.getMinutes();
   const difference=dayDelta(bounds(ev).first,targetDay),delta=t-orig;
@@ -431,7 +431,7 @@ function movePointer(event){
  d.ghost.style.left=(event.clientX+12)+'px';d.ghost.style.top=(event.clientY+12)+'px';
  d.tooltip.style.left=(event.clientX+16)+'px';d.tooltip.style.top=(event.clientY-30)+'px';
  const day=droppedDay(event.clientX,event.clientY,d.view);
- const track=$('.daytrack').find(t=>t.dataset.slot===day),r=track?.getBoundingClientRect();
+ const track=$$('.daytrack').find(t=>t.dataset.slot===day),r=track?.getBoundingClientRect();
  d.tooltip.textContent=(day||'')+(r?' · '+minutesText(snap15((event.clientY-r.top)/r.height*1440)):'');
  event.preventDefault();
 }
@@ -442,7 +442,7 @@ document.addEventListener('keydown',e=>{
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
- $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
+ $$('[data-cell]').forEach(x=>x.onclick=e=>{if(Date.now()-dragJustFinished>=500&&!e.target.closest('button'))openEditor(null,x.dataset.cell)});
  $$('[data-detail]').forEach(x=>x.onclick=e=>{if(Date.now()-dragJustFinished<500)return;e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
 }
 document.addEventListener('keydown',e=>{
@@ -764,7 +764,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',s
  };
 };
 document.addEventListener('keydown',event=>{
- if((event.metaKey||event.ctrlKey)&&event.key===','){
+ if((event.metaKey||event.ctrlKey)&&(event.key===','||event.code==='Comma')){
   event.preventDefault();if(state.user)settings();
  }
 });
