@@ -5,7 +5,7 @@ const client=new Client({name:'daylight-smoke',version:'1.0.0'});
 await client.connect(transport);
 async function call(name:string,args:Record<string,unknown>={}){
  const result=await client.callTool({name,arguments:args});
- const value=result.content?.find(x=>x.type==='text');
+ const value=result.content?.find((x:any)=>x.type==='text');
  const content=String(value?.text||'');
  if(result.isError)throw new Error(name+': '+content);
  return JSON.parse(content);
