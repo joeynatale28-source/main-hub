@@ -404,3 +404,63 @@ test('timed cross-midnight and native multi-day expansion includes each civil da
  const expanded=expandEvents([ev],new Date(2026,10,1),new Date(2026,10,6));
  expect(expanded.map(eventDate)).toEqual(['2026-11-02','2026-11-03']);
 });
+
+test('multi-day Nov 7–10 is a continuous interval segmented exactly once per week row',()=>{
+ const e={id:'span-1',title:'Meet',starts_at:'2026-11-07T00:00:00Z',ends_at:'2026-11-11T00:00:00Z',all_day:true,repeat_rule:{}};
+ const all=instances([e],'2026-11-01','2026-11-20');
+ expect(all).toHaveLength(1);
+ expect(bounds(all[0])).toEqual({first:'2026-11-07',last:'2026-11-10'});
+ const left=weekSegments(all,'2026-11-01'),right=weekSegments(all,'2026-11-08');
+ expect(left).toHaveLength(1);expect(left[0].startCol).toBe(6);expect(left[0].span).toBe(1);expect(left[0].rightOpen).toBe(true);
+ expect(right).toHaveLength(1);expect(right[0].startCol).toBe(0);expect(right[0].span).toBe(3);expect(right[0].leftOpen).toBe(true);
+});
+test('recurrence EXDATE removes only the selected weekly date',()=>{
+ const e={id:'repeat',title:'Weekly swim',starts_at:'2026-11-02T18:00:00Z',ends_at:'2026-11-02T19:00:00Z',all_day:false,repeat_rule:{frequency:'weekly',count:4,ends:'count',exdates:['2026-11-09']}};
+ const all=instances([e],'2026-11-01','2026-12-15');
+ expect(all.map(x=>x._first)).toEqual(['2026-11-02','2026-11-16','2026-11-23']);
+});
+test('Cmd/Ctrl plus comma opens the existing Settings dialog',async({page})=>{
+ await setup(page);await page.keyboard.press('Control+,');
+ await expect(page.locator('#settingsModal')).toBeVisible();
+});
+test('duplicate subscription URL is blocked inline and list refreshes without closing Settings',async({page})=>{
+ const model=await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="data"]').click();
+ await page.locator('#addSub').click();await page.locator('#subURL').fill('https://example.org/events.ics');
+ await page.locator('#subSave').click();
+ await expect.poll(()=>model.get().subscriptions.length).toBe(1);
+ await expect(page.locator('#settingsSubs')).toContainText('example.org');
+ await page.locator('#addSub').click();await page.locator('#subURL').fill('https://example.org/events.ics');
+ await page.locator('#subSave').click();
+ await expect(page.locator('#subError')).toContainText('That feed is already added.');
+ await expect(page.locator('#subSave')).toBeEnabled();
+ expect(model.get().subscriptions.length).toBe(1);
+});
+test('an occurrence delete opens scope choice and only deletes that instance',async({page})=>{
+ const model=await setup(page);await page.locator('#newEvent').click();
+ await page.locator('#quickTitle').fill('Recurring run');
+ await page.locator('#repeatButton').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Weekly'}).click();await page.locator('#quickSave').click();
+ await expect.poll(()=>model.get().events.length).toBe(1);
+ await page.locator('.span-week-layer .span-bar').filter({hasText:'Recurring run'}).first().click();
+ await page.locator('#deleteEvent').click();
+ await expect(page.locator('#scopeOnly')).toBeVisible();
+ await expect(page.locator('#scopeFuture')).toBeVisible();
+ await expect(page.locator('#scopeAll')).toBeVisible();
+ await page.locator('#scopeOnly').click();
+ await expect.poll(()=>model.get().events[0].repeat_rule.exdates?.length).toBe(1);
+ expect(model.get().events).toHaveLength(1);
+ await page.reload();
+ await expect(page.locator('.span-week-layer .span-bar').filter({hasText:'Recurring run'})).toHaveCount(0);
+ await page.locator('#next').click();
+ await expect(page.locator('.span-week-layer .span-bar').filter({hasText:'Recurring run'})).toBeVisible();
+});
+test('Month drag-select spanning three days opens a prefilled all-day event form',async({page})=>{
+ const model=await setup(page);model.get().settings.default_view='month';await page.reload();
+ const first=page.locator('.spanning-month .monthcell').filter({has:page.locator('.datenum')}).nth(8),last=page.locator('.spanning-month .monthcell').nth(10);
+ const day1=await first.getAttribute('data-cell'),day3=await last.getAttribute('data-cell');
+ const a=await first.boundingBox(),b=await last.boundingBox();
+ await page.mouse.move(a.x+a.width/2,a.y+a.height-22);await page.mouse.down();
+ await page.mouse.move(b.x+b.width/2,b.y+b.height-22,{steps:6});await page.mouse.up();
+ await expect(page.locator('#quickForm')).toBeVisible();
+ await expect(page.locator('#startDate')).toHaveValue(day1);
+ await expect(page.locator('#endDate')).toHaveValue(day3);
+});
