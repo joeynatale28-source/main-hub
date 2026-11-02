@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.10';
-import bcrypt from 'npm:bcryptjs@2.4.3';
 import { parseCalendar } from './ical.ts';
 const url=Deno.env.get('SUPABASE_URL')!,secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -16,13 +15,14 @@ const allowed:Record<string,{table:string,fields:string[]}>={
  subscriptions:{table:'dl_subscriptions',fields:['calendar_id','name','url','last_fetched_at']},
  settings:{table:'dl_user_settings',fields:['theme','accent','custom_accent_hex','default_view','start_of_week','reduce_motion','show_weekends','compact_mode','show_week_numbers','show_declined_events','work_hours_start','work_hours_end','task_reminders','event_reminders','notification_sound','default_reminder_minutes','mcp_allow_delete','time_zone','extra']}
 };
-async function session(token:string){
- if(!/^[a-f0-9]{64}$/.test(token))return null;
- const hash=await sha(token);
- const {data:s,error:e}=await db.from('sessions').select('id,user_id,expires_at').eq('token_hash',hash).gt('expires_at',new Date().toISOString()).maybeSingle();
- if(e||!s)return null;
- const {data:u}=await db.from('users').select('id,first_name,last_name,username,is_admin').eq('id',s.user_id).maybeSingle();
- return u?{user:u,session:s}:null;
+async function session(req:Request){
+ const bearer=req.headers.get('authorization')||'';
+ const token=bearer.startsWith('Bearer ')?bearer.slice(7):'';
+ if(!token)return null;
+ const {data,error}=await db.auth.getUser(token);
+ if(error||!data.user)return null;
+ const u=data.user;
+ return{user:{id:u.id,first_name:String(u.user_metadata?.first_name||u.email?.split('@')[0]||'User'),last_name:String(u.user_metadata?.last_name||''),email:u.email||''}};
 }
 async function bootstrap(uid:string){
  const {error:se}=await db.from('dl_user_settings').upsert({user_id:uid},{onConflict:'user_id',ignoreDuplicates:true});
@@ -98,30 +98,18 @@ async function handle(req:Request){
  if(req.method!=='POST')return fail('Method not allowed',405);
  let body:Record<string,unknown>;try{body=await req.json();if(!body||Array.isArray(body)||typeof body!=='object')throw Error()}catch{return fail('Invalid request')}
  const action=plain(body.action);
- if(action==='auth_login'){
-  const generic="That username and password don't match";
-  const userName=plain(body.username).toLowerCase(),password=String(body.password??'');
-  if(!userName||!password)return fail(generic,401);
-  const {data:u}=await db.from('users').select('id,first_name,last_name,username,is_admin,password_hash,password_salt').eq('username',userName).maybeSingle();
-  const candidate=u?.password_hash||'$2a$12$qPjyg7ojIrlQWMz9hA68A.e2N1owCGVgpryoiL5cElYc/09nOgECy';
-  const verified=await bcrypt.compare(password+(u?.password_salt||''),candidate).catch(()=>false);
-  if(!u||!verified)return fail(generic,401);
-  const token=fresh(),{error}=await db.from('sessions').insert({user_id:u.id,token_hash:await sha(token),expires_at:new Date(Date.now()+30*86400000).toISOString()});
-  if(error)throw error;
-  await bootstrap(u.id);
-  return json({token,user:{id:u.id,first_name:u.first_name,last_name:u.last_name,username:u.username,is_admin:u.is_admin}});
- }
- const token=plain(body.token)||plain(req.headers.get('x-daylight-session'));
- const pair=await session(token);
+ const pair=await session(req);
  if(!pair)return fail('Session expired. Log in again.',401);
  const uid=pair.user.id;
- if(action==='auth_logout'){const hash=await sha(token);await db.from('sessions').delete().eq('user_id',uid).eq('token_hash',hash);return json({ok:true})}
- if(action==='auth_session')return json({user:pair.user});
+ if(action==='auth_session'){await bootstrap(uid);return json({user:pair.user})}
  if(action==='user_update'){
   const first=plain(body.first_name).slice(0,60),last=plain(body.last_name).slice(0,60);
-  if(!first||!last)return fail('First and last names are required');
-  const {error}=await db.from('users').update({first_name:first,last_name:last}).eq('id',uid);
-  if(error)throw error;return json({ok:true,user:{...pair.user,first_name:first,last_name:last}});
+  if(!first)return fail('First name is required.',400);
+  const bearer=(req.headers.get('authorization')||'').replace(/^Bearer /,'');
+  const userClient=createClient(url,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:'Bearer '+bearer}},auth:{persistSession:false,autoRefreshToken:false}});
+  const {error}=await userClient.auth.updateUser({data:{first_name:first,last_name:last}});
+  if(error)return fail('Could not update profile.',400);
+  return json({user:{...pair.user,first_name:first,last_name:last}});
  }
  if(action==='mcp_list'){
   const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).eq('revoked',false).order('created_at',{ascending:false});
