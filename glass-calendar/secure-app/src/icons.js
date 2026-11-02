@@ -1,6 +1,6 @@
 // Daylight shared icon system — every visual icon is inline SVG, never a font/Unicode glyph.
 const paths={
- brand:'<path d="M12 2v20M3.34 7l17.32 10M3.34 17 20.66 7"/>',
+ brand:'<path d="M3 17h18M5 20h14M6.5 13.5a5.5 5.5 0 0 1 11 0M12 3v3M4.9 6.8l2.1 2.1M19.1 6.8 17 8.9M2 12h2m16 0h2"/>',
  eye:'<path d="M2.1 12s3.6-6.5 9.9-6.5 9.9 6.5 9.9 6.5-3.6 6.5-9.9 6.5S2.1 12 2.1 12Z"/><circle cx="12" cy="12" r="3"/>',
  'eye-off':'<path d="M3 3l18 18M10.6 5.6A11.6 11.6 0 0 1 12 5.5c6.3 0 9.9 6.5 9.9 6.5a15 15 0 0 1-3.1 3.5M6.2 6.5A15.5 15.5 0 0 0 2.1 12S5.7 18.5 12 18.5c1.5 0 2.8-.4 4-1M10 10a3 3 0 0 0 4 4"/>',
  search:'<circle cx="10.8" cy="10.8" r="7.6"/><path d="m16.5 16.5 5 5"/>',
@@ -37,6 +37,10 @@ const paths={
  warning:'<path d="M12 3 1.8 21h20.4L12 3Z"/><path d="M12 10v5m0 3h.01"/>',
  logout:'<path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4m4-4 4-4-4-4m4 4H9"/>',
  'arrow-left':'<path d="m12 19-7-7 7-7M5 12h14"/>',
+ 'panel-left-close':'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m8-11-3 3 3 3"/>',
+ 'panel-left-open':'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m5-11 3 3-3 3"/>',
+ 'calendar-days':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+ 'file-text':'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
  'calendar-plus':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-6 6h4m-2-2v4"/>'
 };
 export function icon(name,size=18){const shape=paths[name]||paths.info;return '<span class="dl-icon-slot'+(size===16?' is-compact':'')+'" aria-hidden="true"><svg class="dl-icon" width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'+shape+'</svg></span>'}
@@ -46,7 +50,7 @@ const setIcon=(element,name,size=18)=>{
 };
 const clean=(text)=>String(text||'').trim();
 const replaceText=(node)=>{
- const glyphs={'✳':'brand','▦':'calendar','◎':'plug','☑':'tasks','⚙':'settings','♧':'bell','☷':'align-left','⌖':'map-pin','◐':'sun','◷':'clock','⌕':'search','ⓘ':'info','‹':'chevron-left','›':'chevron-right','⋮':'more-vertical','⋯':'more-horizontal','◈':'palette','▤':'database','⌁':'brand','⌄':'chevron-down','▾':'chevron-down','×':'x','✎':'pencil','✓':'check','↗':'external-link'};
+ const glyphs={'✳':'brand','▦':'calendar','◎':'plug','☑':'tasks','⚙':'settings','♧':'bell','☷':'align-left','⌖':'map-pin','◐':'sun','◷':'clock','⌕':'search','ⓘ':'info','‹':'chevron-left','›':'chevron-right','⋮':'more-vertical','⋯':'more-horizontal','◈':'palette','▤':'database','⌁':'brand','⌄':'chevron-down','▾':'chevron-down','×':'x','✎':'pencil','✓':'check','↗':'external-link','△':'warning','✚':'plus'};
  const key=clean(node.nodeValue);
  if(!Object.hasOwn(glyphs,key))return;
  const p=node.parentElement;
@@ -71,6 +75,7 @@ function decorateOne(scope){
  pick('#locationRow .row-icon','map-pin');pick('#calendarRow .row-icon','calendar');
  pick('.quick-row .row-icon',el=>el.closest('#locationRow')?'map-pin':el.closest('#calendarRow')?'calendar':el.closest('.quick-row')?.querySelector('#quickDescription')?'align-left':el.closest('.quick-row')?.querySelector('#reminderButton')?'bell':'clock');
  pick('.cellplus,.mini-add,[data-add]','plus',16);
+ pick('.collapse-toggle',()=>document.querySelector('#root')?.classList.contains('collapsed')?'panel-left-open':'panel-left-close',16);
  pick('.whole-empty .empty-icon',el=>el.closest('.task-list')?'tasks':'calendar',18);
  scope.querySelectorAll('.floating-menu button').forEach(el=>{
   if(el.dataset.iconDecorated)return;el.dataset.iconDecorated='1';
