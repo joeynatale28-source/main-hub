@@ -248,3 +248,11 @@ html[data-reduce-motion=true] *,html[data-reduce-motion=true] *:before,html[data
 .quick-dialog #addressOptions [data-address]>strong,.quick-dialog #addressOptions [data-address]>small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .quick-dialog #addressOptions [data-address]>small{grid-column:2}
 @media(max-height:760px){.day-view-empty{top:190px}}
+
+.view-segment{display:inline-flex;align-items:center;gap:2px;height:34px;padding:3px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;flex:none}
+.view-segment button{height:26px;min-width:44px;border:0;border-radius:7px;padding:0 9px;font-size:12px!important;font-weight:500;background:transparent;color:var(--sub)}
+.view-segment button:hover{background:var(--hover);color:var(--text)}
+.view-segment button.active{background:var(--primary)!important;color:var(--primary-ink)!important;font-weight:700}
+.view-header .tools>[hidden]{display:none!important}
+@media(min-width:901px) and (max-width:1420px){.view-header .tools{gap:4px!important}.view-segment button{min-width:40px;padding:0 6px!important}.heading-copy h1{font-size:24px!important}}
+@media(max-width:1080px){.view-header{flex-wrap:wrap}.view-header .tools{flex-wrap:wrap!important;justify-content:flex-start}.content{overflow:auto}}
