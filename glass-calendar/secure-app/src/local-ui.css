@@ -182,3 +182,7 @@ html[data-reduce-motion=true] *,html[data-reduce-motion=true] *::before,html[dat
  #root .side-support{min-height:108px!important;padding:0 14px 8px!important}
  #root .profile{height:70px!important;min-height:70px!important}
 }
+
+/* Keep the complete greeting visible as the view title/range changes. */
+#root .view-header .heading-copy{min-width:160px!important;width:max-content!important;flex-shrink:0!important;overflow:visible!important}
+#root .view-header .greeting{overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important}
