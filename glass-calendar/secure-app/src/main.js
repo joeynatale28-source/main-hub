@@ -148,6 +148,8 @@ function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+(['declined','cancelled'].includes(e.status)?'#92929a':eventColor(e))+';';
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
+const compactClock=value=>new Date(value).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\\s?(AM|PM)$/,(match,part)=>part.toLowerCase());
+const compactRange=e=>compactClock(e.starts_at)+' - '+compactClock(e.ends_at);
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
@@ -284,7 +286,7 @@ function header(title){
  const msg=greeting(first,now(),holidays),greetingMarkup=uiHasWaved?h(msg):h(msg).replace('👋','<span class="greeting-wave">👋</span>');
  uiHasWaved=true;
  const d=state.date,month=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
- const firstDay=add(d,-d.getDay()),lastDay=add(firstDay,6);
+ const shift=state.settings.start_of_week==='monday'?1:0,firstDay=add(d,-((d.getDay()-shift+7)%7)),lastDay=add(firstDay,6);
  const dayText=x=>x.toLocaleDateString('en-US',{month:'long',day:'2-digit'});
  const range=state.view==='week'?dayText(firstDay)+' - '+dayText(lastDay)+(firstDay.getFullYear()===lastDay.getFullYear()?', '+lastDay.getFullYear():', '+firstDay.getFullYear()+' - '+lastDay.getFullYear()):state.view==='day'?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):state.view==='agenda'?'Upcoming 12 months':month;
  const heading=state.view==='agenda'?'Agenda':month;
@@ -345,7 +347,7 @@ function renderMonth(){
  const items=occurrences(add(start,-1),add(start,count+1));
  let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
  for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">';
+  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside ':'')+([0,6].includes(t.getDay())?'weekend':'')+'" data-cell="'+key+'">';
   if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
   html+='<button class="datenum '+(key===iso(now())?'today ':'')+(key===iso(state.date)?'selected':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button></div>';
  }
@@ -357,7 +359,7 @@ function renderMonth(){
    let lane=0;while(lanes[lane]?.some(([a,b])=>a<=e._right&&e._left<=b))lane++;
    if(lane>=3)continue;
    (lanes[lane]??=[]).push([e._left,e._right]);
-   html+='<button class="month-span-bar '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'">'+h(e.title)+'</button>';
+   html+='<button class="month-span-bar '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'"><span class="span-title">'+(e._continuationLeft?'':h(e.title))+'</span>'+(!e.all_day&&!e._continuationLeft?'<span class="span-time">'+h(compactClock(e.starts_at))+'</span>':'')+'</button>';
   }
   for(let i=0;i<7;i++){
    const day=iso(days[i]),extra=items.filter(e=>eventOn(e,day)).length-3;
@@ -367,26 +369,26 @@ function renderMonth(){
  $('#grid').innerHTML=html+'</div>';bindEventButtons();enableCalendarDrag();
 }
 function renderWeek(){
- const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
- let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
+ const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1)),tz=Intl.DateTimeFormat('en-US',{timeZoneName:'short'}).formatToParts(now()).find(x=>x.type==='timeZoneName')?.value||'Local';
+ let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div class="week-zone" title="'+h(tz)+'">'+h(tz)+'</div>'+days.map(t=>'<div class="week-day-header '+(iso(t)===iso(now())?'is-today':'')+'"><small>'+t.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()+'</small><button class="week-date '+(iso(t)===iso(now())?'is-today':'')+'" data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
  const all=spansFor(events.filter(e=>(e.all_day||isLong(e))&&days.some(d=>eventOn(e,iso(d)))),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
  for(const e of all)html+='<button class="all-day-span '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
- html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*48)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
+ html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*80)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
-  const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
+  const key=iso(t);html+='<div class="daytrack '+([0,6].includes(t.getDay())?'weekend':'')+'" data-slot="'+key+'">';
   for(const e of events.filter(x=>!x.all_day&&!isLong(x)&&eventOn(x,key))){
    const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e,'top:'+(minute*.8)+'px;height:'+(height*.8)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+(minute*80/60)+'px;height:'+(height*80/60)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><small class="event-card-time">'+h(compactRange(e))+'</small>'+(height>=60&&(e.location_name||e.location_address)?'<small class="event-card-location">'+h(e.location_name||e.location_address)+'</small>':'')+'<span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
   }html+='</div>';
  }
  $('#grid').innerHTML=html+'</div></div>';
  const current=now(),minutesNow=current.getHours()*60+current.getMinutes();
  const todayTrack=$('[data-slot="'+iso(current)+'"]',$('#grid'));
- if(todayTrack){const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*.8)+'px';todayTrack.append(line);const dot=document.createElement('div');dot.className='now-gutter-dot';dot.style.top=(minutesNow*.8)+'px';$('.hours',$('#grid')).append(dot)}
+ if(todayTrack){const body=$('.weekbody',$('#grid'));const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*80/60)+'px';body.append(line);const time=document.createElement('div');time.className='now-time-pill';time.style.top=(minutesNow*80/60)+'px';time.textContent=current.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});$('.hours',$('#grid')).append(time)}
  if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
  bindEventButtons();enableCalendarDrag();
- $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/.8)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
+ $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/(80/60))/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
  const today=iso(now()),items=uniqueInstances(occurrences(add(now(),-1),add(now(),370))).filter(x=>eventDate(x)>=today||x._lastCivil>=today);
@@ -630,7 +632,7 @@ function enableCalendarDrag(){
   if(!drag||e.pointerId!==drag.id)return;
   if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
   if(!drag.started){drag.started=true;grid.setPointerCapture(e.pointerId);document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
-  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round(((e.clientY-drag.y)/.8)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round(((e.clientY-drag.y)/(80/60))/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
   e.preventDefault();
  };
  grid.onpointerup=async e=>{
@@ -644,7 +646,7 @@ function enableCalendarDrag(){
   const ev=d.original,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
   let nextStart=new Date(start),nextEnd=new Date(end);
   if(d.item?.classList.contains('weekevent')){
-   const minutes=Math.round(((e.clientY-d.y)/.8)/15)*15;
+   const minutes=Math.round(((e.clientY-d.y)/(80/60))/15)*15;
    const days=endCell?Math.round((date(endCell)-date(daykey(start)))/86400000):0;
    if(d.edge==='start')nextStart=new Date(Math.min(end.getTime()-900000,start.getTime()+minutes*60000));
    else if(d.edge==='end')nextEnd=new Date(Math.max(start.getTime()+900000,end.getTime()+minutes*60000));
