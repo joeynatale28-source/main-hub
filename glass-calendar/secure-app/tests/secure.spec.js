@@ -235,7 +235,7 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
  await expect(page.locator('.month-span-bar').filter({hasText:'Three-day conference'})).toHaveCount(1);
- const span=await page.locator('.month-span-bar').filter({hasText:'Three-day conference'}).getAttribute('style');expect(span).toContain('--span-length:3');
+ const span=await page.locator('.month-span-bar').filter({hasText:'Three-day conference'}).evaluate(el=>el.style.getPropertyValue('--span-length').trim());expect(span).toBe('3');
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
  const model=await setup(page);await page.locator('#newEvent').click();
