@@ -388,7 +388,8 @@ function renderWeek(){
  if(todayTrack){const body=$('.weekbody',$('#grid'));const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*80/60)+'px';body.append(line);const time=document.createElement('div');time.className='now-time-pill';time.style.top=(minutesNow*80/60)+'px';time.textContent=current.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});$('.hours',$('#grid')).append(time)}
  if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
  bindEventButtons();enableCalendarDrag();
- $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/(80/60))/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
+ $('.weekwrapper',$('#grid')).scrollTop=8*80; // Present the reference's 8 AM starting viewport; the full 24 hours remain scrollable.
+ $('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/(80/60))/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
  const today=iso(now()),items=uniqueInstances(occurrences(add(now(),-1),add(now(),370))).filter(x=>eventDate(x)>=today||x._lastCivil>=today);
