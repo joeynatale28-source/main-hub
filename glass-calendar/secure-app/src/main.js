@@ -251,7 +251,7 @@ function spansFor(segments,days){
   if(!source.length)return null;
   const from=source.find(x=>x>=first)||source[0],to=source.filter(x=>x<=last).at(-1)||source.at(-1);
   const lo=Math.max(0,days.findIndex(x=>iso(x)===from)),hi=Math.max(lo,days.findIndex(x=>iso(x)===to));
-  return {...e,_left:lo,_right:hi,_continuationLeft:e._segment>0||source[0]<first,_continuationRight:source.at(-1)>last||e._segments>source.length};
+  return {...e,_left:lo,_right:hi,_continuationLeft:e._segment>0,_continuationRight:(e._segment||0)+source.length<e._segments};
  }).filter(Boolean);
 }
 function renderMonth(){
@@ -271,7 +271,7 @@ function renderMonth(){
    let lane=0;while(lanes[lane]?.some(([a,b])=>a<=e._right&&e._left<=b))lane++;
    if(lane>=3)continue;
    (lanes[lane]??=[]).push([e._left,e._right]);
-   html+='<button class="month-span-bar '+(e._left===0?'continue-left ':'')+(e._right===6?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'">'+h(e.title)+'</button>';
+   html+='<button class="month-span-bar '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'">'+h(e.title)+'</button>';
   }
   for(let i=0;i<7;i++){
    const day=iso(days[i]),extra=items.filter(e=>eventOn(e,day)).length-3;
@@ -285,7 +285,7 @@ function renderWeek(){
  let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
  const all=spansFor(events.filter(e=>(e.all_day||isLong(e))&&days.some(d=>eventOn(e,iso(d)))),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
- for(const e of all)html+='<button class="all-day-span '+(e._left===0?'continue-left ':'')+(e._right===days.length-1?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
+ for(const e of all)html+='<button class="all-day-span '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
  html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
