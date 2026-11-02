@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "test": "playwright test"
   },
   "devDependencies": {
-    "vite": "7.1.12"
+    "vite": "7.1.12",
+    "@playwright/test": "1.55.0"
   }
 }
