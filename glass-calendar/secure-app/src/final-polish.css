@@ -115,3 +115,6 @@ html[data-reduce-motion=true] .action-spinner{animation:none!important}
 #settingsPane:has(.about-summary)>.setting-row:last-child{margin-bottom:20px}
 .changelog h3{margin-top:16px;margin-bottom:7px}
 .changelog ul{padding-left:18px;color:var(--sub);line-height:1.7;font-size:12px}
+
+#root.collapsed .sidebar [data-tooltip]:is(:hover,:focus-visible)::after{display:none!important}
+#railTooltip{position:fixed;z-index:2147483600;display:block;pointer-events:none;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 25px #0004;padding:8px 12px;white-space:nowrap;font:500 12px/1.2 Inter,-apple-system,sans-serif}
