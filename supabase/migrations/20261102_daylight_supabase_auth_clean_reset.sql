@@ -20,7 +20,7 @@ alter table public.dl_mcp_audit_log add constraint dl_mcp_audit_log_user_id_fkey
 alter table public.dl_events add column if not exists excluded_dates jsonb not null default '[]'::jsonb;
 alter table public.dl_events add column if not exists status text not null default 'confirmed';
 create unique index if not exists dl_subscriptions_feed_user_url on public.dl_subscriptions(user_id,url);
-create unique index if not exists dl_events_feed_uid_dedup on public.dl_events(source_subscription_id,external_uid) where source_subscription_id is not null and external_uid is not null;
+create unique index if not exists dl_events_feed_uid_dedup on public.dl_events(source_subscription_id,external_uid);
 alter table public.dl_user_settings alter column show_declined_events set default false;
 do $$ declare tab text; begin
 foreach tab in array array['dl_calendars','dl_events','dl_tasks','dl_subscriptions','dl_user_settings','dl_mcp_tokens','dl_mcp_audit_log'] loop
@@ -28,3 +28,7 @@ foreach tab in array array['dl_calendars','dl_events','dl_tasks','dl_subscriptio
  execute format('drop policy if exists "daylight_owner" on public.%I',tab);
  execute format('create policy "daylight_owner" on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))',tab);
 end loop;end $$;
+
+-- Remove the superseded manual account and token-session tables once all new FKs are established.
+drop table if exists public.sessions cascade;
+drop table if exists public.users cascade;
