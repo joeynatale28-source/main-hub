@@ -2,11 +2,15 @@ import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2
 import {icon,upgradeIcons,startIcons} from './icons.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey,uniqueInstances,rangeLabel} from './polish.js';
 const root=document.querySelector('#root');
-const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
+const runtimeConfig={...(window.__DAYLIGHT_CONFIG||{}),...(import.meta.env||{})};
+// GitHub Pages is the canonical public host. Its existing /glass-calendar/ path
+// handles both ordinary email/password sign-in and redirected Auth callbacks.
+const publicSiteUrl=runtimeConfig.VITE_PUBLIC_SITE_URL||'https://joeynatale28-source.github.io/main-hub/glass-calendar/';
+const authRedirectUrl=new URL(publicSiteUrl).href;
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
 const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
-const supabase=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+const supabase=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}}):null;
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
@@ -52,7 +56,7 @@ function login(){
  $('#forgotPassword').onclick=async()=>{
   const email=$('#email').value.trim(),err=$('#authError');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.hidden=false;err.textContent='Enter your email address first.';$('#email').focus();return}
-  const button=$('#forgotPassword');button.disabled=true;button.textContent='Sending reset link…';const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});button.disabled=false;button.textContent='Forgot password?';
+  const button=$('#forgotPassword');button.disabled=true;button.textContent='Sending reset link…';const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl});button.disabled=false;button.textContent='Forgot password?';
   err.hidden=false;err.textContent=error?(error.message.endsWith('.')?error.message:error.message+'.'):'If the email exists, a password reset link has been sent. Open it to set a new password.';
  };
  upgradeIcons();
@@ -737,14 +741,67 @@ function checkReminders(){
 }
 setInterval(checkReminders,30000);
 window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.code==='Comma'||e.key===','||e.key==='<')){e.preventDefault();e.stopPropagation();if(state.user)settings()}},{capture:true});
+const cleanAuthLocation=()=>{
+ // Never retain one-time auth codes or access/refresh tokens in browser history.
+ const next=new URL(location.href);
+ for(const key of ['code','type','error','error_code','error_description','auth_callback'])next.searchParams.delete(key);
+ next.hash='';
+ history.replaceState(history.state,'',next.pathname+next.search);
+};
+const showAuthFailure=message=>{
+ login();
+ const field=$('#authError');
+ if(field){field.hidden=false;field.textContent=String(message||'Authentication could not be completed.').replace(/[. ]*$/,'')+'.'}
+};
+const authCallbackParams=()=>{
+ const params=new URLSearchParams(location.search),hash=new URLSearchParams(location.hash.replace(/^#/,''));
+ return {query:params,hash,code:params.get('code'),error:params.get('error_description')||params.get('error')||hash.get('error_description')||hash.get('error'),type:hash.get('type')||params.get('type')};
+};
+async function initializeAuth(){
+ const callback=authCallbackParams();
+ if(callback.error){
+  cleanAuthLocation();
+  showAuthFailure(callback.error);
+  return;
+ }
+ const hasCode=Boolean(callback.code),hasTokens=Boolean(callback.hash.get('access_token')&&callback.hash.get('refresh_token'));
+ try{
+  if(hasCode||hasTokens){
+   root.innerHTML='<main class="center"><div class="login" role="status"><div class="mark">'+icon('brand',24)+'</div><h1>Signing you in</h1><p>Completing secure authentication…</p></div></main>';
+   let result;
+   if(hasCode){
+    // GoTrue returns ?code= for PKCE email/OAuth callbacks. Exchange exactly
+    // once and allow supabase-js to persist the resulting session.
+    result=await supabase.auth.exchangeCodeForSession(callback.code);
+   }else{
+    // Accept legacy implicit-flow email links too, without keeping tokens
+    // visible in the URL or writing them to our own storage.
+    result=await supabase.auth.setSession({
+     access_token:callback.hash.get('access_token'),
+     refresh_token:callback.hash.get('refresh_token')
+    });
+   }
+   if(result.error)throw result.error;
+   if(!result.data?.session)throw Error('The sign-in link did not provide a valid session.');
+   cleanAuthLocation();
+   if(callback.type==='recovery'){passwordRecoveryActive=true;showPasswordRecovery();return}
+  }
+  if(passwordRecoveryActive){showPasswordRecovery();return}
+  await load();
+ }catch(error){
+  cleanAuthLocation();
+  console.error('DAYLIGHT AUTH CALLBACK ERROR',error?.message||error);
+  showAuthFailure('The sign-in link could not be completed. Please log in again.');
+ }
+}
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">'+icon('brand',24)+'</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else {
+else{
  supabase.auth.onAuthStateChange(event=>{
   if(event==='PASSWORD_RECOVERY'){
    passwordRecoveryActive=true;
    showPasswordRecovery();
   }
  });
- load();
+ initializeAuth();
 }
