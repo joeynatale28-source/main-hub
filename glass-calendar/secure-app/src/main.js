@@ -478,14 +478,49 @@ function renderIntegrations(){
  $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
  $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
+function recurring(e){
+ const r=(e._origin||e).repeat_rule||{};
+ return !e.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(r.frequency);
+}
+function occurrenceDate(e){return iso(new Date(e._occurrence||e.starts_at))}
+function scopeChoice(e,verb,callback){
+ if(!recurring(e))return callback('all');
+ const dlg=modal('<h2>'+h(verb==='delete'?'Delete recurring event?':'Change recurring event?')+'</h2><p>Choose which occurrences to '+h(verb)+'.</p><div class="recurrence-actions"><button id="scopeOnly">'+h('Only this event')+'</button><button id="scopeFuture">This and following events</button><button id="scopeAll">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
+ for(const [id,scope] of [['scopeOnly','only'],['scopeFuture','following'],['scopeAll','all']]){
+  $('#'+id,dlg).onclick=()=>{dlg.close();callback(scope)};
+ }
+}
+async function commitOccurrence(e,scope,action,changes=null){
+ const root=e._origin||e,r={...(root.repeat_rule||{})};
+ const day=occurrenceDate(e),previous=plusCivil(day,-1);
+ if(scope==='all'){
+  if(action==='delete')await api('data_delete',{entity:'events',id:root.id});
+  else if(action==='edit')await api('data_update',{entity:'events',id:root.id,data:changes});
+ }else if(scope==='only'){
+  const exdates=[...new Set([...(r.exdates||[]),day])];
+  await api('data_update',{entity:'events',id:root.id,data:{repeat_rule:{...r,exdates}}});
+  if(action==='edit')await api('data_create',{entity:'events',data:{...changes,repeat_rule:{frequency:'never'}}});
+ }else{
+  if(e._index===0){
+   if(action==='delete')await api('data_delete',{entity:'events',id:root.id});
+   else await api('data_update',{entity:'events',id:root.id,data:changes});
+  }else{
+   // End original immediately before the selected occurrence. The replacement
+   // series (for edits) starts from this instance, never from its original first day.
+   await api('data_update',{entity:'events',id:root.id,data:{repeat_rule:{...r,ends:'on',until:previous}}});
+   if(action==='edit')await api('data_create',{entity:'events',data:{...changes,repeat_rule:{...r,exdates:(r.exdates||[]).filter(d=>d>=day),ends:r.ends==='count'?'never':r.ends,until:r.ends==='on'?r.until:undefined}}});
+  }
+ }
+ await refreshData();toast(action==='delete'?'Event deleted':'Event updated');
+}
 function details(e){
- const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
- const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
- $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e)});
- $('#deleteEvent',dlg)?.addEventListener('click',()=>confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()}));
+ const readOnly=!!e.source_subscription_id||state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
+ const cal=state.calendars.find(c=>c.id===e.calendar_id),base=bounds(e),when=rangeLabel(e)+(e.all_day?'':' · '+prettyClock(e.starts_at)+' – '+prettyClock(e.ends_at));
+ const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p>'+(e.location_address||e.location_name?'<p>'+h(e.location_address||e.location_name)+'</p>':'')+'<div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
+ $('#editEvent',dlg)?.addEventListener('click',()=>scopeChoice(e,'edit',scope=>{dlg.close();openEditor(scope==='all'?(e._origin||e):e,null,null,'event',scope)}));
+ $('#deleteEvent',dlg)?.addEventListener('click',()=>scopeChoice(e,'delete',async scope=>{if(recurring(e))await commitOccurrence(e,scope,'delete');else{await safeChange('events',e.id,null,'delete');toast('Event deleted')}dlg.close()}));
  upgradeIcons();
 }
-
 let addressTimer=0,selectedLocation=null;
 function openCustomRepeat(current,done){
  const dlg=modal('<h2>Custom repeat</h2><label>Frequency<select id="repeatFrequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label><label>Every <input id="repeatInterval" type="number" min="1" max="365" value="1"></label><label>Ends<select id="repeatEnds"><option value="never">Never</option><option value="on">On date</option><option value="count">After occurrences</option></select></label><label id="repeatUntilRow" hidden>End date<input id="repeatUntil" type="date"></label><label id="repeatCountRow" hidden>Occurrences<input id="repeatCount" type="number" min="1" max="1000" value="10"></label><div class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="saveRepeat">Apply</button></div>');
@@ -497,14 +532,14 @@ function openCustomRepeat(current,done){
  q('saveRepeat').onclick=()=>{const frequency=q('repeatFrequency').value,interval=Math.max(1,Math.min(365,Number(q('repeatInterval').value)||1)),ends=q('repeatEnds').value,count=Math.max(1,Math.min(1000,Number(q('repeatCount').value)||10)),until=q('repeatUntil').value;done({frequency,interval,ends,...(ends==='on'?{until}:{}),...(ends==='count'?{count}:{})});dlg.close()};
 }
 
-function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
+function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',scope='all',chosenEnd=null){
  state.edit=existing;state.mode=kind;state.timed=!!chosenTime||(!!existing&&!existing.all_day);state.allDay=kind==='event'&&!state.timed;
  selectedLocation=existing?.location_address?{display:existing.location_name,address:existing.location_address}:null;
  const first=existing?(kind==='task'?(existing.due_date?date(existing.due_date):now()):new Date(existing.starts_at)):chosenDate?date(chosenDate):now();
  if(!existing&&!chosenTime){first.setHours(first.getHours()+1,0,0,0)}
  if(chosenTime){const [hr,min]=chosenTime.split(':').map(Number);first.setHours(hr,min,0,0)}
  const finish=existing&&kind==='event'?new Date(existing.ends_at):new Date(first.getTime()+3600000);
- const dateText=existing?.all_day?String(existing.starts_at).slice(0,10):iso(first),endText=existing?.all_day?iso(add(date(String(existing.ends_at).slice(0,10)),-1)):iso(finish),startTime=('0'+first.getHours()).slice(-2)+':'+('0'+first.getMinutes()).slice(-2),endTime=('0'+finish.getHours()).slice(-2)+':'+('0'+finish.getMinutes()).slice(-2);
+ const dateText=existing?.all_day?bounds(existing).first:iso(first),endText=chosenEnd|| (existing?.all_day?bounds(existing).last:iso(finish)),startTime=('0'+first.getHours()).slice(-2)+':'+('0'+first.getMinutes()).slice(-2),endTime=('0'+finish.getHours()).slice(-2)+':'+('0'+finish.getMinutes()).slice(-2);
  const options=state.calendars.filter(c=>c.client_id!=='us-holidays'&&!state.subscriptions.some(s=>s.calendar_id===c.id));
  const chosen=options.find(c=>c.id===existing?.calendar_id)||options[0];
  const dlg=modal('<form id="quickForm"><header class="quick-top"><span class="grip" aria-hidden="true"></span><button type="button" class="icon" id="editorClose">×</button></header><input id="quickTitle" class="quick-title" placeholder="Add title" maxlength="300" value="'+h(existing?.title||'')+'"><small class="title-error" id="titleError" hidden>Add a title</small><div class="toggle-segments"><button type="button" data-mode="event" class="'+(kind==='event'?'selected':'')+'">Event</button><button type="button" data-mode="task" class="'+(kind==='task'?'selected':'')+'">Task</button></div><div class="quick-content"><div class="quick-row"><span class="row-icon">◷</span><div class="quick-fields"><div class="date-time-row"><button type="button" data-pick="start" class="field-button" id="startDateBtn">'+h(label(first))+'</button><span>–</span><button type="button" data-pick="end" class="field-button" id="endDateBtn">'+h(existing?.all_day?label(date(endText)):label(finish))+'</button><button type="button" id="addTime" class="secondary '+(state.timed?'active':'')+'">Add time</button></div><div id="timedFields" '+(state.timed?'':'hidden')+' class="timed-row"><button type="button" class="field-button" data-pick="startTime">'+h(startTime)+'</button><button type="button" class="field-button" data-pick="endTime">'+h(endTime)+'</button></div><button type="button" class="repeat-line" id="repeatButton">Does not repeat ▾</button></div></div><div class="quick-row" id="locationRow"><span class="row-icon">⌖</span><div class="quick-fields location-area"><input id="quickLocation" placeholder="Add location" autocomplete="off" value="'+h(existing?.location_name||'')+'"><small class="saved-address" id="addressSaved" '+(selectedLocation?'':'hidden')+'>Full address saved: '+h(selectedLocation?.address||'')+'</small><div id="addressOptions" class="address-options" hidden></div></div></div><div class="quick-row"><span class="row-icon">☷</span><textarea id="quickDescription" placeholder="Add description" rows="1">'+h(existing?.description||existing?.notes||'')+'</textarea></div><div class="quick-row" id="calendarRow"><span class="row-icon">▦</span><div class="quick-fields"><button type="button" id="eventCalendarBtn" class="field-button"><i class="form-calendar-dot" style="background:'+colorFor(chosen)+'"></i> '+h(chosen?.name||'No calendar')+' ▾</button><small id="calSummary">'+h(chosen?.name||'')+' · Reminder: 15 minutes before</small></div></div><div id="extraFields" hidden><div class="quick-row"><span class="row-icon">◷</span><div class="quick-fields">All day <button type="button" class="switch '+(state.allDay?'on':'')+'" id="allDaySwitch" role="switch" aria-checked="'+!!state.allDay+'"><span></span></button></div></div><div class="quick-row"><span class="row-icon">♧</span><button type="button" class="field-button" id="reminderButton">15 minutes before ▾</button></div></div></div><footer class="quick-footer"><button class="secondary" type="button" id="moreOptions">More options</button><div class="quick-footer-right">'+(existing?'<button type="button" class="danger-text" id="quickDelete">Delete</button>':'')+'<button type="submit" class="primary" id="quickSave">'+'Save'+'</button></div></footer><input type="hidden" id="startDate" value="'+dateText+'"><input type="hidden" id="endDate" value="'+endText+'"><input type="hidden" id="startTime" value="'+startTime+'"><input type="hidden" id="endTime" value="'+endTime+'"><input type="hidden" id="calendarValue" value="'+h(chosen?.id||'')+'"><input type="hidden" id="repeatValue" value="never"><input type="hidden" id="reminderValue" value="15"></form>');
@@ -566,7 +601,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
  field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
  field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
  upgradeIcons();
- $('#quickDelete',form)?.addEventListener('click',()=>confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()}));
+ $('#quickDelete',form)?.addEventListener('click',()=>{if(state.mode==='event'&&recurring(existing)){dlg.close();scopeChoice(existing,'delete',async selection=>commitOccurrence(existing,selection,'delete'))}else confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()})});
  form.onsubmit=async e=>{
   e.preventDefault();if(!title.value.trim()){title.classList.add('shake','invalid');$('#titleError',form).hidden=false;title.focus();setTimeout(()=>title.classList.remove('shake'),300);return}
   const startD=$('#startDate',form).value,endD=$('#endDate',form).value;
@@ -575,7 +610,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
   const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
-  try{loading($('#quickSave',form),true,'Saving…');await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
+  try{loading($('#quickSave',form),true,'Saving…');if(existing&&state.mode==='event'&&recurring(existing)){await commitOccurrence(existing,scope,'edit',data)}else await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
 startIcons();
