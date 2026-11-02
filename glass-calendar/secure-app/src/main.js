@@ -189,10 +189,10 @@ let addressTimer=0,selectedLocation=null;
 function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
  state.edit=existing;state.mode=kind;state.timed=!!chosenTime||(!!existing&&!existing.all_day);state.allDay=existing?.all_day||false;
  selectedLocation=existing?.location_address?{display:existing.location_name,address:existing.location_address}:null;
- const first=existing?new Date(existing.starts_at):chosenDate?date(chosenDate):now();
+ const first=existing?(kind==='task'?(existing.due_date?date(existing.due_date):now()):new Date(existing.starts_at)):chosenDate?date(chosenDate):now();
  if(!existing&&!chosenTime){first.setHours(first.getHours()+1,0,0,0)}
  if(chosenTime){const [hr,min]=chosenTime.split(':').map(Number);first.setHours(hr,min,0,0)}
- const finish=existing?new Date(existing.ends_at):new Date(first.getTime()+3600000);
+ const finish=existing&&kind==='event'?new Date(existing.ends_at):new Date(first.getTime()+3600000);
  const dateText=iso(first),endText=iso(finish),startTime=('0'+first.getHours()).slice(-2)+':'+('0'+first.getMinutes()).slice(-2),endTime=('0'+finish.getHours()).slice(-2)+':'+('0'+finish.getMinutes()).slice(-2);
  const options=state.calendars.filter(c=>c.client_id!=='us-holidays'&&!state.subscriptions.some(s=>s.calendar_id===c.id));
  const chosen=options.find(c=>c.id===existing?.calendar_id)||options[0];
@@ -233,7 +233,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
   const entity=state.mode==='task'?'tasks':'events',data=entity==='task'?{}:state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:{frequency:$('#repeatValue',form).value},reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
-  try{await change(entity,existing?'update':'create',data,'create')}catch{}
+  try{await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?'Task saved':'Event created')}catch{toast("Couldn't save — check your connection")}
  };
 };
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
