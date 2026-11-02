@@ -20,7 +20,7 @@ const emptyState=(heading,help,glyph='calendar')=>'<div class="ui-empty" role="s
 const shimmer=()=>'<span class="ui-skeleton wide"></span><span class="ui-skeleton mid"></span><span class="ui-skeleton short"></span>';
 let uiGridDirection=0,uiMiniDirection=0,uiPreviousView='',uiHasWaved=false,uiLastPage='';
 const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
-const toast=(message)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}const label=String(message||'').replace(/\.$/,'');const bad=/couldn.t|error|fail|invalid|required|blocked|denied|not found|check your connection/i.test(label);el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.innerHTML='<span class="toast-icon">'+icon(bad?'alert-circle':'check-circle',16)+'</span><span class="toast-message">'+h(label)+'</span>';el.classList.remove('show');void el.offsetWidth;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200)};
+const toast=(message)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}const label=String(message||'').replace(/\.$/,'');const bad=/couldn.t|error|fail|invalid|required|blocked|denied|not found|check your connection/i.test(label);el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.innerHTML='<span class="toast-icon">'+icon(bad?'alert-circle':'check-circle',16)+'</span><span class="toast-message">'+h(label)+'</span><button type="button" class="toast-dismiss" aria-label="Dismiss notification">'+icon('x',16)+'</button>';el.querySelector('.toast-dismiss').onclick=()=>{clearTimeout(toast.timer);el.classList.remove('show')};el.classList.remove('show');void el.offsetWidth;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),bad?6500:3200)};
 async function api(action,data={}){
  const {data:session}=await supabase.auth.getSession();
  const access=session.session?.access_token;
@@ -45,19 +45,33 @@ async function load(){
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor')}
 function login(){
- root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">'+icon('brand',24)+'</div><h1>daylight.</h1><p>Welcome back.</p><label>Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">'+icon('eye')+'</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" id="forgotPassword" class="link-action">Forgot password?</button><small>Accounts are created by the owner. Public registration is unavailable.</small></form></main>';
- $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
- $('#login').onsubmit=async e=>{
-  e.preventDefault();const btn=$('#loginBtn'),err=$('#authError');btn.disabled=true;btn.textContent='Logging in…';err.hidden=true;
-  const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim().toLowerCase(),password:$('#password').value});
-  if(error){err.textContent=error.code==='invalid_credentials'?'Email or password not recognized. Check the exact email address listed in Supabase Authentication > Users.':error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
-  await load();
+ root.innerHTML='<main class="center"><form class="login" id="login" novalidate><div class="mark">'+icon('brand',28)+'</div><h1>daylight.</h1><p>Welcome back.</p><label for="email">Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"><span class="field-help" id="emailHelp" aria-live="polite"></span></label><label for="password">Password<div class="password"><input id="password" type="password" required autocomplete="current-password"><button type="button" id="eye" aria-label="Show password" title="Show password">'+icon('eye',20)+'</button></div><span class="field-help" id="passwordHelp" aria-live="polite"></span></label><p id="authError" class="error" aria-live="polite" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" id="forgotPassword" class="link-action" aria-expanded="false" aria-controls="passwordHelpPanel">Forgot password?</button><div id="passwordHelpPanel" class="auth-help-panel" hidden><strong>Reset by email</strong><span>Enter the email on your account, then choose Send reset email. We’ll email you a secure link.</span><button type="button" class="secondary" id="sendReset" style="margin-top:12px">Send reset email</button><p id="resetStatus" role="status"></p></div><small>Accounts are created by the owner.</small></form></main>';
+ const email=$('#email'),password=$('#password'),error=$('#authError'),btn=$('#loginBtn');
+ const fieldError=(field,reason)=>{const help=$('#'+field.id+'Help');field.classList.toggle('invalid',!!reason);field.setAttribute('aria-invalid',String(!!reason));help.textContent=reason||'';help.classList.toggle('visible',!!reason)};
+ for(const field of [email,password])field.oninput=()=>{fieldError(field,'');error.hidden=true};
+ $('#eye').onclick=()=>{password.type=password.type==='password'?'text':'password';$('#eye').innerHTML=icon(password.type==='password'?'eye':'eye-off',20);$('#eye').setAttribute('aria-label',password.type==='password'?'Show password':'Hide password')};
+ $('#login').onsubmit=async event=>{
+  event.preventDefault();error.hidden=true;fieldError(email,'');fieldError(password,'');
+  let invalid=false;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())){fieldError(email,'Enter a valid email address.');invalid=true}
+  if(!password.value){fieldError(password,'Enter your password.');invalid=true}
+  if(invalid){(email.classList.contains('invalid')?email:password).focus();return}
+  btn.disabled=true;btn.textContent='Logging in…';
+  try{
+   const {error:authError}=await supabase.auth.signInWithPassword({email:email.value.trim().toLowerCase(),password:password.value});
+   if(authError){error.textContent=authError.code==='invalid_credentials'?'Email or password not recognized. Check the account email in Supabase Authentication > Users.':authError.message;error.hidden=false;return}
+   await load();
+  }catch(err){error.textContent=err?.message||'Unable to sign in. Check your connection.';error.hidden=false}
+  finally{btn.disabled=false;btn.textContent='Log in'}
  };
- $('#forgotPassword').onclick=async()=>{
-  const email=$('#email').value.trim(),err=$('#authError');
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.hidden=false;err.textContent='Enter your email address first.';$('#email').focus();return}
-  const button=$('#forgotPassword');button.disabled=true;button.textContent='Sending reset link…';const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl});button.disabled=false;button.textContent='Forgot password?';
-  err.hidden=false;err.textContent=error?(error.message.endsWith('.')?error.message:error.message+'.'):'If the email exists, a password reset link has been sent. Open it to set a new password.';
+ $('#forgotPassword').onclick=()=>{const panel=$('#passwordHelpPanel');panel.hidden=!panel.hidden;$('#forgotPassword').setAttribute('aria-expanded',String(!panel.hidden))};
+ $('#sendReset').onclick=async()=>{
+  fieldError(email,'');const status=$('#resetStatus');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())){fieldError(email,'Enter your account email first.');email.focus();return}
+  const send=$('#sendReset');send.disabled=true;send.textContent='Sending…';
+  try{const {error:resetError}=await supabase.auth.resetPasswordForEmail(email.value.trim().toLowerCase(),{redirectTo:authRedirectUrl});status.textContent=resetError?resetError.message:'If the address belongs to an account, a reset email is on its way.'}
+  catch(err){status.textContent=err?.message||'Could not send reset email.'}
+  finally{send.disabled=false;send.textContent='Send reset email'}
  };
  upgradeIcons();
 }
