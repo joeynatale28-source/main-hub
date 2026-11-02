@@ -106,11 +106,11 @@
   let tipTimer=0;
   const hideTip=()=>{clearTimeout(tipTimer);tip.hidden=true};
   sidebar.addEventListener('pointerover',e=>{
-    const button=e.target.closest('button, .nav');
+    const button=e.target.closest('button, .nav, .calendar-filter');
     hideTip();if(!button||!document.querySelector('.app').classList.contains('sidebar-collapsed'))return;
     tipTimer=setTimeout(()=>{
       if(!document.querySelector('.app').classList.contains('sidebar-collapsed'))return;
-      const rect=button.getBoundingClientRect();tip.textContent=button.getAttribute('aria-label')||button.title||'';
+      const rect=button.getBoundingClientRect();tip.textContent=button.getAttribute('aria-label')||button.title||button.querySelector('.cal-name')?.textContent||'';
       if(!tip.textContent)return;tip.hidden=false;tip.style.left=(rect.right+12)+'px';tip.style.top=(rect.top+Math.max(0,(rect.height-30)/2))+'px';
     },300);
   });
@@ -157,11 +157,11 @@
     const secondaryOf=p=>[p.city,p.state,p.country].filter(Boolean).join(', ');
     const hide=()=>{resultList.hidden=true;active=-1;location.setAttribute('aria-expanded','false')};
     const highlight=()=>resultList.querySelectorAll('[data-address-index]').forEach((el,i)=>{el.classList.toggle('active',i===active);el.setAttribute('aria-selected',String(i===active))});
-    const choose=i=>{const item=results[i];if(!item)return;selected={label:item.label,address:item.address};location.value=item.label;hide();location.dispatchEvent(new Event('change',{bubbles:true}));location.focus()};
+    const saved=document.createElement('small');saved.className='saved-address';saved.hidden=true;where.append(saved);const choose=i=>{const item=results[i];if(!item)return;selected={label:item.label,address:item.address};location.value=item.label;saved.textContent='Full address saved: '+item.address;saved.hidden=false;hide();location.dispatchEvent(new Event('change',{bubbles:true}));location.focus()};
     const draw=()=>{
       location.setAttribute('aria-expanded','true');resultList.hidden=false;
       resultList.innerHTML=results.length?results.map((r,i)=>'<button type="button" role="option" class="address-option" data-address-index="'+i+'"><span class="address-pin" aria-hidden="true">⌖</span><span><strong>'+esc(r.label)+'</strong><small>'+esc(r.secondary)+'</small></span></button>').join(''):'<div class="address-empty">No matches — you can still use what you typed.</div>';
-      resultList.querySelectorAll('[data-address-index]').forEach(b=>b.addEventListener('click',()=>choose(+b.dataset.addressIndex)));highlight();
+      resultList.querySelectorAll('[data-address-index]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();choose(+b.dataset.addressIndex)}));highlight();
     };
     const fetchPlaces=async query=>{
       request?.abort();const signal=(request=new AbortController()).signal;
@@ -179,7 +179,7 @@
     };
     location.addEventListener('input',()=>{
       clearTimeout(timer);request?.abort();
-      if(selected&&location.value!==selected.label)selected=null;
+      if(selected&&location.value!==selected.label){selected=null;saved.hidden=true;saved.textContent=''}
       const q=location.value.trim();previous=q;active=-1;
       if(q.length<3){hide();return}
       timer=setTimeout(()=>fetchPlaces(q),300);
@@ -195,7 +195,7 @@
     document.addEventListener('pointerdown',e=>{if(!where.contains(e.target))hide()});
     window.DaylightLocationMenuOpen=()=>!resultList.hidden;
     const oldPrepare=window.DaylightUI.prepareEvent;
-    window.DaylightUI.prepareEvent=(e,day,time)=>{selected=e?.locationAddress?{label:e.location,address:e.locationAddress}:null;hide();return oldPrepare(e,day,time)};
+    window.DaylightUI.prepareEvent=(e,day,time)=>{selected=e?.locationAddress?{label:e.location,address:e.locationAddress}:null;saved.hidden=!selected;saved.textContent=selected?'Full address saved: '+selected.address:'';hide();return oldPrepare(e,day,time)};
     const oldFields=window.DaylightUI.eventFields;
     window.DaylightUI.eventFields=()=>({...oldFields(),locationAddress:selected?.address||''});
   }

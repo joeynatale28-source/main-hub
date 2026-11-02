@@ -1,0 +1,84 @@
+/* Daylight v1.1: release dialog, calendar controls and constrained shell. */
+#settingsModal{padding:0;border:1px solid var(--border);border-radius:18px;background:var(--surface);color:var(--text);width:min(880px,calc(100vw - 28px));height:min(620px,90dvh);max-height:90dvh;max-width:calc(100vw - 28px);box-shadow:0 28px 85px #0007;overflow:hidden;animation:release-open 200ms cubic-bezier(.2,0,0,1)}
+#settingsModal::backdrop{background:#0008;backdrop-filter:blur(5px);animation:release-backdrop 120ms ease}
+#settingsModal .release-settings-wrap{height:100%;position:relative;display:flex;min-height:0}
+#settingsModal .settings-close{position:absolute;right:15px;top:14px;width:30px;height:30px;border-radius:8px;color:var(--text-2);border:0;background:var(--surface);font-size:22px;display:grid;place-items:center;cursor:pointer;z-index:11}
+#settingsModal #settingsPage{display:block!important;height:100%!important;max-height:100%!important;min-height:0!important;overflow:hidden!important;position:static!important;inset:auto!important;padding:26px 22px!important;margin:0!important;box-shadow:none!important;background:transparent!important;z-index:0!important}
+#settingsModal #settingsPage .settings-layout{display:grid!important;grid-template-columns:215px minmax(0,1fr)!important;max-width:100%!important;gap:25px!important;height:100%!important;max-height:100%!important;min-height:0!important;overflow:hidden!important;padding:0!important;justify-content:start!important}
+#settingsModal #settingsPage .settings-sections{width:auto!important;max-height:100%!important;overflow:hidden!important;position:static!important;display:flex!important;flex-direction:column!important;gap:4px!important;padding:36px 12px 0 0!important;border-right:1px solid var(--border)!important}
+#settingsModal .settings-anchor{min-height:40px!important;padding:9px 12px!important;display:flex!important;align-items:center;gap:12px;font-size:13px!important;line-height:1.2;flex:0 0 auto!important;text-align:left}
+#settingsModal .settings-anchor.active{background:var(--surface-hover)!important;border-radius:9px!important}
+#settingsModal .settings-nav-icon{width:18px;height:18px;flex:0 0 18px;display:grid;place-items:center;font-size:17px}
+#settingsModal #settingsPage .settings-stack{width:100%!important;min-width:0!important;max-height:100%!important;height:100%!important;overflow-y:auto!important;overflow-x:hidden!important;padding:36px 4px 20px 0!important;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+#settingsModal #settingsPage .setting-group{margin:0!important;padding:0!important;border:0!important;display:block!important}
+#settingsModal #settingsPage .setting-group[hidden]{display:none!important}
+#settingsModal .setting-group h2{font-size:16px!important;font-weight:600!important;margin:0!important}
+#settingsModal .setting-item{padding:14px 8px!important;min-height:58px!important;gap:12px!important}
+#settingsModal .setting-item strong{font-size:13px!important}
+#settingsModal .setting-item small{font-size:11px!important;color:var(--text-2)}
+#settingsModal select,#settingsModal .select-button{min-width:120px;max-width:230px}
+#settingsModal .select-button{border-radius:999px!important;min-height:34px!important;font-size:12px!important}
+#settingsModal .release-pane-enter{animation:release-pane 150ms cubic-bezier(.2,0,0,1)}
+#settingsModal .theme-previews{width:100%;min-width:0}
+#settingsModal .theme-preview{min-width:0;flex:1}
+#settingsModal .setting-header{margin:0 0 16px!important}
+#settingsModal .settings-layout #settingsAppearance .custom-accent-trigger,#settingsModal .custom-accent-trigger{background:var(--accent)!important;border-radius:50%!important}
+#settingsModal #reduceMotion{accent-color:var(--accent)}
+#settingsModal a{color:var(--text);text-underline-offset:3px}
+#settingsModal .setting-group .integration-jump .outline{white-space:normal}
+@keyframes release-open{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+@keyframes release-backdrop{from{opacity:0}to{opacity:1}}
+@keyframes release-pane{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.calendar-filter{position:relative!important;min-width:0!important;display:flex!important;gap:7px!important;transition:opacity 200ms ease}
+.calendar-filter.calendar-hidden .dot,.calendar-filter.calendar-hidden .cal-name,.calendar-filter.calendar-hidden input{opacity:.45!important;filter:grayscale(1)}
+.calendar-filter .cal-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.calendar-filter .calendar-actions-button{border:0;background:transparent;width:28px;height:28px;min-width:28px;min-height:28px;display:grid;place-items:center;padding:0;color:var(--text-2);border-radius:7px;cursor:pointer;font-size:20px;font-weight:500;line-height:1;opacity:0;transition:opacity 150ms ease}
+.calendar-filter:hover .calendar-actions-button,.calendar-filter:focus-within .calendar-actions-button{opacity:1}
+@media(hover:none){.calendar-filter .calendar-actions-button{opacity:1!important}}
+.calendar-actions-menu{position:fixed;z-index:2500;width:200px;padding:5px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 14px 35px #0003;animation:release-pane 120ms ease}
+.calendar-actions-menu[hidden]{display:none!important}
+.calendar-actions-menu button{width:100%;height:37px;display:flex;gap:11px;align-items:center;border:0;background:transparent;color:var(--text);border-radius:8px;text-align:left;font-size:13px;padding:0 12px;cursor:pointer}
+.calendar-actions-menu button span{width:17px;display:grid;place-items:center}
+.calendar-actions-menu button:hover,.calendar-actions-menu button:focus-visible{background:var(--surface-hover)}
+.calendar-actions-menu button.danger{color:#dd5858}
+.calendar-rename-input{min-width:0;width:100%;flex:1;font:inherit;color:var(--text);background:var(--surface-hover);border:1px solid var(--accent);border-radius:7px;padding:3px 5px}
+.calendar-rename-save{width:26px;height:26px;border-radius:7px;color:var(--accent);background:transparent;border:0;cursor:pointer}
+.calendar-rename-input.rename-error{animation:rename-shake 240ms ease}
+@keyframes rename-shake{25%,75%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+.calendar-removing{opacity:0;max-height:0!important;margin:0!important;overflow:hidden;transition:opacity 150ms ease,max-height 250ms ease}
+.release-confirm{max-width:min(430px,calc(100vw - 30px));padding:26px;border:1px solid var(--border);border-radius:17px;background:var(--surface);color:var(--text);box-shadow:0 22px 55px #0005}
+.release-confirm::backdrop{background:#0008;backdrop-filter:blur(4px)}
+.release-confirm h2{font-size:18px;font-weight:600;margin:10px 0}
+.release-confirm p{font-size:13px;line-height:1.5;color:var(--text-2)}
+.release-confirm input{display:block;box-sizing:border-box;width:100%;height:38px;padding:8px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);margin:16px 0}
+.release-confirm input[hidden]{display:none!important}
+.release-confirm .confirm-warning{width:30px;height:30px;border-radius:50%;background:#e35a5a22;color:#ed6363;display:grid;place-items:center;font-weight:700}
+.release-confirm .confirm-actions{display:flex;justify-content:flex-end;gap:9px}
+.release-confirm .danger-button{border:0;border-radius:9px;background:#c94040;color:white;padding:9px 13px;cursor:pointer;font-size:13px}
+.release-confirm .danger-button:disabled{opacity:.4;cursor:not-allowed}
+.saved-address{display:block;font-size:11px;color:var(--text-2);padding:6px 2px 0;line-height:1.4}
+.saved-address[hidden]{display:none!important}
+#offlineNotice{position:fixed;z-index:2500;bottom:60px;left:50%;transform:translateX(-50%);border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:8px 15px;font-size:12px;color:var(--text)}
+#offlineNotice[hidden]{display:none}
+.sidebar-collapsed .sidebar .cal-name,.sidebar-collapsed .sidebar .nav-label,.sidebar-collapsed .sidebar .support-nav .nav-label,.sidebar-collapsed .sidebar .calendar-actions-button,.sidebar-collapsed .sidebar .cal-count,.sidebar-collapsed .sidebar .navlabel,.sidebar-collapsed .sidebar .brand-subtitle{display:none!important}
+.sidebar-collapsed .sidebar,.sidebar-collapsed .sidebar-middle{overflow-x:hidden!important}
+.sidebar-collapsed .sidebar .calendar-filter{width:36px!important;min-width:36px!important;height:36px!important;display:grid!important;place-items:center!important;margin:auto!important;padding:0!important;cursor:pointer}
+.sidebar-collapsed .sidebar .calendar-filter .dot{width:13px!important;height:13px!important;grid-area:1/1!important;margin:0!important}
+.sidebar-collapsed .sidebar .calendar-filter input{width:36px!important;height:36px!important;position:absolute!important;opacity:0!important;cursor:pointer}
+.sidebar-collapsed .sidebar .calendar-filter .cal-name{display:none!important}
+.sidebar-collapsed .sidebar .sidebar-middle .navlabel{font-size:0!important;border-top:1px solid var(--border);height:1px;min-height:1px;padding:0;margin:10px auto}
+#calendarView .week-day-track.weekend-track{background-image:none!important;background:transparent!important}
+.monthgrid .daycell{position:relative}
+.monthgrid .daycell .cell-add{position:absolute!important;right:6px!important;top:6px!important;left:auto!important;bottom:auto!important}
+#tasksPage .tasks-titlebar,#tasksPage .tasks-board{max-width:860px!important;width:100%!important;margin-left:auto!important;margin-right:auto!important}
+#taskDialog{isolation:isolate;overflow:visible!important}
+#taskDialog input[type=date]{position:relative;z-index:3}
+#eventDialog .picker-panel{max-height:320px!important;overflow-y:auto!important;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.feed-error{color:#df7777}
+#settingsAbout .version{font-weight:600}
+:root[data-reduce-motion=true] .release-pane-enter,:root[data-reduce-motion=true] #settingsModal{animation:none!important}
+@media(max-width:650px){#settingsModal{width:calc(100vw - 16px);height:90dvh}#settingsModal #settingsPage{padding:14px!important}#settingsModal #settingsPage .settings-layout{grid-template-columns:112px minmax(0,1fr)!important;gap:10px!important}#settingsModal #settingsPage .settings-sections{padding:39px 5px 0 0!important}#settingsModal .settings-anchor{font-size:11px!important;padding:8px 5px!important;gap:6px}#settingsModal .settings-nav-icon{width:15px;flex-basis:15px}#settingsModal #settingsPage .settings-stack{padding-top:39px!important}#settingsModal .setting-item{flex-wrap:wrap;gap:7px}}
+
+/* Toast actions stay above the interactive calendar, so Undo is actually clickable. */
+body>#toast,body>.toast,#toast{position:fixed!important;z-index:2147483000!important;pointer-events:auto!important;isolation:isolate!important}
+#toast button{position:relative!important;z-index:2!important;pointer-events:auto!important}

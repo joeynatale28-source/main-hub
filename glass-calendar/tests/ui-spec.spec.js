@@ -13,24 +13,17 @@ test.beforeEach(async({page})=>{
   await expect(page.locator('#calendarView')).toBeVisible();
 });
 
-test('workspace views replace the calendar without covering the sidebar',async({page})=>{
-  await page.locator('#integrationsNav').click();
-  await expect(page.locator('#integrationsPage')).toBeVisible();
-  await expect(page.locator('#calendarContent')).toBeHidden();
-  await expect(page.locator('.sidebar')).toBeVisible();
-  const side=await page.locator('.sidebar').boundingBox();
-  const view=await page.locator('#integrationsPage').boundingBox();
-  expect(view.x).toBeGreaterThan(side.x+side.width-3);
-  await page.locator('#settingsNav').click();
-  await expect(page.locator('#settingsPage')).toBeVisible();
-  await expect(page.locator('#integrationsPage')).toBeHidden();
-  await expect(page.locator('#settingsSearch')).toBeVisible();
-  await page.locator('#openIntegrationView').click();
-  await expect(page.locator('#integrationsPage')).toBeVisible();
-  await page.locator('.nav[data-view="month"]').click();
-  await expect(page.locator('.monthgrid')).toBeVisible();
+test('workspace integrations and popup Settings preserve the sidebar',async({page})=>{
+ await page.locator('#integrationsNav').click();await expect(page.locator('#integrationsPage')).toBeVisible();
+ await expect(page.locator('#calendarContent')).toBeHidden();await expect(page.locator('.sidebar')).toBeVisible();
+ await page.locator('#settingsNav').click();await expect(page.locator('#settingsModal')).toBeVisible();
+ await expect(page.locator('#integrationsPage')).toBeVisible();
+ await page.locator('.settings-anchor[data-target="settingsData"]').click();
+ await page.locator('#openIntegrationView').click();
+ await expect(page.locator('#settingsModal')).toBeHidden();
+ await expect(page.locator('#integrationsPage')).toBeVisible();
+ await page.locator('.nav[data-view="month"]').click();await expect(page.locator('.monthgrid')).toBeVisible();
 });
-
 test('date numbers drill in without altering the default view and Escape returns',async({page})=>{
   await expect(page.locator('.view-toggle')).toBeHidden();
   const number=page.locator('.monthgrid [data-drill-date]').nth(9);
@@ -51,6 +44,7 @@ test('date numbers drill in without altering the default view and Escape returns
 
 test('settings custom select uses the selected option as its label',async({page})=>{
   await page.locator('#settingsNav').click();
+  await page.locator('.settings-anchor[data-target="settingsCalendar"]').click();
   await expect(page.locator('#settingsCalendar')).toBeVisible();
   const native=page.locator('#defaultViewSelect');
   const closed=page.locator('#defaultViewSelect + .select-button');
@@ -59,6 +53,7 @@ test('settings custom select uses the selected option as its label',async({page}
   await page.locator('.select-menu[data-owner="defaultViewSelect"] .select-option').filter({hasText:'Week'}).click();
   await expect(native).toHaveValue('week');
   await expect(closed).toHaveText('Week');
+  await page.locator('#settingsModal .settings-close').click();
   await page.locator('.nav[data-view="month"]').click();
   await expect(page.locator('.week-board')).toBeVisible();
   await page.locator('.week-day-number').nth(2).click();
@@ -115,8 +110,9 @@ test('Photon suggestions are keyboard-drivable without advancing the wizard',asy
 
 test('reduce motion, theme and accent settings work without an account',async({page})=>{
   await page.locator('#settingsNav').click();
+  await page.locator('.settings-anchor[data-target="settingsAppearance"]').click();
   const appearance=page.locator('#settingsAppearance');
-  await appearance.scrollIntoViewIfNeeded();
+  await expect(appearance).toBeVisible();
   await page.locator('#reduceMotion').check();
   await expect(page.locator('html')).toHaveAttribute('data-reduce-motion','true');
   await page.locator('[data-theme-choice="light"]').click();
@@ -146,17 +142,19 @@ test('fourth wizard step has Back and Create but no Skip, and task Save is prima
   await expect(page.locator('#taskForm button[type="submit"]')).toHaveClass(/primary/);
 });
 
-test('both themes render in-shell settings and integrations at desktop width',async({page})=>{
-  await page.setViewportSize({width:1440,height:900});
-  for(const mode of ['dark','light']){
-    await page.locator('#settingsNav').click();
-    await page.locator('[data-theme-choice="'+mode+'"]').click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme',mode);
-    await expect(page.locator('.sidebar')).toBeVisible();
-    await page.screenshot({path:'test-results/spec-settings-'+mode+'.png',fullPage:false});
-    await page.locator('#integrationsNav').click();
-    await expect(page.locator('#integrationsPage')).toBeVisible();
-    await page.screenshot({path:'test-results/spec-integrations-'+mode+'.png',fullPage:false});
-    await page.locator('.nav[data-view="month"]').click();
-  }
+test('both themes render modal settings and in-shell integrations',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ for(const mode of ['dark','light']){
+  await page.locator('#settingsNav').click();
+  await page.locator('.settings-anchor[data-target="settingsAppearance"]').click();
+  await page.locator('[data-theme-choice="'+mode+'"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme',mode);
+  await expect(page.locator('#settingsModal')).toBeVisible();
+  await page.screenshot({path:'test-results/spec-settings-'+mode+'.png',fullPage:false});
+  await page.locator('#settingsModal .settings-close').click();
+  await page.locator('#integrationsNav').click();
+  await expect(page.locator('#integrationsPage')).toBeVisible();
+  await page.screenshot({path:'test-results/spec-integrations-'+mode+'.png',fullPage:false});
+  await page.locator('.nav[data-view="month"]').click();
+ }
 });
