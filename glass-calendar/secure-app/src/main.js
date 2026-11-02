@@ -46,6 +46,16 @@ function login(){
  upgradeIcons();
 }
 async function logout(){await sb.auth.signOut();state.user=null;state.events=[];state.calendars=[];login()}
+function showRecovery(){
+ const dialog=modal('<h2>Set a new password</h2><p>Choose a new password for your Daylight account.</p><label>New password<input type="password" id="recoveryPassword" autocomplete="new-password" minlength="8" required></label><p id="recoveryError" class="error" hidden></p><div class="footer-actions"><button class="primary" id="recoverySave">Update password</button></div>');
+ $('#recoverySave',dialog).onclick=async()=>{const password=$('#recoveryPassword',dialog).value;
+  if(password.length<8){$('#recoveryError',dialog).hidden=false;$('#recoveryError',dialog).textContent='Use a password with at least 8 characters.';return}
+  loading($('#recoverySave',dialog),true,'Updating…');const {error}=await sb.auth.updateUser({password});
+  if(error){loading($('#recoverySave',dialog),false);$('#recoveryError',dialog).hidden=false;$('#recoveryError',dialog).textContent=(error.message||'Could not update your password.')+'.';return}
+  dialog.close();toast('Password updated');await load();
+ };
+}
+
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
 function reflect(){
@@ -664,4 +674,4 @@ function checkReminders(){
 if(typeof window!=='undefined')setInterval(checkReminders,30000);
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else sb.auth.getSession().then(({data})=>data.session?load():login());
+else {sb.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY')queueMicrotask(()=>showRecovery())});sb.auth.getSession().then(({data})=>data.session?load():login());}
