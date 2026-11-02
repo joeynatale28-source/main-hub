@@ -465,8 +465,11 @@ function renderTimeGrid(firstDay,numDays){
    const cal=calOf(o.ev.cal),start=sameDay(o.start,day)||day.getDay()===0||numDays===1;
    const seg=numDays===1?"":segmentClass(o,day);
    const bar=el('<button class="allday-bar'+seg+'" style="background:'+tintOf(cal)+';color:'+tintTextOf(cal)+'" aria-label="'+esc(o.ev.title)+'">'+(start?esc(o.ev.title):'&nbsp;')+'</button>');
-   bar.onclick=e=>{e.stopPropagation();openPopover(o,bar)};cell.append(bar);
-  });allRow.append(cell);
+   bar.onclick=e=>{e.stopPropagation();openPopover(o,bar)};installDragSource(bar,o);cell.append(bar);
+  });
+  cell.addEventListener("dragover",e=>{if(e.dataTransfer.types.includes("application/x-daylight-event"))e.preventDefault()});
+  cell.addEventListener("drop",async e=>{const occ=dragPayload(e);if(!occ)return;e.preventDefault();const start=new Date(occ.start),end=new Date(occ.end),delta=Math.round((sod(day)-sod(start))/86400000);start.setDate(start.getDate()+delta);end.setDate(end.getDate()+delta);await moveOccurrence(occ,start,end)});
+  allRow.append(cell);
  });wrap.append(allRow);
  if(numDays===1&&!occs.length){
   wrap.append(el('<div class="empty-state">'+icon("calendar",30)+'<p>No events yet</p><button class="btn-primary" style="margin:8px 0 0" id="createEmpty">Add Event</button></div>'));
@@ -486,7 +489,34 @@ function renderTimeGrid(firstDay,numDays){
    const card=el('<button class="ev-card" data-event-id="'+esc(o.ev.id)+'" style="top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px);background:'+tintOf(cal)+';color:'+tintTextOf(cal)+'"><span class="ev-title">'+esc(o.ev.title)+'</span>'+(height>=44?'<span class="ev-time">'+fmtTimeRange(o.start,o.end)+'</span>':'')+(o.ev.loc&&height>=66?'<span class="ev-loc">'+esc(o.ev.loc)+'</span>':'')+'</button>');
    if(height<58)$(".ev-title",card).style.webkitLineClamp="1";
    card.onclick=e=>{e.stopPropagation();openPopover(o,card)};
+   installDragSource(card,o);
+   if(!cal.subscribed&&height>=35){
+    const handle=el('<span class="resize-handle" role="button" title="Resize event in 15-minute increments"></span>');
+    handle.onpointerdown=e=>{
+     e.preventDefault();e.stopPropagation();card.draggable=false;
+     const y=e.clientY,original=height;
+     let delta=0,cancelled=false;
+     const moving=ev=>{delta=Math.round(((ev.clientY-y)/HOUR_PX*60)/15)*15;card.style.height=Math.max(26,original+delta/60*HOUR_PX)+"px"};
+     const key=ev=>{if(ev.key==="Escape"){cancelled=true;finish()}};
+     const finish=async()=>{
+      window.removeEventListener("pointermove",moving);window.removeEventListener("pointerup",finish);window.removeEventListener("keydown",key);
+      card.draggable=true;
+      if(cancelled){card.style.height=original+"px";return}
+      if(delta!==0)await resizeOccurrence(o,new Date(o.end.getTime()+delta*60000));
+     };
+     window.addEventListener("pointermove",moving);window.addEventListener("pointerup",finish,{once:true});window.addEventListener("keydown",key);
+    };
+    card.append(handle);
+   }
    col.append(card);
+  });
+  col.addEventListener("dragover",e=>{if(e.dataTransfer.types.includes("application/x-daylight-event"))e.preventDefault()});
+  col.addEventListener("drop",async e=>{
+   const occ=dragPayload(e);if(!occ)return;e.preventDefault();e.stopPropagation();
+   const raw=(e.clientY-col.getBoundingClientRect().top)/HOUR_PX*60;
+   const minutes=Math.max(0,Math.min(1425,Math.round(raw/15)*15));
+   const start=dt(day.getFullYear(),day.getMonth(),day.getDate(),Math.floor(minutes/60),minutes%60);
+   await moveOccurrence(occ,start,new Date(start.getTime()+(occ.end-occ.start)));
   });
   col.addEventListener("dblclick",e=>{if(e.target.closest(".ev-card"))return;const min=Math.floor(e.offsetY/HOUR_PX*60/30)*30;openEventForm(null,day,null,Math.max(0,Math.min(1380,min)))});
   body.append(col);
