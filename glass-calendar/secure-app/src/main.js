@@ -309,11 +309,117 @@ function renderAgenda(){
  $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._first===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(agendaRange(x)|| (x.all_day?'All day':h(prettyClock(x.starts_at))))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
 }
 
+let dragState=null,dragJustFinished=0;
+const snap15=n=>Math.max(0,Math.min(1425,Math.round(n/15)*15));
+const shiftTime=(value,dayDelta,minuteDelta)=>{const d=new Date(value);d.setDate(d.getDate()+dayDelta);d.setMinutes(d.getMinutes()+minuteDelta);return d.toISOString()};
+const minutesText=minute=>String(Math.floor(minute/60)%24).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');
+function droppedDay(x,y,view){
+ if(view==='month'){
+  const row=document.elementFromPoint(x,y)?.closest('.monthweek')||[...$('.monthweek')].find(w=>{const r=w.getBoundingClientRect();return y>=r.top&&y<r.bottom});
+  if(!row)return null;
+  const rect=row.getBoundingClientRect(),col=Math.max(0,Math.min(6,Math.floor((x-rect.left)/(rect.width/7))));
+  return row.querySelectorAll('.monthcell')[col]?.dataset.cell||null;
+ }
+ const tracks=$('.daytrack'),col=tracks.find(t=>{const r=t.getBoundingClientRect();return x>=r.left&&x<r.right});
+ return col?.dataset.slot||null;
+}
+function stopDrag(cancel=false){
+ const drag=dragState;if(!drag)return;
+ drag.ghost?.remove();drag.tooltip?.remove();document.body.classList.remove('dragging-event');
+ dragState=null;
+ if(cancel||!drag.moved)return;
+ dragJustFinished=Date.now();
+ const x=drag.lastX,y=drag.lastY;
+ const newDay=droppedDay(x,y,drag.view);
+ if(drag.create){
+  if(!newDay)return;
+  const from=drag.day<=newDay?drag.day:newDay,to=drag.day<=newDay?newDay:drag.day;
+  openEditor(null,from,null,'event','all',to);
+  return;
+ }
+ if(!drag.e||drag.e.source_subscription_id)return;
+ const ev=drag.e,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
+ let changes={starts_at:ev.starts_at,ends_at:ev.ends_at};
+ if(drag.view==='month'){
+  if(!newDay)return;
+  const shift=dayDelta(bounds(ev).first,newDay);
+  changes={starts_at:shiftTime(ev.starts_at,shift,0),ends_at:shiftTime(ev.ends_at,shift,0)};
+ }else{
+  const targetDay=newDay||bounds(ev).first;
+  const track=$('.daytrack').find(x=>x.dataset.slot===targetDay);
+  if(!track)return;
+  const r=track.getBoundingClientRect(),t=snap15((y-r.top)/r.height*1440),orig=start.getHours()*60+start.getMinutes();
+  const difference=dayDelta(bounds(ev).first,targetDay),delta=t-orig;
+  if(drag.resize==='start'){const shifted=shiftTime(ev.starts_at,difference,delta);if(new Date(shifted)>=end)return;changes.starts_at=shifted}
+  else if(drag.resize==='end'){const shifted=shiftTime(ev.ends_at,difference,delta);if(new Date(shifted)<=start)return;changes.ends_at=shifted}
+  else{changes.starts_at=shiftTime(ev.starts_at,difference,delta);changes.ends_at=shiftTime(ev.ends_at,difference,delta)}
+ }
+ if(changes.starts_at===ev.starts_at&&changes.ends_at===ev.ends_at)return;
+ scopeChoice(ev,'move',async scope=>{
+  try{
+   // The All-events scope moves the SERIES anchor by the same offset.
+   if(recurring(ev)&&scope==='all'){
+    const original=ev._origin;
+    const offset=new Date(changes.starts_at)-start;
+    await commitOccurrence(ev,'all','edit',{starts_at:new Date(new Date(original.starts_at).getTime()+offset).toISOString(),ends_at:new Date(new Date(original.ends_at).getTime()+(new Date(changes.ends_at)-end)).toISOString()});
+   }else if(recurring(ev))await commitOccurrence(ev,scope,'edit',{...ev, ...changes,calendar_id:ev.calendar_id,title:ev.title,repeat_rule:ev.repeat_rule});
+   else{await api('data_update',{entity:'events',id:ev.id,data:changes});await refreshData();toast('Event updated')}
+  }catch(error){toast('Could not update event.')}
+ });
+}
+function bindDragEvents(){
+ const month=state.view==='month',hour=state.view==='day'||state.view==='week';
+ const nodes=$('.span-bar,.weekevent');
+ nodes.forEach(el=>{
+  el.onpointerdown=event=>{
+   if(event.button!==0||!event.isPrimary)return;
+   const e=getOccurrence(el.dataset.detail,el.dataset.occ);if(!e||e.source_subscription_id)return;
+   const resize=event.target.closest('[data-resize]')?.dataset.resize||null;
+   dragState={e,view:month?'month':'week',create:false,resize,lastX:event.clientX,lastY:event.clientY,x:event.clientX,y:event.clientY,moved:false,source:el};
+   el.setPointerCapture(event.pointerId);event.preventDefault();
+  };
+  el.onpointermove=event=>{if(!dragState||dragState.source!==el)return;movePointer(event)};
+  el.onpointerup=event=>{if(dragState?.source===el){dragState.lastX=event.clientX;dragState.lastY=event.clientY;stopDrag()}};
+  el.onpointercancel=()=>stopDrag(true);
+ });
+ if(month)$('.monthcell').forEach(cell=>{
+  cell.onpointerdown=event=>{
+   if(event.button!==0||event.target.closest('button'))return;
+   dragState={view:'month',create:true,day:cell.dataset.cell,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,moved:false,source:cell};
+   cell.setPointerCapture(event.pointerId);event.preventDefault();
+  };
+  cell.onpointermove=event=>{if(dragState?.source===cell)movePointer(event)};
+  cell.onpointerup=event=>{if(dragState?.source===cell){dragState.lastX=event.clientX;dragState.lastY=event.clientY;stopDrag()}};
+  cell.onpointercancel=()=>stopDrag(true);
+ });
+}
+function movePointer(event){
+ const d=dragState;if(!d)return;d.lastX=event.clientX;d.lastY=event.clientY;
+ if(!d.moved&&Math.hypot(event.clientX-d.x,event.clientY-d.y)<6)return;
+ if(!d.moved){
+  d.moved=true;document.body.classList.add('dragging-event');
+  d.ghost=document.createElement('div');d.ghost.className='event-drag-ghost';
+  d.ghost.style.background=d.e?eventColor(d.e):'var(--primary)';
+  d.ghost.textContent=d.e?.title||'New event';
+  document.body.append(d.ghost);
+  d.tooltip=document.createElement('span');d.tooltip.className='drag-time-tooltip';document.body.append(d.tooltip);
+ }
+ d.ghost.style.left=(event.clientX+12)+'px';d.ghost.style.top=(event.clientY+12)+'px';
+ d.tooltip.style.left=(event.clientX+16)+'px';d.tooltip.style.top=(event.clientY-30)+'px';
+ const day=droppedDay(event.clientX,event.clientY,d.view);
+ const track=$('.daytrack').find(t=>t.dataset.slot===day),r=track?.getBoundingClientRect();
+ d.tooltip.textContent=(day||'')+(r?' · '+minutesText(snap15((event.clientY-r.top)/r.height*1440)):'');
+ event.preventDefault();
+}
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&dragState){e.preventDefault();e.stopImmediatePropagation();stopDrag(true)}
+},true);
+
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
- $$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
+ $('[data-detail]').forEach(x=>x.onclick=e=>{if(Date.now()-dragJustFinished<500)return;e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
 }
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
