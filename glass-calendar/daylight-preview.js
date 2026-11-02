@@ -71,7 +71,7 @@ const id=()=>globalThis.crypto?.randomUUID?.()||"local-"+Date.now()+"-"+Math.ran
 let state={
  view:"week",prevView:null,cursor:sod(TODAY()),selected:sod(TODAY()),miniCursor:dt(TODAY().getFullYear(),TODAY().getMonth(),1),
  themeMode:"dark",firstName:"Joey",lastName:"",tzLabel:"",weekNumbers:false,showDeclined:true,
- reduceMotion:false,sidebarRail:false,calendars:[],events:[],settings:{}
+ reduceMotion:false,sidebarRail:false,calendars:[],events:[],tasks:[],page:"calendar",taskFilter:"all",settings:{}
 };
 const effectiveTheme=()=>state.themeMode==="system"?(matchMedia("(prefers-color-scheme:light)").matches?"light":"dark"):state.themeMode;
 const applyTheme=()=>{document.documentElement.dataset.theme=effectiveTheme();document.body.classList.toggle("reduce-motion",state.reduceMotion)};
@@ -98,13 +98,13 @@ function eventToData(e){
  repeat_rule:{frequency:e.repeat||"never"},status:e.declined?"declined":"confirmed",exdates:e.exdates||[]};
 }
 async function loadLocal(){
- const [ur,ca,ev,st]=await Promise.all([
+ const [ur,ca,ev,st,tasks]=await Promise.all([
   localApi("auth_session"),localApi("data_list",{entity:"calendars"}),
-  localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"})]);
+  localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"}),localApi("data_list",{entity:"tasks"})]);
  const s=st.items[0]||{},prefs=readUIPrefs();
  state.firstName=ur.user?.first_name||"Joey";state.lastName=ur.user?.last_name||"";
  state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local",feedUrl:c.source_url||null}));
- state.events=ev.items.map(eventFromData);
+ state.events=ev.items.map(eventFromData);state.tasks=tasks.items;
  state.settings=s;state.themeMode=s.theme||"dark";
  state.view=s.default_view||"week";state.weekNumbers=!!s.show_week_numbers;
  state.showDeclined=s.show_declined_events!==false;state.reduceMotion=!!s.reduce_motion;
@@ -206,6 +206,8 @@ function renderSidebar(){
  const label=el('<div class="side-label rail-hide"><span>My calendars</span></div>');
  const plus=el('<button class="mini-nav" title="New calendar" aria-label="New calendar">'+icon("plus",13)+'</button>');plus.onclick=openNewCalendar;label.append(plus);sidebarEl.append(label);
  const list=el('<div id="calList"></div>');state.calendars.forEach(c=>list.append(calRow(c)));sidebarEl.append(list);
+ const taskNav=el('<button class="side-row" id="tasksNav" title="Tasks">'+icon("list",18)+'<span class="rail-hide">Tasks</span></button>');
+ taskNav.onclick=()=>{state.page=state.page==="tasks"?"calendar":"tasks";renderAll(false)};sidebarEl.append(taskNav);
  sidebarEl.append(el('<div class="side-spacer"></div>'));
  if(!state.sidebarRail)sidebarEl.append(el('<div class="side-label rail-hide"><span>Support</span></div>'));
  const help=el('<button class="side-row" title="Help center">'+icon("lifebuoy",18)+'<span class="rail-hide">Help center</span></button>');help.onclick=openHelp;
@@ -307,6 +309,12 @@ function viewRange(){
 }
 function renderHeader(){
  const hdr=$("#headerBand"),range=viewRange();hdr.innerHTML="";
+ if(state.page==="tasks"){
+  hdr.innerHTML='<div class="head-title-wrap"><span class="head-cal-icon">'+icon("list",22)+'</span><span><span class="head-title">Tasks</span><br><span class="head-sub">All your to-dos in one place</span></span></div><div class="head-right"><button class="icon-btn" id="settingsTasks" title="Settings">'+icon("settings",19)+'</button><button class="btn-primary" id="addTaskHeader">'+icon("plus",16)+' Add Task</button></div>';
+  $("#settingsTasks",hdr).onclick=()=>openSettings("general");
+  $("#addTaskHeader",hdr).onclick=()=>openTaskForm();
+  return;
+ }
  if(state.view==="day"&&state.prevView){
   const back=el('<button class="back-btn">'+icon("arrowL",15)+'Back</button>');
   back.onclick=()=>{state.view=state.prevView;state.prevView=null;renderAll(true,-1)};hdr.append(back);
@@ -338,6 +346,7 @@ function drillToDay(day){
 }
 function renderView(animate,dir=1){
  closeMenu();closePopover();viewWrap.innerHTML="";
+ if(state.page==="tasks"){viewWrap.append(renderTasks());return}
  let node;
  if(state.view==="month")node=renderMonth();
  else if(state.view==="week")node=renderTimeGrid(sundayOf(state.cursor),7);
