@@ -10,7 +10,7 @@ const fresh=()=>Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.
 const plain=(x:unknown)=>String(x??'').trim();
 const allowed:Record<string,{table:string,fields:string[]}>={
  calendars:{table:'dl_calendars',fields:['name','shade','sort_order','is_visible']},
- events:{table:'dl_events',fields:['calendar_id','title','description','location_name','location_address','starts_at','ends_at','all_day','repeat_rule','reminder_offset_minutes']},
+ events:{table:'dl_events',fields:['calendar_id','title','description','location_name','location_address','starts_at','ends_at','all_day','repeat_rule','reminder_offset_minutes','excluded_dates','status']},
  tasks:{table:'dl_tasks',fields:['title','notes','due_date','completed']},
  subscriptions:{table:'dl_subscriptions',fields:['calendar_id','name','url','last_fetched_at']},
  settings:{table:'dl_user_settings',fields:['theme','accent','custom_accent_hex','default_view','start_of_week','reduce_motion','show_weekends','compact_mode','show_week_numbers','show_declined_events','work_hours_start','work_hours_end','task_reminders','event_reminders','notification_sound','default_reminder_minutes','mcp_allow_delete','time_zone','extra']}
@@ -150,6 +150,9 @@ async function handle(req:Request){
   if(action==='data_create'){
    if(entity==='subscriptions'){
     const url=feedUrl(plain(changes.url));
+    const {data:duplicate,error:duplicateError}=await db.from('dl_subscriptions').select('id').eq('user_id',uid).eq('url',url).maybeSingle();
+    if(duplicateError)throw duplicateError;
+    if(duplicate)return fail('That feed is already added.',409);
     const named=plain(changes.name),name=named||new URL(url).hostname;
     const client_id='ics-'+crypto.randomUUID();
     const {data:calendar,error:ce}=await db.from('dl_calendars').insert({user_id:uid,name,shade:'gray-4',client_id,sort_order:100,is_visible:true}).select('*').single();if(ce)throw ce;
