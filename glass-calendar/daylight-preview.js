@@ -107,7 +107,7 @@ async function loadLocal(){
  state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local",feedUrl:c.source_url||null}));
  state.events=ev.items.map(eventFromData);state.tasks=tasks.items;state.exceptions=exceptions.items;
  state.settings=s;state.themeMode=s.theme||"dark";
- state.view=s.default_view||"week";state.weekNumbers=!!s.show_week_numbers;
+ state.view=s.last_view||s.default_view||"month";if(s.focus_date)state.cursor=new Date(s.focus_date+"T12:00:00");state.weekNumbers=!!s.show_week_numbers;
  state.showDeclined=s.show_declined_events!==false;state.reduceMotion=!!s.reduce_motion;
  state.sidebarRail=!!prefs.sidebarRail;
  state.tzLabel=new Intl.DateTimeFormat("en-US",{timeZoneName:"short"}).formatToParts(new Date()).find(p=>p.type==="timeZoneName")?.value||"Local";
@@ -229,13 +229,13 @@ function renderSidebar(){
  if(!state.sidebarRail)sidebarEl.append(el('<div class="side-label rail-hide"><span>Support</span></div>'));
  const help=el('<button class="side-row" title="Help center">'+icon("lifebuoy",18)+'<span class="rail-hide">Help center</span></button>');help.onclick=openHelp;
  const settings=el('<button class="side-row" title="Settings">'+icon("settings",18)+'<span class="rail-hide">Settings</span></button>');settings.onclick=()=>openSettings("general");
- const exp=el('<button class="side-row" title="Export the current UI HTML">'+icon("download",18)+'<span class="rail-hide">Export UI code</span></button>');exp.onclick=exportUI;
+ const exp=el('<button class="side-row" title="Export the current UI HTML">'+icon("download",18)+'<span class="rail-hide">View source code</span></button>');exp.onclick=exportUI;
  sidebarEl.append(help,settings,exp);
  const initials=(state.firstName.slice(0,1)+state.lastName.slice(0,1)).toUpperCase()||"DL";
- const profile=el('<div class="profile-wrap"><button class="profile-row" title="Local profile"><span class="avatar">'+esc(initials)+'</span><span class="rail-hide" style="min-width:0"><span class="profile-name">'+esc([state.firstName,state.lastName].filter(Boolean).join(" "))+'</span><br><span class="profile-email">Saved in this browser</span></span><span class="icon-btn rail-hide" style="pointer-events:none">'+icon("dotsV",17)+'</span></button></div>');
+ const profile=el('<div class="profile-wrap"><button class="profile-row" title="Local profile"><span class="avatar">'+esc(initials)+'</span><span class="rail-hide" style="min-width:0"><span class="profile-name">'+esc([state.firstName,state.lastName].filter(Boolean).join(" "))+'</span><br><span class="profile-email">Private calendar</span></span><span class="icon-btn rail-hide" style="pointer-events:none">'+icon("dotsV",17)+'</span></button></div>');
  $(".profile-row",profile).onclick=e=>openMenu(e.currentTarget,[
   {icon:"settings",label:"Settings",fn:()=>openSettings("general")},
-  {icon:"download",label:"Export UI code",fn:exportUI},
+  {icon:"download",label:"View source code",fn:exportUI},
   {icon:effectiveTheme()==="dark"?"sun":"moon",label:effectiveTheme()==="dark"?"Light theme":"Dark theme",fn:()=>{state.themeMode=effectiveTheme()==="dark"?"light":"dark";updateSetting({theme:state.themeMode});applyTheme();renderAll(false)}},
   {icon:"lifebuoy",label:"Help center",fn:openHelp}
  ],{align:"right"});
@@ -306,7 +306,7 @@ function renderMiniCal(){
   for(let d=0;d<7;d++){
    const day=addDays(firstDay,d),inMonth=day.getMonth()===mc.getMonth();
    const button=el('<button class="mini-day'+(!inMonth?" dim":"")+(sameDay(day,TODAY())?" today":"")+(sameDay(day,state.selected)?" sel":"")+'" aria-label="'+esc(fmtDateLong(day))+'"><span class="num">'+day.getDate()+'</span>'+(inMonth&&eventDays.has(day.getDate())?'<span class="dot"></span>':'')+'</button>');
-   button.onclick=()=>{state.selected=sod(day);state.cursor=sod(day);state.miniCursor=dt(day.getFullYear(),day.getMonth(),1);renderAll(false)};
+   button.onclick=()=>{state.selected=sod(day);state.cursor=sod(day);state.prevView=state.view==="day"?state.prevView:state.view;state.view="day";updateSetting({last_view:"day",focus_date:dateKey(day)});renderAll(false)};
    row.append(button);
   }grid.append(row);
  }wrap.append(grid);return wrap;
@@ -361,20 +361,20 @@ function renderHeader(){
  const create=el('<button class="btn-primary" id="addEventHeader">'+icon("plus",16)+'<span class="bp-label">Add Event</span></button>');
  create.onclick=()=>openEventForm(null,state.selected);right.append(search,settings,help,create);hdr.append(right);installMobileMenu(hdr);
 }
-function goToday(){state.cursor=sod(TODAY());state.selected=sod(TODAY());state.miniCursor=dt(state.cursor.getFullYear(),state.cursor.getMonth(),1);renderAll(false)}
+function goToday(){state.cursor=sod(TODAY());state.selected=sod(TODAY());updateSetting({last_view:state.view,focus_date:dateKey(state.cursor)});renderAll(false)}
 function pageBy(dir){
  const c=state.cursor;
  if(state.view==="month")state.cursor=addMonths(c,dir);
  else if(state.view==="week")state.cursor=addDays(c,7*dir);
  else if(state.view==="day")state.cursor=addDays(c,dir);
  else state.cursor=addDays(c,21*dir);
- state.miniCursor=dt(state.cursor.getFullYear(),state.cursor.getMonth(),1);renderAll(true,dir);
+ updateSetting({last_view:state.view,focus_date:dateKey(state.cursor)});renderAll(true,dir);
 }
 function renderAll(animate,dir=1){renderGreeting();renderHeader();renderSidebar();renderView(animate,dir)}
 function drillToDay(day){
  if(state.view!=="day")state.prevView=state.view;
  state.view="day";state.cursor=sod(day);state.selected=sod(day);
- state.miniCursor=dt(day.getFullYear(),day.getMonth(),1);renderAll(true,1);
+ updateSetting({last_view:state.view,focus_date:dateKey(state.cursor)});renderAll(true,1);
 }
 function renderView(animate,dir=1){
  closeMenu();closePopover();viewWrap.innerHTML="";
@@ -710,7 +710,7 @@ function openConfirm(opts){
 function openHelp(){
  const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:440px"><div class="dialog-head"><span class="dialog-title">Help center</span><button class="icon-btn" data-x aria-label="Close">'+icon("x",17)+'</button></div>'+
   '<div class="dialog-body" style="font-size:14px;line-height:1.6;color:var(--muted)">'+
-  '<p>This version of daylight uses local browser storage. Events, calendars, and preferences remain in this browser after you reload, but do not sync to other devices.</p>'+
+  '<p>Daylight saves calendars, events, and preferences to your private Supabase account. Sign out on shared computers.</p>'+
   '<p>Click a date number to open Day view. Click an event to edit or delete it. Open a calendar’s menu to change its color, visibility, or name.</p>'+
   '<p>Press <b style="color:var(--text)">Ctrl/⌘ + ,</b> for Settings and <b style="color:var(--text)">Ctrl/⌘ + K</b> for Search.</p>'+
   '</div><div class="dialog-foot"><button class="btn-primary" style="margin-left:0" data-ok>Done</button></div></div></div>');
@@ -1152,39 +1152,14 @@ function paneAbout(pane){
  '<li>Settings opens in a fixed-size popup from anywhere in the app.</li>'+
  '<li>Account authentication and per-user calendar storage are enabled.</li>'+
  '</ul></div><div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:6px">'+
- '<button class="btn-primary" style="margin-left:0" id="abExport">'+icon("download",15)+'Export UI code</button>'+
+ '<button class="btn-primary" style="margin-left:0" id="abExport">'+icon("download",15)+'View source code</button>'+
  '<button class="btn-ghost" id="abCheck">Check for updates</button></div>'+
  '<p class="inline-note">Daylight is your calendar, kept simple on purpose.</p></div>');
  pane.append(g);$("#abExport",g).onclick=exportUI;
  $("#abCheck",g).onclick=()=>toast("You are using the current Daylight UI");
 }
-async function exportUI(){
- try{
-  // Bundle the real CSS and real local application code into a standalone HTML file.
-  const cssUrl=new URL("./daylight-preview.css",import.meta.url),jsUrl=new URL("./daylight-preview.js",import.meta.url),storeUrl=new URL("./secure-app/src/local-store.js",import.meta.url);
-  const response=await Promise.all([fetch(cssUrl),fetch(jsUrl),fetch(storeUrl)]);
-  if(response.some(r=>!r.ok))throw Error();
-  const [css,script,store]=await Promise.all(response.map(r=>r.text()));
-  const module=store.replaceAll("export async function ","async function ").replaceAll("export function ","function ").replaceAll("export const ","const ")+"\n"+script.replace(/^import\s+\{localApi,localReset\}[^;]*;\s*/,"");
-  const page='<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>daylight — Local UI</title>'+
-   '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>'+css+'</style></head>'+
-   '<body><div id="app"><aside id="sidebar" aria-label="Sidebar"></aside><main id="main"><div id="greeting"></div><header id="headerBand"></header><div id="viewWrap"></div></main></div><div id="overlayRoot"></div><div id="toastRoot" aria-live="polite"></div>'+
-   '<script type="module">'+module+'</scr'+'ipt></body></html>';
-  downloadBlob(page,"daylight-calendar-ui.html","text/html;charset=utf-8");toast("UI code exported");
- }catch(err){console.error(err);toast("Could not export UI code")}
-}
-const seenReminders=new Set();
-function checkLocalReminders(){
- if(!state.settings.event_reminders||!window.Notification||Notification.permission!=="granted")return;
- const now=TODAY(),windowStart=new Date(now.getTime()-60000),windowEnd=new Date(now.getTime()+60000);
- occsInRange(now,new Date(now.getTime()+86400000)).forEach(o=>{
-  if(o.ev.allDay)return;
-  const due=new Date(o.start.getTime()-15*60000),key=o.ev.id+"|"+dateKey(o.start)+"|"+o.start.getHours()+":"+o.start.getMinutes();
-  if(due>=windowStart&&due<=windowEnd&&!seenReminders.has(key)){
-   seenReminders.add(key);new Notification(o.ev.title,{body:"Starts in 15 minutes"});
-  }
- });
-}
+function exportUI(){window.open("https://github.com/joeynatale28-source/main-hub/tree/main/glass-calendar","_blank","noopener,noreferrer")}
+
 document.addEventListener("keydown",e=>{
  const mod=e.metaKey||e.ctrlKey;
  if(mod&&e.key===","){e.preventDefault();if(!overlayRoot.children.length)openSettings("general");else closeTopmostOverlay()}
