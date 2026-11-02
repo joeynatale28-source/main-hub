@@ -35,6 +35,10 @@ end $$;
 revoke all on public.dl_mcp_tokens,public.dl_mcp_audit_log from anon,authenticated;
 grant select,insert,update,delete on public.dl_calendars,public.dl_events,public.dl_tasks,public.dl_subscriptions,public.dl_user_settings to authenticated;
 -- No legacy account or opaque session tables survive the cutover.
+drop table if exists public.events;
+drop table if exists public.tasks;
+drop table if exists public.subscriptions;
+drop table if exists public.calendars;
 drop table if exists public.sessions;
 drop table if exists public.users;
 
