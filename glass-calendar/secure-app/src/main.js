@@ -441,7 +441,7 @@ function menu(button,items,filterable=false){
    buttons[(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();
   }
  };
- upgradeIcons();if(!filterable)el.querySelector('[data-item]')?.focus();
+ upgradeIcons();if(!filterable)(el.querySelector('[data-item][aria-current=true]')||el.querySelector('[data-item]'))?.focus();
 }
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&document.querySelector('#floatingMenu')){
