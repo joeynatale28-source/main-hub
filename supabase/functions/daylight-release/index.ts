@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.10';
 import bcrypt from 'npm:bcryptjs@2.4.3';
+import { parseCalendar } from './ical.ts';
 const url=Deno.env.get('SUPABASE_URL')!,secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
 const allowHeaders='content-type,authorization,apikey,x-client-info';
@@ -47,6 +48,47 @@ const pick=(entity:string,data:Record<string,unknown>)=>{
  if(entity==='subscriptions'&&'url' in output){const u=new URL(String(output.url));if(u.protocol!=='https:')throw Error('HTTPS required')}
  return output;
 };
+const feedUrl=(raw:string)=>{
+ const u=new URL(raw.replace(/^webcals?:\/\//i,'https://'));
+ if(u.protocol!=='https:'||u.username||u.password||u.port&&u.port!=='443')throw Error('INVALID_URL');
+ const host=u.hostname.toLowerCase();
+ if(host==='localhost'||host.endsWith('.localhost')||host.endsWith('.local')||host.endsWith('.internal')||host.endsWith('.test')||host.endsWith('.invalid')||host==='metadata.google.internal'||host==='host.docker.internal'||host==='[::1]')throw Error('INVALID_URL');
+ if(/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)){
+  const nums=host.split('.').map(Number);
+  if(nums[0]===0||nums[0]===10||nums[0]===127||nums[0]>=224||(nums[0]===169&&nums[1]===254)||(nums[0]===172&&nums[1]>=16&&nums[1]<=31)||(nums[0]===192&&nums[1]===168))throw Error('INVALID_URL');
+ }
+ if(u.hostname.startsWith('['))throw Error('INVALID_URL');
+ return u.href;
+};
+async function refreshSub(uid:string,id:string){
+ const {data:sub,error:err}=await db.from('dl_subscriptions').select('*').eq('id',id).eq('user_id',uid).maybeSingle();
+ if(err)throw err;if(!sub)return{error:'Subscription not found',status:404};
+ let parsed;
+ try{
+  const u=feedUrl(sub.url);
+  const response=await fetch(u,{headers:{accept:'text/calendar, text/plain;q=.9, */*;q=.1'},redirect:'error',signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw Error('FETCH_FAILED');
+  const size=Number(response.headers.get('content-length')||0);
+  if(size>4e6)throw Error('NOT_CALENDAR');
+  const text=await response.text();if(text.length>4e6)throw Error('NOT_CALENDAR');
+  parsed=parseCalendar(text);
+ }catch(e){
+  const code=e instanceof Error&&['NOT_CALENDAR','TOO_MANY_EVENTS'].includes(e.message)?'NOT_CALENDAR':'CORS_OR_NETWORK';
+  await db.from('dl_subscriptions').update({last_error_code:code,last_error_at:new Date().toISOString()}).eq('id',id).eq('user_id',uid);
+  return{error:code,status:422};
+ }
+ const {data:count,error:dbError}=await db.rpc('dl_replace_subscription_events',{p_user_id:uid,p_subscription_id:id,p_events:parsed.events});
+ if(dbError)throw dbError;
+ const changes:Record<string,unknown>={last_error_code:null,last_error_at:null};
+ if(!sub.name_custom&&parsed.name.trim()){
+  changes.name=parsed.name.trim().slice(0,75);
+  await db.from('dl_calendars').update({name:changes.name}).eq('user_id',uid).eq('id',sub.calendar_id);
+ }
+ const {data:updated,error:updateError}=await db.from('dl_subscriptions').update(changes).eq('user_id',uid).eq('id',id).select('*').single();
+ if(updateError)throw updateError;
+ return{item:updated,count};
+}
+
 async function handle(req:Request){
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':'*','access-control-allow-headers':allowHeaders,'access-control-allow-methods':'POST,OPTIONS'}});
  if(req.method!=='POST')return fail('Method not allowed',405);
@@ -91,6 +133,11 @@ async function handle(req:Request){
   const {data,error}=await db.from('dl_mcp_tokens').update({revoked:true}).eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
   if(error)throw error;return data?json({ok:true}):fail('Token not found',404);
  }
+ if(action==='sub_refresh'){
+  const id=plain(body.id);if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Invalid subscription');
+  const result=await refreshSub(uid,id);
+  return 'error' in result?fail(result.error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.",result.status):json(result);
+ }
  if(/^data_(list|create|update|delete)$/.test(action)){
   const entity=plain(body.entity),spec=allowed[entity];if(!spec)return fail('Unknown resource');
   if(action==='data_list'){
@@ -109,7 +156,17 @@ async function handle(req:Request){
   const changes=pick(entity,raw);
   if(['events','subscriptions'].includes(entity)&&changes.calendar_id)await calendarOwner(uid,String(changes.calendar_id));
   if(action==='data_create'){
-   if(entity==='events'&&(!changes.title||!changes.calendar_id||!changes.starts_at||!changes.ends_at))return fail('Missing event fields');
+   if(entity==='subscriptions'){
+    const url=feedUrl(plain(changes.url));
+    const named=plain(changes.name),name=named||new URL(url).hostname;
+    const client_id='ics-'+crypto.randomUUID();
+    const {data:calendar,error:ce}=await db.from('dl_calendars').insert({user_id:uid,name,shade:'gray-4',client_id,sort_order:100,is_visible:true}).select('*').single();if(ce)throw ce;
+    const {data:subscription,error:se}=await db.from('dl_subscriptions').insert({user_id:uid,calendar_id:calendar.id,name,url,name_custom:!!named}).select('*').single();
+    if(se){await db.from('dl_calendars').delete().eq('id',calendar.id).eq('user_id',uid);throw se}
+    const refreshed=await refreshSub(uid,subscription.id);
+    return json({item:'item' in refreshed?refreshed.item:subscription,refresh_error:'error' in refreshed?refreshed.error:null});
+   }
+      if(entity==='events'&&(!changes.title||!changes.calendar_id||!changes.starts_at||!changes.ends_at))return fail('Missing event fields');
    if(entity==='tasks'&&!changes.title||entity==='calendars'&&!changes.name)return fail('A title or name is required');
    const {data,error}=await db.from(spec.table).insert({...changes,user_id:uid}).select('*').single();
    if(error)throw error;return json({item:data});
@@ -120,11 +177,18 @@ async function handle(req:Request){
    const {data:found}=await db.from(spec.table).select('client_id').eq('id',id).eq('user_id',uid).maybeSingle();
    if(found?.client_id==='us-holidays')return fail('Read-only calendar',403);
   }
-  if(entity==='events'&&action==='data_update'){
+  if(entity==='subscriptions'&&action==='data_delete'){
+   const {data:sub}=await db.from('dl_subscriptions').select('calendar_id').eq('user_id',uid).eq('id',id).maybeSingle();
+   if(!sub)return fail('Subscription not found',404);
+   const {error:de}=await db.from('dl_subscriptions').delete().eq('user_id',uid).eq('id',id);if(de)throw de;
+   if(sub.calendar_id)await db.from('dl_calendars').delete().eq('user_id',uid).eq('id',sub.calendar_id);
+   return json({item:{id}});
+  }
+  if(entity==='events'&&(action==='data_update'||action==='data_delete')){
    const {data:existing}=await db.from('dl_events').select('starts_at,ends_at,calendar_id,source_subscription_id').eq('id',id).eq('user_id',uid).maybeSingle();
    if(!existing)return fail('Event not found',404);
    if(existing.source_subscription_id)return fail('Subscribed events are read-only',403);
-   if(changes.starts_at||changes.ends_at){const a=String(changes.starts_at||existing.starts_at),b=String(changes.ends_at||existing.ends_at);if(Date.parse(b)<=Date.parse(a))return fail('End must be after start')}
+   if(action==='data_update'&&(changes.starts_at||changes.ends_at)){const a=String(changes.starts_at||existing.starts_at),b=String(changes.ends_at||existing.ends_at);if(Date.parse(b)<=Date.parse(a))return fail('End must be after start')}
   }
   let query=action==='data_update'?db.from(spec.table).update({...changes,updated_at:new Date().toISOString()}):db.from(spec.table).delete();
   const {data,error}=await query.eq('id',id).eq('user_id',uid).select('*').maybeSingle();
