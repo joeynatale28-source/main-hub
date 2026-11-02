@@ -149,3 +149,10 @@
 .profile small{font-size:11px!important}
 @media(max-width:850px){.side-header{padding:10px 4px!important;gap:0}.side-header .brand span:nth-child(2){display:none}.side-header .collapse-toggle{width:26px!important;min-width:26px!important}.cal-row .switch{display:none}.cal-row{justify-content:center}.cal-row .cal-name{display:none}.cal-row .cal-dot{width:12px;height:12px}.cal-row .icon{display:none!important}#settingsModal .settings-grid{grid-template-columns:160px minmax(0,1fr)!important}}
 @media(max-width:540px){.view-header .tools{gap:2px}#settingsModal .settings-grid{grid-template-columns:112px minmax(0,1fr)!important}.settings-pane{padding:23px 12px!important}.dialog.wide#settingsModal{width:96vw!important} .worktime{flex-wrap:wrap}}
+
+/* Dropdowns must escape the dialog border while the outer Settings box remains fixed. */
+#settingsModal:has(#floatingMenu),.quick-dialog:has(#floatingMenu){overflow:visible!important}
+#settingsModal #floatingMenu,.quick-dialog #floatingMenu{z-index:2147483000!important}
+#root.collapsed #newEvent .dl-icon-slot{width:18px;height:18px;display:inline-grid!important}
+#root.collapsed .side-middle>.primary{font-size:0!important}
+#root.collapsed .side-middle>.primary svg{width:18px;height:18px}
