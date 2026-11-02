@@ -1,31 +1,32 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
-<head>
- <meta charset="utf-8" />
- <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
- <meta name="color-scheme" content="light dark" />
- <meta name="theme-color" content="#131518" />
- <meta name="description" content="daylight — your private personal calendar." />
- <link rel="icon" href="data:," />
- <title>daylight — Calendar</title>
- <link rel="preconnect" href="https://fonts.googleapis.com" />
- <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
- <link rel="stylesheet" href="./daylight-preview.css?v=full-app-1" />
- <script>document.documentElement.dataset.theme="dark";</script>
-</head>
-<body>
- <div id="app">
-  <aside id="sidebar" aria-label="Sidebar"></aside>
-  <main id="main">
-   <div id="greeting"></div>
-   <header id="headerBand"></header>
-   <div id="viewWrap"></div>
-  </main>
- </div>
- <div id="overlayRoot"></div>
- <div id="toastRoot" aria-live="polite"></div>
- <noscript>JavaScript is required to use Daylight.</noscript>
- <script type="module" src="./daylight-preview.js?v=full-app-1"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>daylight</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar" aria-label="Sidebar"></aside>
+      <main id="main">
+        <div id="greeting"></div>
+        <header id="headerBand"></header>
+        <div id="viewWrap"></div>
+      </main>
+    </div>
+    <div id="overlayRoot"></div>
+    <div id="toastRoot" aria-live="polite"></div>
+
+    <script src="js/holidays.js"></script>
+    <script src="js/ics.js"></script>
+    <script src="js/rrule.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>
