@@ -114,9 +114,32 @@ export async function bootAuth(ready){
   const r=await supabase.auth.resetPasswordForEmail(email,{redirectTo:new URL('./',location.href).href});
   fail(r.error||'If this account exists, a reset email has been sent.');
  };
+ const showRecovery=()=>{
+  overlay.style.display='grid';
+  const form=document.getElementById('authForm');form.style.display='none';
+  document.getElementById('forgot').style.display='none';
+  document.getElementById('resetArea').style.display='none';
+  let block=document.getElementById('passwordRecovery');
+  if(!block){
+   block=document.createElement('form');block.id='passwordRecovery';block.noValidate=true;
+   block.innerHTML='<label for="newPassword" style="display:block;margin:0 0 8px">New password</label><input class="text-input" type="password" id="newPassword" autocomplete="new-password" placeholder="New password" required><p class="inline-note">Choose a new password for your account.</p><button type="submit" class="btn-primary" style="margin:12px 0 0;width:100%">Update password</button>';
+   overlay.querySelector('section').append(block);
+   block.onsubmit=async event=>{
+    event.preventDefault();const password=document.getElementById('newPassword').value;
+    if(password.length<8){fail('Use at least 8 characters.');return}
+    const {error}=await supabase.auth.updateUser({password});
+    if(error){fail(error);return}
+    block.remove();form.style.display='block';
+    document.getElementById('forgot').style.display='block';
+    document.getElementById('password').value='';
+    fail('Password updated. Please sign in with your new password.');
+    await supabase.auth.signOut();
+   };
+  }
+ };
  supabase.auth.onAuthStateChange((event,session)=>{
   if(event==='SIGNED_OUT'){currentUser=null;overlay.style.display='grid'}
-  if(event==='PASSWORD_RECOVERY'){currentUser=session?.user||null;fail('Use the reset link to change your password through your account.')}
+  if(event==='PASSWORD_RECOVERY'){currentUser=session?.user||null;showRecovery()}
  });
 }
 export async function signOut(){await supabase.auth.signOut();currentUser=null}
