@@ -73,7 +73,7 @@ function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===
 function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+eventColor(e)+';';
-const eventAttr=e=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+'"';
+const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
@@ -224,7 +224,7 @@ function renderWeek(){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
   for(const e of events.filter(x=>!x.all_day&&eventOn(x,key))){
    const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,e._segment?60:(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e)+' style="top:'+minute+'px;height:'+height+'px;'+eventStyle(e)+'"><strong>'+h(e.title)+'</strong></button>';
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+'><strong>'+h(e.title)+'</strong></button>';
   }html+='</div>';
  }
  $('#grid').innerHTML=html+'</div></div>';bindEventButtons();
