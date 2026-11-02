@@ -71,8 +71,14 @@ for(const theme of ['light','dark']){
    await page.goto('/');
    await expect(page.locator('.view-header h1')).toHaveText('November 2026');
    await expect(page.locator('.monthcell')).toHaveCount(35);
-   const heights=await page.locator('.monthcell').evaluateAll(cells=>cells.map(c=>Math.round(c.getBoundingClientRect().height)));
-   expect(new Set(heights).size).toBe(1);
+   const geometry=await page.locator('.monthcell').evaluateAll(cells=>cells.map(cell=>{const b=cell.getBoundingClientRect();return{x:Math.round(b.x),y:Math.round(b.y),h:Math.round(b.height),key:cell.dataset.cell}}));
+   expect(new Set(geometry.map(x=>x.h)).size).toBe(1);
+   // Prevent event spans from pushing numbered days into the wrong weekday columns.
+   expect(geometry.slice(0,7).map(x=>x.key)).toEqual(['2026-11-01','2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06','2026-11-07']);
+   expect(new Set(geometry.slice(0,7).map(x=>x.y)).size).toBe(1);
+   expect(new Set(geometry.slice(0,7).map(x=>x.x)).size).toBe(7);
+   for(let i=7;i<geometry.length;i++)expect(geometry[i].x).toBe(geometry[i%7].x);
+   for(let i=7;i<geometry.length;i++)expect(geometry[i].y).toBeGreaterThan(geometry[i-7].y);
    const shot=async name=>page.screenshot({path:`test-results/daylight-${theme}-${size.width}-${name}.png`});
    await shot('month');
    await setCalendarView(page,'Week');
