@@ -63,6 +63,17 @@ export async function feedAction(action,payload={}){
  if(data?.error)throw Error(data.error);
  return data;
 }
+export async function mcpAction(action,payload={}){
+ ensure();
+ const {data,error}=await supabase.functions.invoke('daylight-mcp',{body:{action,...payload}});
+ if(error){
+  let message=error.message;
+  try{if(error.context&&typeof error.context.json==='function'){const detail=await error.context.json();message=detail.error||message}}catch{}
+  throw Error(message);
+ }
+ if(data?.error)throw Error(data.error);
+ return data;
+}
 export async function refreshFeeds(){
  ensure();
  const {data,error}=await supabase.from('calendars').select('id').eq('user_id',currentUser.id).neq('source_type','local');
