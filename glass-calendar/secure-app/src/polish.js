@@ -96,7 +96,7 @@ export const uniqueInstances=segments=>{
 export const rangeLabel=(e,long=false)=>{
  const start=e.all_day&&e.source_subscription_id?String(e.starts_at).slice(0,10):daykey(new Date(e.starts_at));
  const exclusiveEnd=new Date(new Date(e.ends_at).getTime()-1);
- const end=e.all_day&&e.source_subscription_id?daykey(new Date(e.ends_at.slice(0,10)+'T12:00:00Z').getTime()-86400000):daykey(exclusiveEnd);
+ const end=e.all_day&&e.source_subscription_id?daykey(new Date(new Date(e.ends_at.slice(0,10)+'T12:00:00Z').getTime()-86400000)):daykey(exclusiveEnd);
  if(start===end)return new Date(start+'T12:00:00').toLocaleDateString('en-US',long?{weekday:'long',month:'long',day:'numeric',year:'numeric'}:{month:'short',day:'numeric'});
  const fmt=long?{weekday:'long',month:'long',day:'numeric'}:{month:'short',day:'numeric'};
  return new Date(start+'T12:00:00').toLocaleDateString('en-US',fmt)+' – '+new Date(end+'T12:00:00').toLocaleDateString('en-US',{...fmt,...(long?{year:'numeric'}:{})});
