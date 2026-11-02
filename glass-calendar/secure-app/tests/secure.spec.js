@@ -81,7 +81,7 @@ test('Settings popup changes default view and keeps navigation',async({page})=>{
  await page.locator('[data-select="default_view"]').click();
  await page.locator('#floatingMenu').getByText('Month').click();
  await expect(page.locator('#settingsModal')).toBeVisible();
- expect(model.get().settings.default_view).toBe('month');
+ await expect.poll(()=>model.get().settings.default_view).toBe('month');
 });
 test('AI access token is shown once and deletes require confirmation',async({page})=>{
  await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
@@ -221,9 +221,11 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- for(const d of [start,plus(start,1),end]){
-  await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Three-day conference'})).toHaveCount(1);
- }
+ const span=page.locator('.month-span').filter({hasText:'Three-day conference'});
+ await expect(span).toHaveCount(1);
+ expect(await span.getAttribute('style')).toContain('span 3');
+ for(const d of [start,plus(start,1),end])await expect(page.locator('[data-cell="'+d+'"]')).toHaveCount(1);
+ await expect(page.locator('.eventchip').filter({hasText:'Three-day conference'})).toHaveCount(0);
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
  const model=await setup(page);await page.locator('#newEvent').click();
