@@ -31,7 +31,7 @@ async function calendar(uid:string,id:string){
 async function query<T>(q:PromiseLike<{data:T;error:{message:string}|null}>):Promise<T>{const {data,error}=await q;if(error)throw new Error(error.message);return data}
 const response=(r:unknown)=>({content:[{type:'text' as const,text:JSON.stringify(r)}]});
 function register(server:McpServer,name:string,description:string,schema:z.ZodRawShape,run:(uid:string,a:any)=>Promise<unknown>){
- server.registerTool(name,{description,inputSchema:z.object(schema)},async a=>{
+ server.registerTool(name,{description,inputSchema:schema},async (a:any)=>{
   try{const uid=await context();const data=await run(uid,a);return response(data)}
   catch(e){return{isError:true,content:[{type:'text',text:e instanceof Error?e.message:'Operation failed'}]}}
  });
@@ -44,7 +44,7 @@ async function deleteOne(uid:string,entity:'events'|'tasks',id:string){
  // Service-role bypasses RLS, so both the delete AND audit must be user-scoped.
  const removed=await query(sb.from(table).delete().eq('user_id',uid).eq('id',id).select('id').single());
  await query(sb.from('dl_mcp_audit_log').insert({user_id:uid,tool:'delete_'+(entity==='events'?'event':'task'),action:'delete',target_id:id}).select('id').single());
- return{deleted:removed.id};
+ if(!removed)throw new Error('Delete failed');return{deleted:removed.id};
 }
 const createServer=()=>{
  const server=new McpServer({name:'daylight',version:'1.1.0'});
