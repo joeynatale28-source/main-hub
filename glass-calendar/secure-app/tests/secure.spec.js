@@ -14,6 +14,7 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
    if(failLogin)return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({msg:'Invalid login credentials',error:'invalid_grant'})});
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(session)});
   }
+  if(target.pathname.endsWith('/token')&&target.searchParams.get('grant_type')==='pkce')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(session)});
   if(target.pathname.endsWith('/user'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(authUser)});
   if(target.pathname.endsWith('/recover'))return route.fulfill({status:200,contentType:'application/json',body:'{}'});
   if(target.pathname.endsWith('/logout'))return route.fulfill({status:204,body:''});
@@ -506,4 +507,39 @@ test('password recovery link opens new-password form and updates Supabase Auth',
  await page.locator('#recoverySave').click();
  await expect(page.locator('#login')).toBeVisible();
  await expect(page.locator('#authError')).toContainText('Password updated.');
+});
+
+test('GitHub Pages callback strips tokens and uses Supabase session for authenticated workspace',async({page})=>{
+ await setup(page,{loggedIn:false});
+ const payload=Buffer.from(JSON.stringify({sub:account.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url');
+ const jwt='eyJhbGciOiJIUzI1NiJ9.'+payload+'.callback';
+ await page.goto('/#access_token='+jwt+'&refresh_token=mock-refresh-token&expires_in=3600&token_type=bearer&type=magiclink');
+ await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page).toHaveURL(/\/$/);
+ await expect(page.locator('#calList')).toContainText('Personal');
+ const stored=await page.evaluate(()=>Boolean(localStorage.getItem('sb-mock-auth-token')));
+ expect(stored).toBe(true);
+});
+test('GitHub Pages callback displays Auth errors without leaving unsafe query params',async({page})=>{
+ await setup(page,{loggedIn:false});
+ await page.goto('/?error=access_denied&error_description=The%20link%20has%20expired');
+ await expect(page.locator('#login')).toBeVisible();
+ await expect(page.locator('#authError')).toContainText('The link has expired.');
+ await expect(page).toHaveURL(/\/$/);
+});
+test('Email-password sign-in succeeds directly through Supabase Auth without a redirect',async({page})=>{
+ await setup(page,{loggedIn:false});
+ await expect(page.locator('#login')).toBeVisible();
+ await page.locator('#email').fill('example@daylight.test');
+ await page.locator('#password').fill('correct-test-password');
+ await page.locator('#loginBtn').click();
+ await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page).toHaveURL(/\/$/);
+});
+test('GitHub Pages PKCE callback exchanges code for session, strips code from URL',async({page})=>{
+ await setup(page,{loggedIn:false});
+ await page.addInitScript(()=>localStorage.setItem('sb-mock-auth-token-code-verifier','test-verifier'));
+ await page.goto('/?code=mock-pkce-code');
+ await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page).toHaveURL(/\/$/);
 });
