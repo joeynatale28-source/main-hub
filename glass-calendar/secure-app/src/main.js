@@ -176,7 +176,7 @@ function render(){
  $('#workspaceMenu').onclick=e=>menu(e.currentTarget,[['Calendar',()=>go('calendar')],['Tasks',()=>go('tasks')],['Integrations',()=>go('integrations')]]);
  $('#settings').onclick=()=>settings();
  $('#about').onclick=()=>settings('about');
- $('#profileMenu').onclick=e=>menu(e.currentTarget,[['Calendar',()=>go('calendar')],['Tasks',()=>go('tasks')],['Integrations',()=>go('integrations')],['Appearance',()=>settings('appearance')],['Settings',()=>settings()],['Log out',logout]]);
+ $('#profileMenu').onclick=e=>menu(e.currentTarget,[['Calendar',()=>go('calendar')],['Tasks',()=>go('tasks')],['Integrations',()=>go('integrations')],['Appearance',()=>settings('appearance')],['Cycle theme',()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3])}],['Settings',()=>settings()],['Log out',logout]]);
  $('#collapseRail').onclick=()=>{state.collapsed=!state.collapsed;localStorage.setItem('daylight-rail-collapsed',state.collapsed?'1':'0');render()};
  $('#newCalendar').onclick=()=>calendarForm();
  renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();
@@ -281,10 +281,15 @@ function drill(key){
 const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const year=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-year)/86400000)+1)/7)};
 function header(title){
  const first=state.user?.first_name||'there',holidays=occurrences(add(now(),-2),add(now(),2)).filter(x=>state.calendars.find(c=>c.id===x.calendar_id)?.client_id==='us-holidays');
- const msg=greeting(first,now(),holidays),greetingMarkup=uiHasWaved?h(msg):h(msg).replace('👋','<span class="greeting-wave">👋</span>'),theme=state.settings.theme||'system',themeName=theme==='dark'?'Midnight':theme==='light'?'Daylight':'System';
- uiHasWaved=true;const returnChip=state.drilled&&state.returnView&&state.view==='day'?'<button id="backDrill" class="secondary">'+icon('arrow-left',16)+' Back to '+h(state.returnView[0].toUpperCase()+state.returnView.slice(1))+'</button>':'';
- const viewNames={month:'Month',week:'Week',day:'Day',agenda:'Agenda'};const shift=state.settings.start_of_week==='monday'?1:0;const weekStart=add(state.date,-((state.date.getDay()-shift+7)%7));const weekEnd=add(weekStart,6);const fmt=x=>x.toLocaleDateString('en-US',{month:'short',day:'numeric'});const range=state.view==='week'?fmt(weekStart)+' – '+fmt(weekEnd)+', '+weekEnd.getFullYear():state.view==='day'?state.date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):state.view==='agenda'?'Upcoming 12 months':state.date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  return '<header class="view-header"><div class="heading-copy"><div class="greeting">'+greetingMarkup+'</div><h1>'+h(viewNames[state.view]||title)+'</h1><p class="view-range">'+h(range)+'</p></div><div class="tools">'+returnChip+'<button class="icon" id="prev" aria-label="Previous period">'+icon('chevron-left')+'</button><button class="icon" id="next" aria-label="Next period">'+icon('chevron-right')+'</button><button class="secondary" id="today">Today</button><div class="view-segment" role="group" aria-label="Calendar view">'+['day','week','month','agenda'].map(v=>'<button type="button" data-view-switch="'+v+'" aria-pressed="'+(state.view===v)+'" class="'+(state.view===v?'active':'')+'">'+v[0].toUpperCase()+v.slice(1)+'</button>').join('')+'</div><button class="icon" id="searchButton" aria-label="Search">'+icon('search')+'</button><button class="icon" id="themeButton" aria-label="Theme: '+themeName+'" title="Theme: '+themeName+'">'+icon(theme==='dark'?'moon':theme==='light'?'sun':'monitor')+'</button><button class="icon" id="settingsButton" aria-label="Settings">'+icon('settings')+'</button></div></header>';
+ const msg=greeting(first,now(),holidays),greetingMarkup=uiHasWaved?h(msg):h(msg).replace('👋','<span class="greeting-wave">👋</span>');
+ uiHasWaved=true;
+ const d=state.date,month=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+ const firstDay=add(d,-d.getDay()),lastDay=add(firstDay,6);
+ const dayText=x=>x.toLocaleDateString('en-US',{month:'long',day:'2-digit'});
+ const range=state.view==='week'?dayText(firstDay)+' - '+dayText(lastDay)+(firstDay.getFullYear()===lastDay.getFullYear()?', '+lastDay.getFullYear():', '+firstDay.getFullYear()+' - '+lastDay.getFullYear()):state.view==='day'?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):state.view==='agenda'?'Upcoming 12 months':month;
+ const heading=state.view==='agenda'?'Agenda':month;
+ const back=state.drilled&&state.returnView&&state.view==='day'?'<button id="backDrill" class="secondary">'+icon('arrow-left',16)+' Back to '+h(state.returnView[0].toUpperCase()+state.returnView.slice(1))+'</button>':'';
+ return '<div class="main-greeting">'+greetingMarkup+'</div><header class="view-header"><div class="heading-copy"><span class="header-calendar-icon">'+icon('calendar',18)+'</span><div class="heading-text"><h1>'+h(heading)+'</h1><p class="view-range">'+h(range)+'</p></div></div><div class="header-period">'+back+'<div class="period-pill" role="group" aria-label="Calendar period navigation"><button type="button" id="prev" aria-label="Previous period">'+icon('chevron-left',16)+'</button><button type="button" id="today">Today</button><button type="button" id="next" aria-label="Next period">'+icon('chevron-right',16)+'</button></div></div><div class="tools"><button class="icon" id="searchButton" aria-label="Search">'+icon('search',19)+'</button><button class="icon" id="settingsButton" aria-label="Settings">'+icon('settings',19)+'</button><button class="icon" id="helpButton" aria-label="Help center">'+icon('life-buoy',19)+'</button><button class="primary header-add" id="addEventHeader">'+icon('plus',18)+' Add Event</button></div></header>';
 }
 function exitDrill(){
  if(state.drilled){state.drilled=false;state.view=state.returnView||state.settings.default_view||'week';state.returnView=null;render();return true}return false;
@@ -292,12 +297,12 @@ function exitDrill(){
 function renderCalendar(){
  const d=state.date,title=state.view==='day'?label(d):d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
  $('#content').innerHTML=header(title)+'<div id="searchBar" hidden><input id="searchQuery" aria-label="Search events" placeholder="Search all dates"><button id="searchClose" class="icon" aria-label="Close search">'+icon('x',16)+'</button><div class="micro">All dates</div><div id="searchResults"></div></div><section id="grid" class="calendar-grid"></section>';
- $('#backDrill')?.addEventListener('click',exitDrill);$('[data-view-switch]').forEach(b=>b.onclick=()=>{if(state.view===b.dataset.view)return;state.view=b.dataset.view;state.drilled=false;state.returnView=null;uiGridDirection=0;render()});if(state.view==='agenda'){for(const id of ['prev','next','today'])$('#'+id).hidden=true}
+ $('#backDrill')?.addEventListener('click',exitDrill);$('#addEventHeader').onclick=()=>openEditor();$('#helpButton').onclick=()=>settings('about');if(state.view==='agenda'){for(const id of ['prev','next','today'])$('#'+id).hidden=true}
  $('#today').onclick=()=>{state.date=now();render()};
  const move=n=>{uiGridDirection=n>0?1:-1;uiMiniDirection=n>0?1:-1;state.date=state.view==='month'?new Date(d.getFullYear(),d.getMonth()+n,1):add(d,n*(state.view==='week'?7:1));render()};
  $('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1);
  $('#settingsButton').onclick=()=>settings();
- $('#themeButton').onclick=()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3]);};
+ 
  const searchBar=$('#searchBar');searchBar.setAttribute('role','dialog');searchBar.insertAdjacentHTML('beforeend','<small class="search-hint">Search by event name · ↑↓ to navigate · Enter to open · Esc to close</small>');searchBar.setAttribute('aria-label','Search all dates');
  $('#searchQuery').setAttribute('role','combobox');$('#searchQuery').setAttribute('aria-controls','searchResults');$('#searchQuery').setAttribute('aria-autocomplete','list');
  let activeResult=0;
