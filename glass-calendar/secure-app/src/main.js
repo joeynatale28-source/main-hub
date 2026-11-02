@@ -393,7 +393,7 @@ function stopDrag(cancel=false){
 }
 function bindDragEvents(){
  const month=state.view==='month',hour=state.view==='day'||state.view==='week';
- const nodes=$('.span-bar,.weekevent');
+ const nodes=$$('.span-bar,.weekevent');
  nodes.forEach(el=>{
   el.onpointerdown=event=>{
    if(event.button!==0||!event.isPrimary)return;
