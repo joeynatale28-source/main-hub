@@ -1,0 +1,23 @@
+name: Daylight targeted startup diagnostic
+on:
+  pull_request:
+    paths:
+      - 'glass-calendar/secure-app/**'
+      - '.github/workflows/daylight-startup-check.yml'
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: glass-calendar/secure-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Check login and authenticated app startup
+        run: npx playwright test -g 'authenticated calendar loads in Week at today' --reporter=line --workers=1

@@ -27,6 +27,10 @@ async function session(token:string){
 async function bootstrap(uid:string){
  const {error:se}=await db.from('dl_user_settings').upsert({user_id:uid},{onConflict:'user_id',ignoreDuplicates:true});
  if(se)throw se;
+ const {count,error:countError}=await db.from('dl_calendars').select('id',{head:true,count:'exact'}).eq('user_id',uid);
+ if(countError)throw countError;
+ // Seed only once: a calendar the owner deleted must never reappear at next login.
+ if(count&&count>0)return;
  for(const [i,c] of ['Personal','Work','Life & plans','US Holidays'].entries()){
   const {error:ce}=await db.from('dl_calendars').upsert({user_id:uid,name:c,shade:'gray-'+(i+1),sort_order:i,is_visible:true,client_id:['personal','work','life','us-holidays'][i]},{onConflict:'user_id,client_id',ignoreDuplicates:true});
   if(ce)throw ce;
@@ -120,7 +124,7 @@ async function handle(req:Request){
   if(error)throw error;return json({ok:true,user:{...pair.user,first_name:first,last_name:last}});
  }
  if(action==='mcp_list'){
-  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).order('created_at',{ascending:false});
+  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).eq('revoked',false).order('created_at',{ascending:false});
   if(error)throw error;return json({items:data});
  }
  if(action==='mcp_generate'){
@@ -130,7 +134,7 @@ async function handle(req:Request){
  }
  if(action==='mcp_revoke'){
   if(!/^[0-9a-f-]{36}$/i.test(plain(body.id)))return fail('Invalid token');
-  const {data,error}=await db.from('dl_mcp_tokens').update({revoked:true}).eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
+  const {data,error}=await db.from('dl_mcp_tokens').delete().eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
   if(error)throw error;return data?json({ok:true}):fail('Token not found',404);
  }
  if(action==='sub_refresh'){
