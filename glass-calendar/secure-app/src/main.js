@@ -156,7 +156,7 @@ function confirmCalendarDelete(cal){
    state.events=state.events.filter(e=>e.calendar_id!==cal.id);
    dlg.close();render();
    toastUndo('Calendar deleted — Undo',async()=>{
-    const saved=await api('data_create',{entity:'calendars',data:{name:cal.name,shade:cal.shade,is_visible:cal.is_visible,sort_order:cal.sort_order}});
+    const saved=await api('data_create',{entity:'calendars',data:{name:cal.name,shade:Object.keys(palette).find(k=>palette[k]===colorFor(cal))||cal.shade,is_visible:cal.is_visible,sort_order:cal.sort_order}});
     const newCal=saved.item;
     for(const e of snapshot){
      const payload={calendar_id:newCal.id,title:e.title,description:e.description,location_name:e.location_name,location_address:e.location_address,starts_at:e.starts_at,ends_at:e.ends_at,all_day:e.all_day,repeat_rule:e.repeat_rule,reminder_offset_minutes:e.reminder_offset_minutes};
@@ -396,7 +396,7 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',()=>safeChange('subscriptions',b.dataset.remove,null,'delete')));
+ $('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();toast('Subscription removed')}}));
 }
 function legal(id){const text={
  privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
