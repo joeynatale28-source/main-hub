@@ -103,7 +103,7 @@ function eventFields(){
 const searchWrap=$('searchInput').closest('.search-wrap'),results=$('searchResults');
 function closeSearch(){searchWrap.hidden=true;results.hidden=true;$('searchButton').setAttribute('aria-expanded','false')}
 function searchChanged(query){
- const term=String(query||'').trim().toLowerCase(),hits=bridge()?.getEvents().filter(e=>(e.title+' '+(e.notes||'')).toLowerCase().includes(term)).slice(0,40)||[];
+ const term=String(query||'').trim().toLowerCase(),hits=bridge()?.getVisibleEvents().filter(e=>(e.title+' '+(e.notes||'')).toLowerCase().includes(term)).slice(0,40)||[];
  results.hidden=!term;
  if(!term){results.innerHTML='';return}
  results.innerHTML=hits.length?hits.map(e=>'<button type="button" class="search-result" data-search-id="'+esc(e.id)+'"><strong>'+esc(e.title)+'</strong><span>'+esc(formatDate(e.date))+(e.holiday||e.allDay?' · All day':' · '+esc(formatTime(e.time)))+'</span></button>').join(''):'<div class="search-empty">No results for &ldquo;'+esc(query)+'&rdquo;</div>';
