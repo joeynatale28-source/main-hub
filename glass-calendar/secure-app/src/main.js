@@ -514,43 +514,34 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();toast('Subscription removed')}}));
+ $('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{loading(b,true,'Removing…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}else loading(b,false)}));
 }
 function legal(id){const text={
  privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
  terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
  changelog:''
  };const title=id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog',body=id==='changelog'?'<div class="changelog"><h3>Version 2.1</h3><ul><li>Month-grid date picking and native repeat rendering</li><li>Calendar colors and contextual greetings</li><li>Tasks filters, event details, and updated Settings</li></ul><h3>Version 2.0</h3><ul><li>Improved calendar visibility, inline renaming, and fixed Settings sizing</li></ul><h3>Version 1.1</h3><ul><li>Login-only accounts, Supabase storage, and AI access controls</li></ul></div>':'<p>'+h(text[id])+'</p>';modal('<h2>'+h(title)+'</h2>'+body+'<div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
-function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{loading($('#subSave',dlg),true,'Adding…');const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();const r=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:u.href}});dlg.close();await refreshData();if(r.refresh_error)toast(r.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");else toast('Subscription added')}catch{loading($('#subSave',dlg),false);toast('Enter a valid HTTPS feed URL')}}}
-function renderTasks(){
- const counts={all:state.tasks.length,todo:state.tasks.filter(t=>!t.completed).length,completed:state.tasks.filter(t=>t.completed).length};
- const choices=[['all','All'],['todo','To do'],['completed','Completed']];
- const filtered=state.tasks.filter(t=>state.taskFilter==='all'||(state.taskFilter==='completed'?t.completed:!t.completed));
- $('#content').innerHTML='<div class="list-page tasks-view"><header class="view-header"><div><h1>Tasks</h1><p>Stay on top of what matters.</p></div><button class="primary" id="newTask">'+icon('plus')+' New task</button></header><div class="task-filters">'+choices.map(([key,label])=>'<button data-task-filter="'+key+'" class="'+(key===state.taskFilter?'selected':'')+'">'+label+' <span>'+counts[key]+'</span></button>').join('')+'</div><div class="task-list">'+(filtered.length?filtered.map(t=>'<div class="task-row"><button data-done="'+t.id+'" role="checkbox" aria-checked="'+t.completed+'" class="check '+(t.completed?'checked':'')+'">'+(t.completed?icon('check',16):'')+'</button><button data-task="'+t.id+'" class="task-title '+(t.completed?'done':'')+'"><strong>'+h(t.title)+'</strong><small>'+h(t.due_date?prettyShort(t.due_date+'T12:00:00'):'No due date')+'</small></button></div>').join(''):'<div class="whole-empty"><span class="empty-icon">'+icon('tasks',40)+'</span><p>'+(state.taskFilter==='all'?'No tasks yet':state.taskFilter==='todo'?'No tasks to do':'No completed tasks yet')+'</p></div>')+'</div></div>';
- $('#newTask').onclick=()=>openEditor(null,null,null,'task');
- $$('[data-task-filter]').forEach(b=>b.onclick=()=>{state.taskFilter=b.dataset.taskFilter;renderTasks();upgradeIcons()});
- $$('[data-done]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.done);safeChange('tasks',t.id,{completed:!t.completed},'update')});
- $$('[data-task]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.task);openEditor(t,null,null,'task')});
-}
-function renderIntegrations(){
- $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
- $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
-}
-const isNativeRepeat=e=>!e?.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(String(e?.repeat_rule?.frequency||'').toLowerCase());
-function occurrenceChoice(event,action,callback){
- const dlg=modal('<h2>'+(action==='delete'?'Delete recurring event':'Change recurring event')+'</h2><p>Which occurrences should this change affect?</p><div class="occurrence-options"><button type="button" data-occurrence="only">Only this event</button><button type="button" data-occurrence="following">This and following events</button><button type="button" data-occurrence="all">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
- $('[data-occurrence]',dlg).forEach(b=>b.onclick=()=>{const which=b.dataset.occurrence;dlg.close();callback(which)});
-}
-async function mutateOccurrence(event,scope,mode,changes=null){
- const base=event._origin||event;
- const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,occurrence_date:event._civilDate||iso(new Date(event._occurrence||event.starts_at)),...(changes?{changes}:{})});
- await refreshData();toast(mode==='delete'?'Event deleted':'Event updated');return result;
-}
-function deleteEventSafely(e,closeDetail){
- const event=e._origin||e;
- if(event.source_subscription_id)return toast('Subscribed events are read-only');
- if(isNativeRepeat(event)){occurrenceChoice(e,'delete',async scope=>{try{await mutateOccurrence(e,scope,'delete');closeDetail?.()}catch(ex){toast(ex.message||'Could not delete event.')}});return}
- confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',event.id,null,'delete');closeDetail?.();toast('Event deleted')});
+function subscriptionDialog(){
+ const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><p id="subscriptionError" class="error" hidden></p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');
+ $('#subSave',dlg).onclick=async()=>{
+  const input=$('#subURL',dlg).value.trim(),errorNode=$('#subscriptionError',dlg);
+  errorNode.hidden=true;errorNode.textContent='';
+  let normalized;
+  try{const u=new URL(input.replace(/^webcal:/i,'https:'));if(u.protocol!=='https:')throw Error();normalized=u.href}
+  catch{errorNode.textContent='Enter a valid HTTPS feed URL.';errorNode.hidden=false;return}
+  if(state.subscriptions.some(s=>s.url===normalized)){errorNode.textContent='That feed is already added.';errorNode.hidden=false;return}
+  const button=$('#subSave',dlg);loading(button,true,'Adding…');
+  try{
+   const response=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:normalized}});
+   dlg.close();await refreshData();if($('#settingsModal'))renderSettings();
+   if(response.refresh_error)toast(response.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");
+   else toast('Subscription added');
+  }catch(error){
+   loading(button,false);
+   errorNode.textContent=error.message==='That feed is already added.'?'That feed is already added.':(error.message||'Could not add subscription.');
+   errorNode.hidden=false;
+  }
+ };
 }
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
