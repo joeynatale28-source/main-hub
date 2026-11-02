@@ -33,7 +33,7 @@ const response=(r:unknown)=>({content:[{type:'text' as const,text:JSON.stringify
 function register(server:McpServer,name:string,description:string,schema:z.ZodRawShape,run:(uid:string,a:any)=>Promise<unknown>){
  server.registerTool(name,{description,inputSchema:schema as any},async (a:any)=>{
   try{const uid=await context();const data=await run(uid,a);return response(data)}
-  catch(e){return{isError:true,content:[{type:'text',text:e instanceof Error?e.message:'Operation failed'}]}}
+  catch(e){return{isError:true,content:[{type:'text' as const,text:e instanceof Error?e.message:'Operation failed'}]}}
  });
 }
 async function deleteOne(uid:string,entity:'events'|'tasks',id:string){
