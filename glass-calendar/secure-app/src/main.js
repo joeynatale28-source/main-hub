@@ -105,7 +105,7 @@ function promptForm(title,placeholder,cb,value=''){
 function menu(button,items){
  $('#floatingMenu')?.remove();const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
  el.innerHTML=items.map((x,i)=>'<button class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('');
- document.body.append(el);
+ (button.closest('dialog[open]')||document.body).append(el);
  const rect=button.getBoundingClientRect();el.style.top=Math.min(innerHeight-180,rect.bottom+6)+'px';el.style.left=Math.max(5,Math.min(innerWidth-204,rect.right-194))+'px';
  $$('[data-item]',el).forEach(b=>b.onclick=()=>{const fn=items[+b.dataset.item][1];el.remove();fn()});
  const dismiss=e=>{if(!el.contains(e.target)&&e.target!==button){el.remove();document.removeEventListener('pointerdown',dismiss,true)}};setTimeout(()=>document.addEventListener('pointerdown',dismiss,true),0);
