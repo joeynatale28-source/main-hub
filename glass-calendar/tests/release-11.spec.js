@@ -65,7 +65,7 @@ test('Settings opens over calendar, theme changes inside modal, closes cleanly',
  await expect(page.locator('#settingsModal')).toBeHidden();
 });
 test('per-calendar actions support rename, hide, delete confirmation and Undo',async({page})=>{
- await page.locator('#newCalendar').click();await page.locator('#calendarName').fill('To rename');await page.locator('#calendarForm button[type=submit]').click();
+ await page.locator('#addCalendarMenu').click();await page.locator('#createCalendarOption').click();await page.locator('#calendarName').fill('To rename');await page.locator('#calendarForm button[type=submit]').click();
  let row=page.locator('.calendar-filter').filter({hasText:'To rename'});
  await row.locator('.calendar-actions-button').click();
  await page.locator('#calendarActionsMenu [data-command="rename"]').click();
@@ -101,5 +101,5 @@ test('collapsed rail hides labels; calendars are dot-only',async({page})=>{
  await expect(page.locator('.app')).toHaveClass(/sidebar-collapsed/);
  const hidden=await page.locator('.sidebar .nav-label').first().evaluate(el=>getComputedStyle(el).display==='none');
  expect(hidden).toBe(true);
- await expect(page.locator('.sidebar .calendar-filter').first()).toBeVisible();
+ await expect(page.locator('.rail-calendar-dot').first()).toBeVisible();
 });
