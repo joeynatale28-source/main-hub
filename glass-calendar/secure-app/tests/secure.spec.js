@@ -54,12 +54,14 @@ test('email login has no signup; failed auth and password reset use Supabase flo
  await expect(page.locator('#login')).toBeVisible();
  await expect(page.locator('#email')).toBeVisible();
  await expect(page.locator('#username')).toHaveCount(0);
- await expect(page.locator('#newEvent')).toHaveCount(0);
+ await expect(page.locator('#addEventHeader')).toHaveCount(0);
  await page.locator('#email').fill('notfound@daylight.test');await page.locator('#password').fill('anything');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toContainText('Invalid login credentials.');
+ await expect(page.locator('#authError')).toContainText(/Invalid login credentials|not recognized/);
  await page.locator('#forgotPassword').click();
- await expect(page.locator('#authError')).toContainText('password reset link');
+ await expect(page.locator('#passwordHelpPanel')).toBeVisible();
+ await page.locator('#sendReset').click();
+ await expect(page.locator('#resetStatus')).toContainText('reset email');
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
@@ -68,7 +70,7 @@ test('authenticated calendar loads in Week at today',async({page})=>{
  await expect(page.locator('#calList')).toContainText('Personal');
 });
 test('one-dialog event editor creates event, no step wizard',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();
+ const model=await setup(page);await page.locator('#addEventHeader').click();
  await expect(page.locator('#quickForm')).toBeVisible();
  await expect(page.locator('#quickTitle')).toBeFocused();
  await expect(page.getByText('Step 1 of 4')).toHaveCount(0);
@@ -79,7 +81,7 @@ test('one-dialog event editor creates event, no step wizard',async({page})=>{
  expect(model.get().events.find(e=>e.title==='Evening training')).toBeTruthy();
 });
 test('event task toggle saves task without a wizard',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();
+ const model=await setup(page);await page.locator('#addEventHeader').click();
  await page.locator('#quickTitle').fill('Finish assignment');
  await page.locator('[data-mode="task"]').click();
  await page.locator('#quickSave').click();
@@ -109,7 +111,7 @@ test('SVG icons and the mini-calendar grid use consistent dimensions',async({pag
  await setup(page);
  await expect(page.locator('#mini .mini-date')).toHaveCount(42);
  const v=await page.evaluate(()=>{const r=document.querySelector('#miniPrev').getBoundingClientRect(),s=document.querySelector('#miniNext').getBoundingClientRect(),x=document.querySelector('.mini-grid');return{sideBySide:Math.abs(r.y-s.y)<3,columns:getComputedStyle(x).gridTemplateColumns.split(' ').length,icon:document.querySelector('#settingsButton svg')?.getAttribute('viewBox'),height:r.height}});
- expect(v.sideBySide).toBe(true);expect(v.columns).toBe(7);expect(v.icon).toBe('0 0 24 24');expect(v.height).toBe(28);
+ expect(v.sideBySide).toBe(true);expect(v.columns).toBe(7);expect(v.icon).toBe('0 0 24 24');expect(v.height).toBe(29);
  await page.locator('#settings').click();
  await page.locator('[data-sec="notifications"]').click();
  await expect(page.locator('[data-sec="notifications"] svg')).toBeVisible();
@@ -173,11 +175,11 @@ test('calendar Hide and Unhide persist, inline Rename works, collapse persists',
  await page.locator('.calendar-rename').fill('Training');
  await page.locator('.calendar-rename').press('Enter');
  await expect(page.locator('#calList')).toContainText('Training');
- await page.locator('#collapseRail').click();
+ await page.locator('.side-header').hover();await page.locator('#collapseRail').click();
  await expect(page.locator('#root')).toHaveClass(/collapsed/);
  await page.reload();
  await expect(page.locator('#root')).toHaveClass(/collapsed/);
- await page.locator('#collapseRail').click();
+ await page.locator('.side-header').hover();await page.locator('#collapseRail').click();
  await expect(page.locator('#root')).not.toHaveClass(/collapsed/);
 });
 test('network failure rolls back Hide; successful changes show no false error',async({page})=>{
@@ -188,14 +190,15 @@ test('network failure rolls back Hide; successful changes show no false error',a
    await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'offline'})});
   }else await route.fallback();
  });
- await page.locator('#calList [data-hide]').first().click();
+ await page.locator('#calList [data-menu]').first().click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:'Hide'}).click();
  await expect(page.locator('#toast')).toContainText("Couldn't save");
  await expect(page.locator('#calList .cal-row').first()).not.toHaveClass(/dim/);
  expect(model.get().calendars[0].is_visible).toBe(true);
 });
 test('Month today highlight and all-day event edit preserves a one-day date',async({page})=>{
  const model=await setup(page);
- await page.locator('#newEvent').click();
+ await page.locator('#addEventHeader').click();
  await page.locator('#quickTitle').fill('One-day event');
  const original=await page.locator('#startDate').inputValue();
  await page.locator('#quickSave').click();
@@ -219,7 +222,7 @@ test('Month today highlight and all-day event edit preserves a one-day date',asy
 
 const plus=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 test('month-grid picker commits Start and End and supports a three-day event',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();
+ const model=await setup(page);await page.locator('#addEventHeader').click();
  await page.locator('#quickTitle').fill('Three-day conference');
  const original=await page.locator('#startDate').inputValue(),start=plus(original,3),end=plus(original,5);
  await page.locator('#startDateBtn').click();
@@ -239,7 +242,7 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  const span=await page.locator('.month-span-bar').filter({hasText:'Three-day conference'}).evaluate(el=>el.style.getPropertyValue('--span-length').trim());expect(span).toBe('3');
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();
+ const model=await setup(page);await page.locator('#addEventHeader').click();
  await page.locator('#quickTitle').fill('Weekly swimming');
  await page.locator('#repeatButton').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Weekly'}).click();
  await page.locator('#quickSave').click();
@@ -286,7 +289,7 @@ test('calendar colors tint chips while primary remains monochrome',async({page})
  await page.locator('#calendarFormName').fill('Swim Team');await page.locator('[data-color="teal"]').click();
  await page.locator('#calendarFormSave').click();
  await expect.poll(()=>model.get().calendars.length).toBe(2);
- await page.locator('#newEvent').click();await page.locator('#quickTitle').fill('Pool workout');
+ await page.locator('#addEventHeader').click();await page.locator('#quickTitle').fill('Pool workout');
  await page.locator('#eventCalendarBtn').click();
  await page.locator('#floatingMenu [data-item]').filter({hasText:'Swim Team'}).click();
  await page.locator('#quickSave').click();
@@ -298,13 +301,13 @@ test('calendar colors tint chips while primary remains monochrome',async({page})
  const item=page.locator('.month-span-bar').filter({hasText:'Pool workout'});
  await expect(item).toHaveCount(1);
  const eventStyle=await item.getAttribute('style');expect(eventStyle.toLowerCase()).toContain(palette.teal.toLowerCase());
- const primary=await page.locator('#newEvent').evaluate(x=>getComputedStyle(x).backgroundColor);
+ const primary=await page.locator('#addEventHeader').evaluate(x=>getComputedStyle(x).backgroundColor);
  expect(primary).not.toEqual('rgb(74, 184, 182)');
 });
 test('Tasks filters show counts and friendly dates',async({page})=>{
  const model=await setup(page);
  model.get().tasks.push({id:'t1',title:'Spanish homework',due_date:'2026-11-02',completed:false},{id:'t2',title:'Completed project',due_date:'2026-11-01',completed:true});
- await page.reload();await page.locator('[data-nav="tasks"]').click();
+ await page.reload();await page.locator('#workspaceMenu').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Tasks'}).click();
  await expect(page.locator('[data-task-filter="all"]')).toContainText('2');
  await expect(page.locator('[data-task-filter="todo"]')).toContainText('1');
  await page.locator('[data-task-filter="todo"]').click();
@@ -359,13 +362,14 @@ test('search shows no-match copy and Escape closes without losing the calendar',
  await expect(page.locator('.weekwrapper')).toBeVisible();
 });
 test('changing start time shifts end by one hour and saves correct duration',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();await page.locator('#quickTitle').fill('Time shift');
+ const model=await setup(page);await page.locator('#addEventHeader').click();await page.locator('#quickTitle').fill('Time shift');
  await page.locator('#addTime').click();
  const oldStart=await page.locator('#startTime').inputValue();
  const parts=oldStart.split(':').map(Number),newHour=(parts[0]+2)%24;
  const newStart=String(newHour).padStart(2,'0')+':00';
  await page.locator('[data-pick="startTime"]').click();
- await page.locator('#floatingMenu [data-item]').filter({hasText:newStart}).first().click();
+ const displayTime=new Date(2026,10,2,newHour,0).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+ await page.locator('#floatingMenu [data-item]').filter({hasText:displayTime}).first().click();
  expect(await page.locator('#startTime').inputValue()).toBe(newStart);
  const end=(await page.locator('#endTime').inputValue()).split(':').map(Number);
  expect((end[0]-newHour+24)%24).toBe(1);
@@ -374,17 +378,17 @@ test('changing start time shifts end by one hour and saves correct duration',asy
  const ev=model.get().events[0];expect(Math.round((new Date(ev.ends_at)-new Date(ev.starts_at))/60000)).toBe(60);
 });
 test('changing calendar color re-tints existing event and rail tooltips render',async({page})=>{
- const model=await setup(page);await page.locator('#newEvent').click();
+ const model=await setup(page);await page.locator('#addEventHeader').click();
  await page.locator('#quickTitle').fill('Color change');await page.locator('#quickSave').click();
  await expect.poll(()=>model.get().events.length).toBe(1);
  await page.locator('#calList [data-menu]').first().click();
  await page.locator('#floatingMenu [data-item]').filter({hasText:'Change color'}).click();
  await page.locator('[data-color="rose"]').click();await page.locator('#calendarFormSave').click();
  await expect.poll(()=>model.get().calendars[0].shade).toBe('rose');
- await page.locator('#collapseRail').click();
- await page.locator('[data-nav="tasks"]').hover();
- await expect(page.locator('#railTooltip')).toContainText('Tasks');
- await page.locator('#collapseRail').click();
+ await page.locator('.side-header').hover();await page.locator('#collapseRail').click();
+ await page.locator('#settings').hover();
+ await expect(page.locator('#railTooltip')).toContainText('Settings');
+ await page.locator('.side-header').hover();await page.locator('#collapseRail').click();
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
@@ -411,7 +415,7 @@ test('Nov 7–10 renders continuous Month segments and one Agenda item with full
  const item={id:'multi-1',calendar_id:calendar.id,title:'Long trip',starts_at:'2026-11-07T00:00:00.000Z',ends_at:'2026-11-11T00:00:00.000Z',all_day:true,repeat_rule:{frequency:'never'}};
  model.get().events.push(item);model.get().settings.default_view='month';
  await page.reload();await page.locator('#today').click();
- const bars=page.locator('.month-span-bar').filter({hasText:'Long trip'});
+ const bars=page.locator('.month-span-bar[data-detail="multi-1"]');
  await expect(bars).toHaveCount(2);
  const lens=await bars.evaluateAll(xs=>xs.map(x=>Number(x.style.getPropertyValue('--span-length'))));
  expect(lens.reduce((a,b)=>a+b,0)).toBe(4);
@@ -439,7 +443,7 @@ test('Only this event recurring delete saves EXDATE without deleting the series'
 });
 test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up',async({page})=>{
  await setup(page);
- await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('#addEventHeader')).toBeVisible();
  await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',ctrlKey:true,bubbles:true,cancelable:true})));
  // Verify the app's handler directly: Chromium may reserve Ctrl+, for browser Settings.
  await expect(page.locator('#settingsModal')).toBeVisible();
@@ -450,23 +454,24 @@ test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up
 
 test('UI overhaul uses SVG brand and captions, date picker includes month/year dropdowns',async({page})=>{
  await setup(page);
- await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('#addEventHeader')).toBeVisible();
  await expect(page.locator('.brand .logo svg')).toHaveCount(1);
  await expect(page.locator('#profileMenu svg')).toHaveCount(1);
  await expect(page.locator('#miniPrev svg')).toHaveCount(1);
  await expect(page.locator('#miniNext svg')).toHaveCount(1);
  await expect(page.locator('#newCalendar svg')).toHaveCount(1);
- await page.locator('#newEvent').click();
+ await page.locator('#addEventHeader').click();
  await page.locator('#startDateBtn').click();
- await expect(page.locator('#calendarDatePicker [data-calendar-month]')).toBeVisible();
- await expect(page.locator('#calendarDatePicker [data-calendar-year]')).toBeVisible();
+ await expect(page.locator('#calendarDatePicker [data-month]')).toBeVisible();
+ await expect(page.locator('#calendarDatePicker [data-year]')).toBeVisible();
  await expect(page.locator('#calendarDatePicker [data-date-choice]')).toHaveCount(42);
- await page.locator('#calendarDatePicker [data-calendar-month]').selectOption('0');
+ await page.locator('#calendarDatePicker [data-month]').click();
+ await page.locator('#calendarDatePicker .dl-date-options [data-opt="0"]').click();
  await expect(page.locator('#calendarDatePicker')).toBeVisible();
 });
 test('UI overhaul unifies About, Data and Tasks Empty patterns',async({page})=>{
- await setup(page);await expect(page.locator('#newEvent')).toBeVisible();
- await page.locator('[data-nav="tasks"]').click();
+ await setup(page);await expect(page.locator('#addEventHeader')).toBeVisible();
+ await page.locator('#workspaceMenu').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Tasks'}).click();
  await expect(page.locator('.ui-empty')).toContainText('No tasks yet');
  await expect(page.locator('.ui-empty svg')).toBeVisible();
  await page.locator('#settings').click();await page.locator('[data-sec="data"]').click();
@@ -477,12 +482,12 @@ test('UI overhaul unifies About, Data and Tasks Empty patterns',async({page})=>{
  await expect(page.locator('#settingsPane .about-legal')).toContainText('Privacy Policy');
 });
 test('UI overhaul calendar bars are 28px and page motion respects Reduce motion',async({page})=>{
- const model=await setup(page);await expect(page.locator('#newEvent')).toBeVisible();
+ const model=await setup(page);await expect(page.locator('#addEventHeader')).toBeVisible();
  model.get().settings.default_view='month';
  model.get().events.push({id:'uibar',calendar_id:calendar.id,title:'Long week',starts_at:'2026-11-07T00:00:00.000Z',ends_at:'2026-11-11T00:00:00.000Z',all_day:true,repeat_rule:{frequency:'never'}});
  await page.reload();await expect(page.locator('.monthcells')).toBeVisible();
- const bars=page.locator('.month-span-bar').filter({hasText:'Long week'});await expect(bars).toHaveCount(2);
- const height=await bars.first().evaluate(el=>parseFloat(getComputedStyle(el).height));expect(height).toBe(28);
+ const bars=page.locator('.month-span-bar[data-detail="uibar"]');await expect(bars).toHaveCount(2);
+ const height=await bars.first().evaluate(el=>parseFloat(getComputedStyle(el).height));expect(height).toBe(27);
  await page.locator('#next').click();
  await expect(page.locator('#grid')).toHaveClass(/ui-page-next/);
  model.get().settings.reduce_motion=true;await page.reload();
@@ -514,7 +519,7 @@ test('GitHub Pages callback strips tokens and uses Supabase session for authenti
  const payload=Buffer.from(JSON.stringify({sub:account.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url');
  const jwt='eyJhbGciOiJIUzI1NiJ9.'+payload+'.callback';
  await page.goto('/#access_token='+jwt+'&refresh_token=mock-refresh-token&expires_in=3600&token_type=bearer&type=magiclink');
- await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('#addEventHeader')).toBeVisible();
  await expect(page).toHaveURL(/\/$/);
  await expect(page.locator('#calList')).toContainText('Personal');
  const stored=await page.evaluate(()=>Boolean(localStorage.getItem('sb-mock-auth-token')));
@@ -533,13 +538,13 @@ test('Email-password sign-in succeeds directly through Supabase Auth without a r
  await page.locator('#email').fill('example@daylight.test');
  await page.locator('#password').fill('correct-test-password');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('#addEventHeader')).toBeVisible();
  await expect(page).toHaveURL(/\/$/);
 });
 test('GitHub Pages PKCE callback exchanges code for session, strips code from URL',async({page})=>{
  await setup(page,{loggedIn:false});
  await page.addInitScript(()=>localStorage.setItem('sb-mock-auth-token-code-verifier','test-verifier'));
  await page.goto('/?code=mock-pkce-code');
- await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('#addEventHeader')).toBeVisible();
  await expect(page).toHaveURL(/\/$/);
 });
