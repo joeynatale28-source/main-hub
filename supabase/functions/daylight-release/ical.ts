@@ -1,4 +1,4 @@
-export type FeedEvent={title:string,description:string,location_name:string,location_address:string,starts_at:string,ends_at:string,all_day:boolean,repeat_rule:Record<string,unknown>,external_uid:string};
+export type FeedEvent={title:string,description:string,location_name:string,location_address:string,starts_at:string,ends_at:string,all_day:boolean,repeat_rule:Record<string,unknown>,external_uid:string,status:string};
 const pad=(x:number)=>String(x).padStart(2,'0');
 const unescapeText=(x:string)=>x.replace(/\\[nN]/g,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
 type Parts={y:number,m:number,d:number,h:number,min:number,sec:number,z:boolean,all:boolean};
@@ -76,19 +76,11 @@ export function parseCalendar(text:string):{name:string,events:FeedEvent[]}{
    if(hasRule&&!matches(p,base,rule))continue;
    considered++;if(excluded.has(ms))continue;
    if(allDay){
-    const spans=Math.max(1,Math.min(365,Math.round(duration/864e5)));
-    for(let j=0;j<spans;j++){
-     const item=shift(p,j),start=Date.UTC(item.y,item.m-1,item.d),end=start+864e5;
-     output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms+'::'+j});
-    }
+    const start=Date.UTC(p.y,p.m-1,p.d),end=start+duration;
+    // One UID = one event spanning DTSTART through exclusive DTEND.
+    output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms,status:find('STATUS')?.value.toLowerCase()==='cancelled'?'cancelled':'confirmed'});
    }else{
-    const start=ms,end=ms+duration;
-    let cursor=start,j=0;
-    while(cursor<end&&j<366){
-     const midnight=Math.ceil((cursor+1)/864e5)*864e5,next=Math.min(midnight,end);
-     output.push({title,description,location_name:location,location_address:location,starts_at:new Date(cursor).toISOString(),ends_at:new Date(next).toISOString(),all_day:false,repeat_rule:{},external_uid:uid+'::'+ms+'::'+j});
-     cursor=next;j++;
-    }
+    output.push({title,description,location_name:location,location_address:location,starts_at:new Date(ms).toISOString(),ends_at:new Date(ms+duration).toISOString(),all_day:false,repeat_rule:{},external_uid:uid+'::'+ms,status:find('STATUS')?.value.toLowerCase()==='cancelled'?'cancelled':'confirmed'});
    }
    if(output.length>5000)throw Error('TOO_MANY_EVENTS');
   }
