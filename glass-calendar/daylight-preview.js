@@ -474,3 +474,183 @@ function renderAgenda(){
  });
  scroll.append(inner);const wrap=el('<div style="display:flex;flex-direction:column;flex:1;min-height:0"></div>');wrap.append(scroll);return wrap;
 }
+
+/* === Event popover and working confirmations === */
+function openPopover(occ,anchor){
+ closeMenu();if(popEl?.dataset.id===occ.ev.id&&popEl?.dataset.start===String(occ.start.getTime())){closePopover();return}closePopover();
+ const e=occ.ev,cal=calOf(e.cal),dateLine=sameDay(occ.start,occ.end)?fmtDateLong(occ.start):fmtDateShort(occ.start)+" - "+fmtDateShort(occ.end);
+ const rows='<div class="pop-row">'+icon("clock",16)+'<span>'+esc(dateLine)+(e.allDay?'<br><span class="pr-sub">All day</span>':'<br><span class="pr-sub">'+fmtTimeRange(occ.start,occ.end)+'</span>')+'</span></div>'+
+  (e.repeat?'<div class="pop-row">'+icon("repeat",16)+'<span>'+esc(REPEAT_LABELS[e.repeat]||"Repeats")+'</span></div>':'')+
+  (e.loc?'<div class="pop-row">'+icon("pin",16)+'<span>'+esc(e.loc)+'</span></div>':'')+
+  '<div class="pop-row"><span class="pop-dot" style="background:'+dotOf(cal)+';margin-top:3px"></span><span>'+esc(cal.name)+(e.declined?' <span class="pr-sub">· Declined</span>':'')+'</span></div>';
+ const pop=el('<div class="popover" data-id="'+esc(e.id)+'" data-start="'+occ.start.getTime()+'"><div class="pop-head"><span class="pop-dot" style="background:'+dotOf(cal)+'"></span><span class="pop-title">'+esc(e.title)+'</span><span class="pop-actions">'+
+  '<button class="icon-btn" data-edit title="Edit event">'+icon("pencil",15)+'</button>'+
+  '<button class="icon-btn" data-delete title="Delete event">'+icon("trash",15)+'</button>'+
+  '<button class="icon-btn" data-close title="Close">'+icon("x",15)+'</button></span></div><div class="pop-rows">'+rows+'</div></div>');
+ positionFloat(pop,anchor,308);popEl=pop;
+ $("[data-close]",pop).onclick=closePopover;
+ $("[data-edit]",pop).onclick=()=>{closePopover();openEventForm(e,null,occ)};
+ $("[data-delete]",pop).onclick=()=>{
+  closePopover();
+  const perform=()=>openConfirm({title:"Delete event?",body:'Delete “'+e.title+'”? You can undo immediately.',confirmLabel:"Delete",danger:true,fn:async()=>{
+   const snapshot={...e};
+   if(!await removeEvent(e))return;
+   state.events=state.events.filter(x=>x.id!==e.id);renderAll(false);
+   toast("Event deleted",{label:"Undo",fn:async()=>{
+    const copy={...snapshot};if(await saveEvent(copy,"create")){state.events.push(copy);renderAll(false)}
+   }});
+  }});
+  if(e.repeat)openMenu($("[data-delete]",pop),[
+   {label:"Delete entire recurring series",icon:"trash",danger:true,fn:perform}
+  ]);else perform();
+ };
+}
+function openConfirm(opts){
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:400px"><div class="dialog-head"><span class="dialog-title">'+esc(opts.title)+'</span><button class="icon-btn" data-x aria-label="Close">'+icon("x",17)+'</button></div>'+
+  '<div class="dialog-body"><p style="margin:0;font-size:14px;color:var(--muted);line-height:1.55">'+esc(opts.body)+'</p></div>'+
+  '<div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button><button class="'+(opts.danger?"btn-danger":"btn-primary")+'" style="margin-left:0" data-ok>'+esc(opts.confirmLabel||"Confirm")+'</button></div></div></div>');
+ overlayRoot.append(bd);const close=()=>bd.remove();
+ $("[data-x]",bd).onclick=close;$("[data-cancel]",bd).onclick=close;bd.onmousedown=e=>{if(e.target===bd)close()};
+ $("[data-ok]",bd).onclick=()=>{close();opts.fn?.()};
+}
+function openHelp(){
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:440px"><div class="dialog-head"><span class="dialog-title">Help center</span><button class="icon-btn" data-x aria-label="Close">'+icon("x",17)+'</button></div>'+
+  '<div class="dialog-body" style="font-size:14px;line-height:1.6;color:var(--muted)">'+
+  '<p>This version of daylight uses local browser storage. Events, calendars, and preferences remain in this browser after you reload, but do not sync to other devices.</p>'+
+  '<p>Click a date number to open Day view. Click an event to edit or delete it. Open a calendar’s menu to change its color, visibility, or name.</p>'+
+  '<p>Press <b style="color:var(--text)">Ctrl/⌘ + ,</b> for Settings and <b style="color:var(--text)">Ctrl/⌘ + K</b> for Search.</p>'+
+  '</div><div class="dialog-foot"><button class="btn-primary" style="margin-left:0" data-ok>Done</button></div></div></div>');
+ overlayRoot.append(bd);const close=()=>bd.remove();
+ $("[data-x]",bd).onclick=close;$("[data-ok]",bd).onclick=close;bd.onmousedown=e=>{if(e.target===bd)close()};
+}
+function openNewCalendar(){
+ let chosen="teal";
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:400px"><div class="dialog-head"><span class="dialog-title">New calendar</span><button class="icon-btn" data-x aria-label="Close">'+icon("x",17)+'</button></div>'+
+  '<div class="dialog-body"><div class="field"><label for="ncName">Name</label><input class="text-input" id="ncName" placeholder="Calendar name"><div class="field-err" id="ncErr">Add a name</div></div>'+
+  '<div class="field"><label>Color</label><div class="swatches" id="ncSwatches"></div></div></div>'+
+  '<div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button><button class="btn-primary" style="margin-left:0" data-ok>Create calendar</button></div></div></div>');
+ overlayRoot.append(bd);const sw=$("#ncSwatches",bd);
+ SWATCH_ORDER.forEach(color=>{
+  const b=el('<button class="swatch'+(chosen===color?" sel":"")+'" style="background:'+PALETTE[color].dot+'" title="'+color+'" aria-label="'+color+'"></button>');
+  b.onclick=()=>{chosen=color;$$(".swatch",sw).forEach(x=>x.classList.remove("sel"));b.classList.add("sel")};sw.append(b);
+ });
+ const field=$("#ncName",bd),close=()=>bd.remove();field.focus();
+ $("[data-x]",bd).onclick=close;$("[data-cancel]",bd).onclick=close;bd.onmousedown=e=>{if(e.target===bd)close()};
+ const create=async()=>{
+  const name=field.value.trim();if(!name){field.classList.add("err");$("#ncErr",bd).classList.add("show");field.focus();return}
+  const calendar={id:id(),name,color:chosen,hidden:false};
+  if(await saveCalendar(calendar,"create")){state.calendars.push(calendar);close();renderAll(false);toast("Calendar created")}
+ };
+ $("[data-ok]",bd).onclick=create;field.onkeydown=e=>{if(e.key==="Enter")create()};
+}
+const timeOptions=selected=>{
+ let steps=Array.from({length:48},(_,i)=>i*30);if(Number.isInteger(selected)&&!steps.includes(selected))steps.push(selected);
+ steps.sort((a,b)=>a-b);
+ return steps.map(m=>{
+  const hh=Math.floor(m/60)%12||12,ap=m>=720?"PM":"AM";
+  return '<option value="'+m+'"'+(selected===m?" selected":"")+'>'+hh+':'+pad2(m%60)+' '+ap+'</option>';
+ }).join("");
+};
+function closeDatePicker(){if(closeDatePickerFn)closeDatePickerFn()}
+function openDatePicker(anchor,current,onPick){
+ closeDatePicker();
+ const pop=el('<div class="date-pop" id="datePop" role="dialog" aria-label="Choose date"></div>');
+ let month=dt(current.getFullYear(),current.getMonth(),1);
+ function draw(){
+  pop.innerHTML='';
+  const head=el('<div class="mini-head" style="padding-bottom:6px"><button class="mini-nav" title="Previous month">'+icon("chevL",14)+'</button><span class="mini-title" style="font-size:14px">'+MONTHS[month.getMonth()]+' '+month.getFullYear()+'</span><button class="mini-nav" title="Next month">'+icon("chevR",14)+'</button></div>');
+  const navs=$$(".mini-nav",head);navs[0].onclick=e=>{e.stopPropagation();month=addMonths(month,-1);draw()};navs[1].onclick=e=>{e.stopPropagation();month=addMonths(month,1);draw()};
+  pop.append(head,el('<div class="mini-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>'));
+  const start=sundayOf(month);
+  for(let w=0;w<6;w++){
+   const row=el('<div class="mini-week"></div>');
+   for(let d=0;d<7;d++){
+    const day=addDays(start,w*7+d);
+    const button=el('<button class="mini-day'+(day.getMonth()===month.getMonth()?"":" dim")+(sameDay(day,TODAY())?" today":"")+(sameDay(day,current)?" sel":"")+'"><span class="num">'+day.getDate()+'</span></button>');
+    button.onclick=e=>{e.stopPropagation();closeDatePicker();onPick(sod(day))};row.append(button);
+   }pop.append(row);
+  }
+ }
+ draw();positionFloat(pop,anchor,252);
+ const close=()=>{pop.remove();if(closeDatePickerFn===close)closeDatePickerFn=null};
+ closeDatePickerFn=close;
+}
+function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null){
+ closePopover();closeMenu();closeDatePicker();
+ const src=existing,base=occ||src,now=TODAY(),nextHour=Math.min(23,now.getHours()+1);
+ const defaultCal=state.calendars.find(c=>!c.hidden)||state.calendars[0];
+ if(!src&&!defaultCal){toast("Create a calendar first");openNewCalendar();return}
+ const rawEnd=base?.end||null;
+ const f={
+  title:src?.title||"",cal:src?.cal||defaultCal.id,allDay:!!src?.allDay,
+  sDate:sod(base?.start||presetDate||state.selected),eDate:sod(rawEnd||presetDate||state.selected),
+  sMin:base&&!src?.allDay?base.start.getHours()*60+base.start.getMinutes():(presetMinutes??nextHour*60),
+  eMin:base&&!src?.allDay?base.end.getHours()*60+base.end.getMinutes():Math.min(1430,(presetMinutes??nextHour*60)+60),
+  repeat:src?.repeat||null,loc:src?.loc||"",dirty:false
+ };
+ if(f.eMin<=f.sMin)f.eMin=Math.min(1430,f.sMin+60);
+ const bd=el('<div class="backdrop"></div>'),dlg=el('<div class="dialog" role="dialog" aria-modal="true"></div>');
+ dlg.innerHTML='<div class="dialog-head"><span class="dialog-title">'+(src?"Edit event":"New event")+'</span><button class="icon-btn" data-x title="Close" aria-label="Close">'+icon("x",17)+'</button></div>'+
+ '<div class="dialog-body">'+
+  '<div class="field"><label for="efTitle">Title</label><input class="text-input" id="efTitle" placeholder="Event title" value="'+esc(f.title)+'"><div class="field-err" id="efTitleErr">Add a title</div></div>'+
+  '<div class="field"><div class="switch-row"><span class="sw-label">All-day</span><label class="switch"><input type="checkbox" id="efAllDay"'+(f.allDay?" checked":"")+'><span class="track"></span><span class="knob"></span></label></div></div>'+
+  '<div class="form-grid">'+
+   '<div class="field"><label>Starts</label><button class="picker-btn" id="efSDate">'+icon("calendar",15)+'<span></span></button></div>'+
+   '<div class="field"><label>Ends</label><button class="picker-btn" id="efEDate">'+icon("calendar",15)+'<span></span></button></div>'+
+   '<div class="field" id="efSTimeWrap"><label for="efSTime">Start time</label><select class="picker-btn" id="efSTime"></select></div>'+
+   '<div class="field" id="efETimeWrap"><label for="efETime">End time</label><select class="picker-btn" id="efETime"></select></div>'+
+  '</div>'+
+  '<div class="field"><label>Repeats</label><button class="picker-btn" id="efRepeat">'+icon("repeat",15)+'<span></span><span style="margin-left:auto;color:var(--muted)">'+icon("chevD",15)+'</span></button></div>'+
+  '<div class="field"><label for="efLoc">Location</label><input class="text-input" id="efLoc" placeholder="Add a location" value="'+esc(f.loc)+'"></div>'+
+  '<div class="field"><label>Calendar</label><button class="picker-btn" id="efCal"><span></span><span style="margin-left:auto;color:var(--muted)">'+icon("chevD",15)+'</span></button></div>'+
+ '</div><div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button><button class="btn-primary" style="margin-left:0" data-save>'+(src?"Save changes":"Create event")+'</button></div>';
+ bd.append(dlg);overlayRoot.append(bd);
+ const title=$("#efTitle",dlg),loc=$("#efLoc",dlg),all=$("#efAllDay",dlg),startDate=$("#efSDate",dlg),endDate=$("#efEDate",dlg),
+ startTime=$("#efSTime",dlg),endTime=$("#efETime",dlg),repeat=$("#efRepeat",dlg),calendar=$("#efCal",dlg);
+ const dirty=()=>f.dirty=true;
+ const dateLabel=d=>MONTHS_S[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear();
+ function sync(){
+  $("span",startDate).textContent=dateLabel(f.sDate);$("span",endDate).textContent=dateLabel(f.eDate);
+  startTime.innerHTML=timeOptions(f.sMin);endTime.innerHTML=timeOptions(f.eMin);
+  $("#efSTimeWrap",dlg).style.display=f.allDay?"none":"";
+  $("#efETimeWrap",dlg).style.display=f.allDay?"none":"";
+  $("span",repeat).textContent=f.repeat?f.repeat[0].toUpperCase()+f.repeat.slice(1):"None";
+  const c=calOf(f.cal);
+  $("span",calendar).innerHTML='<span style="display:inline-flex;align-items:center;gap:8px"><span class="pop-dot" style="background:'+dotOf(c)+';margin:0"></span>'+esc(c.name)+'</span>';
+ }
+ sync();title.focus();
+ title.oninput=()=>{f.title=title.value;title.classList.remove("err");$("#efTitleErr",dlg).classList.remove("show");dirty()};
+ loc.oninput=()=>{f.loc=loc.value;dirty()};
+ all.onchange=()=>{f.allDay=all.checked;dirty();sync()};
+ startDate.onclick=()=>openDatePicker(startDate,f.sDate,date=>{f.sDate=date;if(f.eDate<date)f.eDate=date;dirty();sync()});
+ endDate.onclick=()=>openDatePicker(endDate,f.eDate,date=>{f.eDate=date;if(f.sDate>date)f.sDate=date;dirty();sync()});
+ startTime.onchange=()=>{const duration=f.eMin-f.sMin;f.sMin=Number(startTime.value);f.eMin=Math.min(1430,f.sMin+Math.max(30,duration));if(f.eMin<=f.sMin)f.eMin=f.sMin+30;dirty();sync()};
+ endTime.onchange=()=>{f.eMin=Number(endTime.value);dirty()};
+ repeat.onclick=()=>openMenu(repeat,[{label2:"Repeat"},...[
+  ["none","None"],["daily","Daily"],["weekly","Weekly"],["monthly","Monthly"],["yearly","Yearly"]
+ ].map(([k,label])=>({label,right:(f.repeat||"none")===k?"check":null,fn:()=>{f.repeat=k==="none"?null:k;dirty();sync()}}))]);
+ calendar.onclick=()=>openMenu(calendar,[{label2:"Calendar"},...state.calendars.map(c=>({label:c.name,right:f.cal===c.id?"check":null,fn:()=>{f.cal=c.id;dirty();sync()}}))]);
+ const close=()=>{closeDatePicker();closeMenu();bd.remove()};
+ const tryClose=()=>{
+  if(f.dirty)openConfirm({title:"Discard changes?",body:"You have unsaved changes to this event. Discarding them cannot be undone.",confirmLabel:"Discard",danger:true,fn:close});else close();
+ };
+ $("[data-x]",dlg).onclick=tryClose;$("[data-cancel]",dlg).onclick=tryClose;bd.onmousedown=e=>{if(e.target===bd)tryClose()};
+ $("[data-save]",dlg).onclick=async()=>{
+  f.title=title.value.trim();if(!f.title){title.classList.add("err");$("#efTitleErr",dlg).classList.add("show");title.focus();return}
+  let start,end;
+  if(f.allDay){start=sod(f.sDate);end=sod(f.eDate);end.setHours(23,59,59)}
+  else{
+   start=dt(f.sDate.getFullYear(),f.sDate.getMonth(),f.sDate.getDate(),Math.floor(f.sMin/60),f.sMin%60);
+   end=dt(f.eDate.getFullYear(),f.eDate.getMonth(),f.eDate.getDate(),Math.floor(f.eMin/60),f.eMin%60);
+   if(end<=start)end=new Date(start.getTime()+30*60000);
+  }
+  const e=src?{...src,title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat}:{
+   id:id(),title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,declined:false
+  };
+  const button=$("[data-save]",dlg);button.disabled=true;
+  if(await saveEvent(e,src?"update":"create")){
+   if(src)Object.assign(src,e);else state.events.push(e);
+   close();renderAll(false);toast(src?"Event updated":"Event created");
+  }else button.disabled=false;
+ };
+}
