@@ -1,0 +1,241 @@
+const root=document.querySelector('#root');
+const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
+const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
+const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
+const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
+const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
+const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
+const date=s=>new Date(s+'T12:00:00'),add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const label=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:'general',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,theme:'system'};
+const toast=(text)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}el.textContent=text;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200)};
+async function api(action,data={},include=true){
+ const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key},body:JSON.stringify({...data,action,...(include?{token:state.token}:{})})});
+ let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable')}
+ if(!r.ok)throw Error(body.error||'Request failed');return body;
+}
+async function load(){
+ try{const result=await api('auth_session');state.user=result.user;const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});applyTheme();render()}catch{localStorage.removeItem('dl-release-session');state.token='';login()}
+}
+function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;const hex=state.settings.custom_accent_hex;document.documentElement.style.setProperty('--accent',/^#[0-9a-f]{6}$/i.test(hex||'')?hex:'#777777')}
+function login(){root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Username<input id="username" required autocomplete="username" placeholder="Username"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">◉</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><small>Accounts are created by Joey — there’s no sign-up.</small></form></main>';
+ $('#eye').onclick=()=>$('#password').type=$('#password').type==='password'?'text':'password';
+ $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
+}
+async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
+async function list(entity){return (await api('data_list',{entity})).items}
+async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
+async function change(entity,id,data,action){
+ const result=await api('data_'+action,{entity,...(id?{id}:{}),...(data?{data}:{})});
+ if(entity==='settings')state.settings=result.item;
+ else if(action==='create')state[entity].push(result.item);
+ else if(action==='delete')state[entity]=state[entity].filter(x=>x.id!==id);
+ else if(action==='update')state[entity]=state[entity].map(x=>x.id===id?result.item:x);
+ render();return result.item;
+}
+function safeChange(...args){return change(...args).catch(()=>toast("Couldn't save — check your connection"))}
+function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible))}
+function nav(page,title,ico){return '<button class="nav '+(state.page===page?'selected':'')+'" data-nav="'+page+'"><span class="glyph">'+ico+'</span>'+title+'</button>'}
+function render(){if(!state.user)return;root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button></div><div class="side-middle"><button id="newEvent" class="primary block">+ New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
+ $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
+ $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
+ $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
+ $('#newCalendar').onclick=()=>promptForm('New calendar','Name',async name=>{await safeChange('calendars',null,{name,shade:'gray-2',sort_order:state.calendars.length,is_visible:true},'create')});
+ renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();
+}
+function renderMini(){
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
+ const active=iso(now());let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon">‹</button><button id="miniNext" class="icon">›</button></span></div><div class="mini-grid">';
+ for(let i=0;i<7;i++)html+='<span class="dayname">'+['S','M','T','W','T','F','S'][(i+shift)%7]+'</span>';
+ for(let i=0;i<42;i++){const day=add(start,i),key=iso(day);html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+'" data-date="'+key+'">'+day.getDate()+(visible().some(e=>e.starts_at.startsWith(key))?'<i></i>':'')+'</button>'}
+ $('#mini').innerHTML=html+'</div>';
+ $('#miniPrev').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()-1,1);renderMini()};$('#miniNext').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()+1,1);renderMini()};$$('[data-date]',$('#mini')).forEach(x=>x.onclick=()=>drill(x.dataset.date));
+}
+function renderCalList(){
+ $('#calList').innerHTML=state.calendars.map(c=>'<div class="cal-row '+(c.is_visible?'':'dim')+'" data-cal="'+c.id+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+c.is_visible+'" data-hide="'+c.id+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon" data-menu="'+c.id+'">⋮</button></div>').join('');
+ $$('[data-hide]').forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.hide);safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')});
+ $$('[data-menu]').forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.menu);menu(x,[['Rename',()=>promptForm('Rename calendar','Name',v=>safeChange('calendars',c.id,{name:v},'update'),c.name)],[(c.is_visible?'Hide':'Unhide'),()=>safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')],['Delete',()=>confirmAction('Delete '+c.name+'?','All events in this calendar will be deleted.',()=>safeChange('calendars',c.id,null,'delete'))]])});
+}
+function drill(key){state.date=date(key);state.drilled=true;state.view='day';state.page='calendar';render()}
+function header(title,subtitle){return '<header class="view-header"><div><h1>'+h(title)+'</h1><p>'+h(subtitle)+'</p></div><div class="tools">'+(state.drilled?'<button id="backDrill" class="secondary">← Back to '+h(state.settings.default_view||'week')+'</button>':'')+'<button class="icon" id="prev">‹</button><button class="icon" id="next">›</button><button class="secondary" id="today">Today</button><button class="icon" id="searchButton">⌕</button><button class="icon" id="themeButton">◐</button><button class="icon" id="settingsButton">⚙</button></div></header>'}
+function renderCalendar(){
+ const d=state.date;$('#content').innerHTML=header(d.toLocaleDateString('en-US',{month:'long',year:'numeric'}),state.view==='week'?'Your weekly schedule':state.view==='month'?'Monthly overview':state.view==='day'?label(d):'Upcoming events')+'<div id="searchBar" hidden><input id="searchQuery" placeholder="Search all dates"><button id="searchClose" class="icon">×</button><div class="micro">ALL DATES</div><div id="searchResults"></div></div><section id="grid" class="calendar-grid"></section>';
+ $('#backDrill')?.addEventListener('click',()=>{state.drilled=false;state.view=state.settings.default_view||'week';render()});
+ $('#today').onclick=()=>{state.date=now();render()};
+ const move=n=>{state.date=state.view==='month'?new Date(d.getFullYear(),d.getMonth()+n,1):add(d,n*(state.view==='week'?7:1));render()};$('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1);
+ $('#settingsButton').onclick=()=>settings();$('#themeButton').onclick=()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3])};
+ $('#searchButton').onclick=()=>{$('#searchBar').hidden=!$('#searchBar').hidden;$('#searchQuery').focus()};$('#searchClose').onclick=()=>{$('#searchBar').hidden=true;$('#searchQuery').value=''};
+ $('#searchQuery').oninput=e=>{$('#searchResults').innerHTML=visible().filter(x=>x.title.toLowerCase().includes(e.target.value.toLowerCase())).slice(0,30).map(x=>'<button data-detail="'+x.id+'">'+h(x.title)+' · '+h(x.starts_at.slice(0,10))+'</button>').join('');bindEventButtons()};
+ if(state.view==='month')renderMonth();else if(state.view==='agenda')renderAgenda();else renderWeek();
+}
+function renderMonth(){
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7)),count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells" style="--weeks:'+count/7+'">';
+ for(let i=0;i<count;i++){const t=add(start,i),key=iso(t),events=visible().filter(e=>iso(new Date(e.starts_at))===key);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'"><button class="datenum" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'">+</button>'+events.slice(0,3).map(e=>'<button class="eventchip" data-detail="'+e.id+'">'+h(e.title)+'</button>').join('')+'</div>'}
+ $('#grid').innerHTML=html+'</div>';bindEventButtons();
+}
+function renderWeek(){
+ const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i));
+ let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div></div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'">+</button></div>').join('')+'</div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
+ for(const t of days){const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';for(const e of visible().filter(x=>iso(new Date(x.starts_at))===key)){const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=st.getHours()*60+st.getMinutes(),height=Math.max(25,(ed-st)/60000);html+='<button class="weekevent" data-detail="'+e.id+'" style="top:'+minute+'px;height:'+height+'px"><strong>'+h(e.title)+'</strong></button>'}html+='</div>'}
+ $('#grid').innerHTML=html+'</div></div>';bindEventButtons();
+ $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor((e.clientY-el.getBoundingClientRect().top)/15)*15));openEditor(null,el.dataset.slot,('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2))});
+}
+function renderAgenda(){
+ const today=iso(now()),items=visible().filter(x=>iso(new Date(x.starts_at))>=today),days=[...new Set(items.map(x=>iso(new Date(x.starts_at))))];
+ $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>iso(new Date(x.starts_at))===d).map(x=>'<button class="agenda-item" data-detail="'+x.id+'"><strong>'+h(x.title)+'</strong><small>'+(x.all_day?'All day':new Date(x.starts_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty">No upcoming events</div>')+'</div>';bindEventButtons();
+}
+function bindEventButtons(){$$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});$$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});$$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});$$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=state.events.find(e=>e.id===x.dataset.detail);if(ev)details(ev)})}
+
+function modal(html,wide=false){
+ const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');dlg.innerHTML='<div class="dialog-body">'+html+'</div>';document.body.append(dlg);dlg.showModal();
+ $$('[data-close]',dlg).forEach(b=>b.onclick=()=>dlg.close());
+ dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close()});
+ dlg.addEventListener('close',()=>dlg.remove());
+ return dlg;
+}
+function confirmAction(title,body,act){const dlg=modal('<h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
+function promptForm(title,placeholder,cb,value=''){
+ const dlg=modal('<h2>'+h(title)+'</h2><input class="text-input" id="promptValue" placeholder="'+h(placeholder)+'" value="'+h(value)+'" maxlength="120"><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="promptSave">Save</button></footer>');
+ const field=$('#promptValue',dlg);field.focus();field.select();
+ const save=async()=>{if(!field.value.trim())return field.classList.add('shake');const val=field.value.trim();dlg.close();await cb(val)};
+ $('#promptSave',dlg).onclick=save;field.onkeydown=e=>{if(e.key==='Enter')save()};
+}
+function menu(button,items){
+ $('#floatingMenu')?.remove();const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
+ el.innerHTML=items.map((x,i)=>'<button class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('');
+ (button.closest('dialog[open]')||document.body).append(el);
+ const rect=button.getBoundingClientRect();el.style.top=Math.min(innerHeight-180,rect.bottom+6)+'px';el.style.left=Math.max(5,Math.min(innerWidth-204,rect.right-194))+'px';
+ $$('[data-item]',el).forEach(b=>b.onclick=()=>{const fn=items[+b.dataset.item][1];el.remove();fn()});
+ const dismiss=e=>{if(!el.contains(e.target)&&e.target!==button){el.remove();document.removeEventListener('pointerdown',dismiss,true)}};setTimeout(()=>document.addEventListener('pointerdown',dismiss,true),0);
+ el.onkeydown=e=>{if(e.key==='Escape'){el.remove();button.focus()}};
+}
+async function saveSetting(field,value){
+ try{const result=await api('data_update',{entity:'settings',data:{[field]:value}});state.settings=result.item;applyTheme();render();settings(state.setting)}catch{toast("Couldn't save — check your connection")}
+}
+const switches={
+ calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Include events that you declined']],
+ appearance:[['show_weekends','Show weekends','Include Saturday and Sunday'],['compact_mode','Compact mode','Use tighter spacing'],['reduce_motion','Reduce motion','Minimize movement and animations']],
+ notifications:[['task_reminders','Task reminders','Notifications for due tasks'],['event_reminders','Event reminders','Notifications for upcoming events'],['notification_sound','Notification sound','Play a sound when a reminder appears']]
+};
+const selectOptions={
+ default_view:[['day','Day'],['week','Week'],['month','Month'],['agenda','Agenda']],
+ start_of_week:[['sunday','Sunday'],['monday','Monday']],
+ default_reminder_minutes:[['-1','None'],['5','5 minutes'],['15','15 minutes'],['30','30 minutes'],['60','1 hour'],['1440','1 day']],
+ time_zone:[[Intl.DateTimeFormat().resolvedOptions().timeZone,'Device time zone']]
+};
+const row=(title,description,control)=>'<div class="setting-row"><div><strong>'+h(title)+'</strong><small>'+h(description||'')+'</small></div><div class="row-control">'+control+'</div></div>';
+function switchHtml(key,value){return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'"><span></span></button>'}
+function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'">'+h(text)+' <span>⌄</span></button>'}
+function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span></button>').join('')+'</div>'}
+function settingsContent(which){
+ const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
+ if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account','@'+u.username,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||Intl.DateTimeFormat().resolvedOptions().timeZone,selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
+ if(which==='calendar')return '<h2>Calendar</h2><p>Plan how your calendar is displayed.</p>'+row('Default Calendar View','View when Daylight opens',customSelect('default_view',s.default_view,selectOptions.default_view))+switchRows+row('Work hours','Beginning and end of the workday','<span class="worktime"><button class="pill-select" data-time="work_hours_start">'+h(s.work_hours_start||'09:00')+'</button> – <button class="pill-select" data-time="work_hours_end">'+h(s.work_hours_end||'17:00')+'</button></span>');
+ if(which==='appearance')return '<h2>Appearance</h2><p>Make Daylight feel like yours.</p>'+themeCards()+'<h3>Accent color</h3><div class="swatches">'+['graphite','#3B82F6','#8B7CFF','#34C759','#F5A623','#FF453A'].map(c=>'<button class="swatch" data-accent="'+c+'" title="'+h(c)+'" style="--swatch:'+(c==='graphite'?'#777777':c)+'"></button>').join('')+'<label class="swatch custom-swatch" title="Custom color"><input id="customAccent" type="color" value="'+h(s.custom_accent_hex||'#737373')+'"></label></div><div class="micro">PREVIEW</div><div class="accent-preview"><button class="primary">Primary button</button>'+switchHtml('preview',true)+'</div>'+switchRows;
+ if(which==='data')return '<h2>Data & sync</h2><p>Manage calendar subscriptions and information.</p>'+row('Connected calendars','Manage the calendars in your workspace','<button class="secondary" id="goIntegrations">Manage connected calendars ›</button>')+row('US Holidays','Show federal holidays',switchHtml('holidays',state.calendars.find(x=>x.client_id==='us-holidays')?.is_visible!==false))+'<h3>Subscriptions</h3><div id="settingsSubs">'+(state.subscriptions.length?state.subscriptions.map(x=>'<div class="sub-item"><strong>'+h(x.name)+'</strong><small>'+h(x.url)+'</small><small>Last fetched: '+h(x.last_fetched_at||'Never')+'</small><button class="secondary" data-refresh="'+x.id+'">Refresh</button><button class="danger outline" data-remove="'+x.id+'">Remove</button></div>').join(''):'<p class="quiet">No subscriptions added.</p>')+'</div>'+row('Add subscription','Read-only .ics calendar link','<button class="secondary" id="addSub">Add subscription</button>')+row('Last sync','Last updated for this account','<button class="secondary" id="refreshAll">Refresh all</button>');
+ if(which==='notifications')return '<h2>Notifications</h2><p>Control browser notifications.</p>'+row('Permission',state.notification==='granted'?'Notifications are enabled':'Permission is required','<button class="secondary" id="enableNotify">'+(state.notification==='granted'?'Enabled':'Enable notifications')+'</button>')+switchRows+row('Default reminder','Used for new events',customSelect('default_reminder_minutes',s.default_reminder_minutes,selectOptions.default_reminder_minutes));
+ if(which==='ai')return '<h2>AI access</h2><p>AI agents with a token can read and edit your calendars and tasks through MCP.</p>'+row('AI deletes','Allow irreversible event and task deletion',switchHtml('mcp_allow_delete',s.mcp_allow_delete))+'<h3>MCP tokens</h3><p class="quiet">Tokens are shown once. Protect them like passwords.</p><button class="primary" id="generateToken">Generate token</button><div id="tokenList"><p>Loading tokens…</p></div>';
+ return '<h2>About daylight.</h2><p>Version 1.1</p><div class="about-mark">✳</div>'+row('Privacy Policy','How Daylight handles your data','<button class="secondary" data-legal="privacy">Read ›</button>')+row('Terms of Service','Using Daylight','<button class="secondary" data-legal="terms">Read ›</button>')+row('Changelog','What changed in each release','<button class="secondary" data-legal="changelog">Read ›</button>');
+}
+function settings(which){
+ state.setting=which||state.setting||'general';
+ const existing=$('#settingsModal');existing?.remove();
+ const sections=[['general','General','⚙'],['calendar','Calendar','▦'],['appearance','Appearance','◈'],['data','Data & sync','▤'],['notifications','Notifications','♧'],['ai','AI access','✳'],['about','About','ⓘ']];
+ const dlg=modal('<div class="settings-grid"><nav class="settings-nav"><h2>Settings</h2>'+sections.map(x=>'<button data-sec="'+x[0]+'" class="'+(x[0]===state.setting?'selected':'')+'"><span class="glyph">'+x[2]+'</span>'+x[1]+'</button>').join('')+'</nav><div class="settings-pane" id="settingsPane"></div></div><button class="close-settings icon" data-close>×</button>',true);dlg.id='settingsModal';
+ $$('[data-sec]',dlg).forEach(b=>b.onclick=()=>{state.setting=b.dataset.sec;$$('[data-sec]',dlg).forEach(x=>x.classList.toggle('selected',x===b));renderSettings()});
+ renderSettings();
+}
+function renderSettings(){
+ const dlg=$('#settingsModal');if(!dlg)return;const pane=$('#settingsPane',dlg);pane.innerHTML=settingsContent(state.setting);
+ pane.scrollTop=0;
+ $$('[data-setting-switch]',pane).forEach(b=>b.onclick=()=>{const key=b.dataset.settingSwitch;if(key==='preview')return;if(key==='holidays'){const c=state.calendars.find(x=>x.client_id==='us-holidays');if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update');return}if(key==='mcp_allow_delete'&&!state.settings[key])return confirmAction('Allow AI agents to delete?','An AI holding a token could permanently delete events and tasks. Deletes are logged and cannot be undone.',()=>saveSetting(key,true));saveSetting(key,!state.settings[key])});
+ $$('[data-select]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.select;menu(b,selectOptions[name].map(x=>[x[1],()=>saveSetting(name,name==='default_reminder_minutes'?Number(x[0]):x[0])]))});
+ $$('[data-time]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.time;menu(b,Array.from({length:48},(_,i)=>{const time=('0'+Math.floor(i/2)).slice(-2)+':'+(i%2?'30':'00');return[time,()=>saveSetting(name,time)]}))});
+ $$('[data-theme]',pane).forEach(b=>b.onclick=()=>saveSetting('theme',b.dataset.theme));
+ $$('[data-accent]',pane).forEach(b=>b.onclick=()=>{saveSetting('accent',b.dataset.accent);if(b.dataset.accent==='graphite')saveSetting('custom_accent_hex',null);else saveSetting('custom_accent_hex',b.dataset.accent)});
+ $('#customAccent',pane)?.addEventListener('input',e=>saveSetting('custom_accent_hex',e.target.value));
+ $('#logoutBtn',pane)?.addEventListener('click',logout);
+ for(const id of ['firstName','lastName']){const input=$('#'+id,pane);if(input){input.onblur=()=>{const first=$('#firstName',pane).value,last=$('#lastName',pane).value;if(!first.trim()||!last.trim())return;api('user_update',{first_name:first,last_name:last}).then(x=>{state.user=x.user;toast('Saved')}).catch(()=>toast("Couldn't save — check your connection"))};input.onkeydown=e=>{if(e.key==='Enter')input.blur()}}}
+ $('#goIntegrations',pane)?.addEventListener('click',()=>{$('#settingsModal').close();state.page='integrations';render()});
+ $('#enableNotify',pane)?.addEventListener('click',async()=>{if(typeof Notification!=='undefined'){state.notification=await Notification.requestPermission();renderSettings()}});
+ $('#generateToken',pane)?.addEventListener('click',()=>promptForm('Generate MCP token','Token name',async name=>{try{const x=await api('mcp_generate',{name});const pop=modal('<h2>Copy your token</h2><p>You won’t see this again.</p><textarea readonly id="tokenSecret">'+h(x.token)+'</textarea><button id="copyToken" class="primary">Copy token</button>');$('#copyToken',pop).onclick=()=>navigator.clipboard.writeText(x.token);renderSettings()}catch{toast('Token could not be created')}}));
+ if(state.setting==='ai')api('mcp_list').then(x=>{const box=$('#tokenList',dlg);if(box)box.innerHTML=(x.items.length?x.items.map(t=>'<div class="token-row">'+h(t.name)+' <small>'+h(t.created_at.slice(0,10))+'</small><button data-revoke="'+t.id+'" class="danger">Revoke</button></div>').join(''):'No tokens yet.');$$('[data-revoke]',box).forEach(b=>b.onclick=()=>confirmAction('Revoke token?','This agent will lose access immediately.',async()=>{await api('mcp_revoke',{id:b.dataset.revoke});renderSettings()}))}).catch(()=>{});
+ $$('[data-legal]',pane).forEach(b=>b.onclick=()=>legal(b.dataset.legal));
+ $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
+ $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
+ $('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',()=>safeChange('subscriptions',b.dataset.remove,null,'delete')));
+}
+function legal(id){const text={
+ privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
+ terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
+ changelog:'Version 1.1: Login-only accounts, Supabase storage, AI token controls, redesigned Settings, one-step event editor and refreshed calendar interface. Version 1.0: Local calendar, tasks and calendar subscriptions.'
+ };modal('<h2>'+h(id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog')+'</h2><p>'+h(text[id])+'</p><div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
+function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();const r=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:u.href}});dlg.close();await refreshData();if(r.refresh_error)toast(r.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");else toast('Subscription added')}catch{toast('Enter a valid HTTPS feed URL')}}}
+function renderTasks(){
+ $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Tasks</h1><p>Stay on top of what matters.</p></div><button class="primary" id="newTask">+ New task</button></header><div class="task-list">'+(state.tasks.length?state.tasks.map(t=>'<div class="task-row"><button data-done="'+t.id+'" role="checkbox" aria-checked="'+t.completed+'" class="check '+(t.completed?'checked':'')+'">'+(t.completed?'✓':'')+'</button><button data-task="'+t.id+'" class="task-title '+(t.completed?'done':'')+'"><strong>'+h(t.title)+'</strong><small>'+h(t.due_date||'No due date')+'</small></button></div>').join(''):'<div class="whole-empty">No tasks yet</div>')+'</div></div>';
+ $('#newTask').onclick=()=>openEditor(null,null,null,'task');
+ $$('[data-done]').forEach(x=>x.onclick=()=>{const t=state.tasks.find(t=>t.id===x.dataset.done);safeChange('tasks',t.id,{completed:!t.completed},'update')});
+ $$('[data-task]').forEach(x=>x.onclick=()=>{const t=state.tasks.find(t=>t.id===x.dataset.task);openEditor(t,null,null,'task')});
+}
+function renderIntegrations(){
+ $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
+ $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>Find the calendar sharing or publishing settings in your provider and copy its .ics feed URL. Private authorization is not connected.</p><button class="primary" data-close>Done</button>'));
+}
+function details(e){const readOnly=state.subscriptions.some(s=>s.calendar_id===e.calendar_id);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(label(new Date(e.starts_at)))+'</p><p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>Close</button>'+(readOnly?'':'<button class="primary" id="editEvent">Edit</button>')+'</div>');$('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e)})}
+
+let addressTimer=0,selectedLocation=null;
+function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
+ state.edit=existing;state.mode=kind;state.timed=!!chosenTime||(!!existing&&!existing.all_day);state.allDay=existing?.all_day||false;
+ selectedLocation=existing?.location_address?{display:existing.location_name,address:existing.location_address}:null;
+ const first=existing?(kind==='task'?(existing.due_date?date(existing.due_date):now()):new Date(existing.starts_at)):chosenDate?date(chosenDate):now();
+ if(!existing&&!chosenTime){first.setHours(first.getHours()+1,0,0,0)}
+ if(chosenTime){const [hr,min]=chosenTime.split(':').map(Number);first.setHours(hr,min,0,0)}
+ const finish=existing&&kind==='event'?new Date(existing.ends_at):new Date(first.getTime()+3600000);
+ const dateText=iso(first),endText=iso(finish),startTime=('0'+first.getHours()).slice(-2)+':'+('0'+first.getMinutes()).slice(-2),endTime=('0'+finish.getHours()).slice(-2)+':'+('0'+finish.getMinutes()).slice(-2);
+ const options=state.calendars.filter(c=>c.client_id!=='us-holidays'&&!state.subscriptions.some(s=>s.calendar_id===c.id));
+ const chosen=options.find(c=>c.id===existing?.calendar_id)||options[0];
+ const dlg=modal('<form id="quickForm"><header class="quick-top"><span class="grip">⌁</span><button type="button" class="icon" id="editorClose">×</button></header><input id="quickTitle" class="quick-title" placeholder="Add title" maxlength="300" value="'+h(existing?.title||'')+'"><div class="toggle-segments"><button type="button" data-mode="event" class="'+(kind==='event'?'selected':'')+'">Event</button><button type="button" data-mode="task" class="'+(kind==='task'?'selected':'')+'">Task</button></div><div class="quick-content"><div class="quick-row"><span class="row-icon">◷</span><div class="quick-fields"><div class="date-time-row"><button type="button" data-pick="start" class="field-button" id="startDateBtn">'+h(label(first))+'</button><span>–</span><button type="button" data-pick="end" class="field-button" id="endDateBtn">'+h(label(finish))+'</button><button type="button" id="addTime" class="secondary '+(state.timed?'active':'')+'">Add time</button></div><div id="timedFields" '+(state.timed?'':'hidden')+' class="timed-row"><button type="button" class="field-button" data-pick="startTime">'+h(startTime)+'</button><button type="button" class="field-button" data-pick="endTime">'+h(endTime)+'</button></div><button type="button" class="repeat-line" id="repeatButton">Does not repeat ▾</button></div></div><div class="quick-row" id="locationRow"><span class="row-icon">⌖</span><div class="quick-fields location-area"><input id="quickLocation" placeholder="Add location" autocomplete="off" value="'+h(existing?.location_name||'')+'"><small class="saved-address" id="addressSaved" '+(selectedLocation?'':'hidden')+'>Full address saved: '+h(selectedLocation?.address||'')+'</small><div id="addressOptions" class="address-options" hidden></div></div></div><div class="quick-row"><span class="row-icon">☷</span><textarea id="quickDescription" placeholder="Add description" rows="1">'+h(existing?.description||existing?.notes||'')+'</textarea></div><div class="quick-row" id="calendarRow"><span class="row-icon">▦</span><div class="quick-fields"><button type="button" id="eventCalendarBtn" class="field-button">'+h(chosen?.name||'No calendar')+' ▾</button><small id="calSummary">'+h(chosen?.name||'')+' · Reminder: 15 minutes</small></div></div><div id="extraFields" hidden><div class="quick-row"><span class="row-icon">◷</span><div class="quick-fields">All day <button type="button" class="switch '+(state.allDay?'on':'')+'" id="allDaySwitch" role="switch" aria-checked="'+!!state.allDay+'"><span></span></button></div></div><div class="quick-row"><span class="row-icon">♧</span><button type="button" class="field-button" id="reminderButton">15 minutes before ▾</button></div></div></div><footer class="quick-footer"><button class="secondary" type="button" id="moreOptions">More options</button><div class="quick-footer-right">'+(existing?'<button type="button" class="danger-text" id="quickDelete">Delete</button>':'')+'<button type="submit" class="primary" id="quickSave">'+(existing?'Save changes':kind==='event'?'Create event':'Save task')+'</button></div></footer><input type="hidden" id="startDate" value="'+dateText+'"><input type="hidden" id="endDate" value="'+endText+'"><input type="hidden" id="startTime" value="'+startTime+'"><input type="hidden" id="endTime" value="'+endTime+'"><input type="hidden" id="calendarValue" value="'+h(chosen?.id||'')+'"><input type="hidden" id="repeatValue" value="never"><input type="hidden" id="reminderValue" value="15"></form>');
+ dlg.classList.add('quick-dialog');
+ const form=$('#quickForm',dlg),title=$('#quickTitle',form);title.focus();
+ const useMode=mode=>{state.mode=mode;$$('[data-mode]',form).forEach(x=>x.classList.toggle('selected',x.dataset.mode===mode));$('#locationRow',form).hidden=mode==='task';$('#calendarRow',form).hidden=mode==='task';$('#repeatButton',form).hidden=mode==='task';$('#addTime',form).hidden=mode==='task';$('#timedFields',form).hidden=mode==='task'||!state.timed;$('#moreOptions',form).hidden=mode==='task';$('#quickSave',form).textContent=mode==='task'?'Save task':existing?'Save changes':'Create event'};
+ $$('[data-mode]',form).forEach(x=>x.onclick=()=>useMode(x.dataset.mode));useMode(kind);
+ const close=()=>{if(title.value.trim())confirmAction('Discard this '+state.mode+'?','Your unsaved changes will be lost.',()=>dlg.close());else dlg.close()};
+ $('#editorClose',form).onclick=close;
+ dlg.oncancel=e=>{e.preventDefault();close()};
+ const pick=(type)=>{
+  const isTime=type.endsWith('Time'),key=type,trigger=$('[data-pick="'+type+'"]',form),items=[];
+  if(isTime){for(let m=0;m<1440;m+=15){const text=('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2);items.push([text,()=>{$('#'+key,form).value=text;trigger.textContent=text}])}}
+  else{const base=date($('#'+key+'Date',form)?.value||$('#'+key,form).value);for(let i=-20;i<=60;i++){const d=add(base,i),v=iso(d);items.push([label(d),()=>{$('#'+key,form).value=v;trigger.textContent=label(d)}])}}
+  menu(trigger,items);
+ };
+ $$('[data-pick]',form).forEach(b=>b.onclick=()=>pick(b.dataset.pick));
+ $('#addTime',form).onclick=()=>{state.timed=!state.timed;$('#timedFields',form).hidden=!state.timed;$('#addTime',form).classList.toggle('active',state.timed)};
+ $('#eventCalendarBtn',form).onclick=e=>menu(e.currentTarget,options.map(c=>[c.name,()=>{$('#calendarValue',form).value=c.id;$('#eventCalendarBtn',form).textContent=c.name+' ▾';$('#calSummary',form).textContent=c.name+' · Reminder: '+$('#reminderValue',form).value+' minutes'}]));
+ $('#repeatButton',form).onclick=e=>menu(e.currentTarget,['never','daily','weekly','monthly','yearly'].map(x=>[x==='never'?'Does not repeat':x[0].toUpperCase()+x.slice(1),()=>{$('#repeatValue',form).value=x;$('#repeatButton',form).textContent=(x==='never'?'Does not repeat':x)+' ▾'}]));
+ $('#moreOptions',form).onclick=()=>{$('#extraFields',form).hidden=!$('#extraFields',form).hidden};
+ $('#allDaySwitch',form).onclick=()=>{state.allDay=!state.allDay;$('#allDaySwitch',form).classList.toggle('on',state.allDay);$('#allDaySwitch',form).setAttribute('aria-checked',String(state.allDay));$('#timedFields',form).hidden=state.allDay||!state.timed};
+ $('#reminderButton',form).onclick=e=>menu(e.currentTarget,[['None',null],['At start',0],['5 minutes',5],['15 minutes',15],['30 minutes',30],['1 hour',60],['1 day',1440]].map(([text,value])=>[text,()=>{$('#reminderValue',form).value=value??'';$('#reminderButton',form).textContent=text+' ▾'}]));
+ const field=$('#quickLocation',form),optionsEl=$('#addressOptions',form),saved=$('#addressSaved',form);
+ let controller=null,cache=new Map(),active=-1;
+ const choose=i=>{const item=state.addrResults[i];if(!item)return;selectedLocation=item;field.value=item.display;saved.hidden=false;saved.textContent='Full address saved: '+item.address;optionsEl.hidden=true;field.focus()};
+ const draw=()=>{active=-1;optionsEl.hidden=false;optionsEl.innerHTML=state.addrResults.length?state.addrResults.map((r,i)=>'<button type="button" data-address="'+i+'"><span>⌖</span><strong>'+h(r.display)+'</strong><small>'+h(r.address)+'</small></button>').join(''):'<div class="quiet">No matches — you can still use what you typed.</div>';$$('[data-address]',optionsEl).forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();choose(+b.dataset.address)}))};
+ field.oninput=()=>{selectedLocation=null;saved.hidden=true;clearTimeout(addressTimer);controller?.abort();const q=field.value.trim();if(q.length<3){optionsEl.hidden=true;return}if(cache.has(q)){state.addrResults=cache.get(q);draw();return}addressTimer=setTimeout(async()=>{controller=new AbortController();try{optionsEl.hidden=false;optionsEl.innerHTML='<div class="quiet">Searching…</div>';const response=await fetch('https://photon.komoot.io/api/?lang=en&limit=5&q='+encodeURIComponent(q),{signal:controller.signal});const json=await response.json();state.addrResults=(json.features||[]).slice(0,5).map(f=>{const p=f.properties||{};return{display:p.name||p.street||p.city||'Location',address:[p.name||p.street,p.housenumber,p.city,p.state,p.country].filter(Boolean).join(', ')}});cache.set(q,state.addrResults);draw()}catch{optionsEl.hidden=true}},300)};
+ field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
+ field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
+ $('#quickDelete',form)?.addEventListener('click',()=>confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()}));
+ form.onsubmit=async e=>{
+  e.preventDefault();if(!title.value.trim()){title.classList.add('shake');title.focus();setTimeout(()=>title.classList.remove('shake'),300);return}
+  const startD=$('#startDate',form).value,endD=$('#endDate',form).value;
+  const startAt=new Date(startD+'T'+(state.timed&&!state.allDay?$('#startTime',form).value:'00:00')+':00');
+  const endAt=new Date(endD+'T'+(state.timed&&!state.allDay?$('#endTime',form).value:'00:00')+':00');
+  if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
+  if(endAt<=startAt){toast('End must be after start');return}
+  const entity=state.mode==='task'?'tasks':'events',data=entity==='task'?{}:state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:{frequency:$('#repeatValue',form).value},reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
+  try{await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?'Task saved':'Event created')}catch{toast("Couldn't save — check your connection")}
+ };
+};
+if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
+else if(state.token)load();else login();

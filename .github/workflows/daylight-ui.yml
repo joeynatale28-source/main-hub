@@ -1,4 +1,4 @@
-name: Daylight UI regression tests
+name: Daylight GitHub Pages release verification
 on:
   push:
     branches: [main]
@@ -12,61 +12,53 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: daylight-ui-${{ github.ref }}
+  group: daylight-pages-ui-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  responsive-ui:
+  secure-ui:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: glass-calendar
+        working-directory: glass-calendar/secure-app
     steps:
-      - name: Checkout source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
+      - name: Install
         run: npm install --no-audit --no-fund
-      - name: Check installed browser
-        run: google-chrome --version
-      - name: Check script syntax
-        run: npm run check
-      - name: Run browser regression tests
+      - name: Build authenticated Daylight
+        run: npm run build
+      - name: Test login, Settings, event creation and Tasks
         run: npm test
-      - name: Verify public GitHub Pages calendar
+      - name: Verify GitHub Pages files are self-hosted and configured
+        working-directory: .
         run: |
+          test -s glass-calendar/site-config.js
+          test -s glass-calendar/secure-app/src/main.js
+          test -s glass-calendar/secure-app/src/style.css
+          grep -q 'secure-app/src/main.js' glass-calendar/index.html
+          grep -q 'site-config.js' glass-calendar/index.html
+          grep -q '__DAYLIGHT_CONFIG' glass-calendar/secure-app/src/main.js
+  deployed-page:
+    if: github.event_name == 'push'
+    needs: secure-ui
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify new app is available on GitHub Pages
+        shell: bash
+        run: |
+          set -euo pipefail
           url="https://joeynatale28-source.github.io/main-hub/glass-calendar/"
-          for attempt in $(seq 1 30); do
-            if curl --location --fail --silent --show-error --max-time 12 "$url" > /tmp/daylight-pages.html 2>/dev/null &&
-               grep -qi '<title>Daylight' /tmp/daylight-pages.html &&
-               curl --location --fail --silent --show-error --max-time 12 "${url}wizard.js" | grep -q 'wizard-progress'; then
-              echo "Live Daylight published at $url"
+          for attempt in $(seq 1 40); do
+            if curl --location --fail --silent --max-time 12 "$url?check=${{ github.sha }}" > /tmp/daylight-pages.html &&
+               grep -q 'secure-app/src/main.js' /tmp/daylight-pages.html &&
+               curl --location --fail --silent --max-time 12 "${url}secure-app/src/main.js" | grep -q '__DAYLIGHT_CONFIG'; then
+              echo "New authenticated Daylight is served by GitHub Pages"
               exit 0
             fi
-            echo "Waiting for GitHub Pages ($attempt/30)"
-            sleep 5
+            echo "Waiting for Pages release ($attempt/40)"
+            sleep 6
           done
-          echo "Public GitHub Pages site was not serving the current Daylight assets"
+          echo "GitHub Pages has not served the new homepage"
           exit 1
-      - name: Upload responsive screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daylight-layout-screenshots
-          path: |
-            glass-calendar/test-results/*.png
-          if-no-files-found: ignore
-          retention-days: 7
-      - name: Upload failed-test evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daylight-ui-test-results
-          path: |
-            glass-calendar/test-results/
-            glass-calendar/playwright-report/
-          retention-days: 7

@@ -1,0 +1,75 @@
+name: Daylight secure release candidate
+on:
+  pull_request:
+    paths:
+      - 'glass-calendar/secure-app/**'
+      - 'mcp/**'
+      - 'supabase/**'
+      - '.github/workflows/daylight-secure.yml'
+  push:
+    branches:
+      - feature/daylight-secure-release-20261102
+    paths:
+      - 'glass-calendar/secure-app/**'
+      - 'mcp/**'
+      - 'supabase/**'
+      - '.github/workflows/daylight-secure.yml'
+permissions:
+  contents: read
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: glass-calendar/secure-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend
+        run: npm install --no-audit --no-fund
+      - name: Compile secure client
+        run: npm run build
+      - name: Run secure frontend browser tests
+        run: npm test
+      - name: Upload compiled app
+        uses: actions/upload-artifact@v4
+        with:
+          name: daylight-secure-client
+          path: glass-calendar/secure-app/dist
+          retention-days: 7
+  mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install MCP dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check MCP
+        run: npm run check
+      - name: Run parser acceptance tests
+        run: npm run test:ical
+
+  api-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check signup disabled and unauthenticated requests rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://qrqemjgpzoqhtmsowmqv.supabase.co/functions/v1"
+          login=$(curl -sS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{"action":"auth_login","username":"definitelynotanaccount","password":"wrong"}' "$base/daylight-release" -w '\n%{http_code}' || true)
+          echo "$login" | grep -q "That username and password don't match"
+          echo "$login" | tail -1 | grep -q '^401$'
+          session=$(curl -sS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{"action":"data_list","entity":"events","token":"invalid"}' "$base/daylight-release" -w '\n%{http_code}' || true)
+          echo "$session" | grep -q 'Session expired'
+          echo "$session" | tail -1 | grep -q '^401$'
+          signup=$(curl -sS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{}' "$base/daylight-signup" -w '\n%{http_code}' || true)
+          echo "$signup" | grep -q 'Registration is disabled'
+          echo "$signup" | tail -1 | grep -q '^410$'
