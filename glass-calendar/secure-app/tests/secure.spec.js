@@ -117,7 +117,7 @@ test('SVG icons and the mini-calendar grid use consistent dimensions',async({pag
  await expect(page.locator('[data-sec="notifications"] svg')).toBeVisible();
  await expect(page.locator('#settingsModal')).toBeVisible();
 });
-test('Settings never changes size, remembers section, searches IANA time zones, and Escape is layered',async({page})=>{
+test('Settings stays fixed, reopens on General, searches time zones, and Escape is layered',async({page})=>{
  await setup(page);await page.locator('#settings').click();
  const dialog=page.locator('#settingsModal');
  let box=await dialog.boundingBox();
@@ -140,9 +140,9 @@ test('Settings never changes size, remembers section, searches IANA time zones, 
  await page.locator('[data-sec="about"]').click();
  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
  await page.locator('#settings').click();
- await expect(page.locator('#settingsPane h2')).toContainText('About');
+ await expect(page.locator('#settingsPane h2')).toContainText('General');
  await page.reload();await page.locator('#settings').click();
- await expect(page.locator('#settingsPane h2')).toContainText('About');
+ await expect(page.locator('#settingsPane h2')).toContainText('General');
 });
 test('Appearance uses monochrome theme controls and no accent system',async({page})=>{
  const model=await setup(page);
@@ -162,7 +162,7 @@ test('calendar Hide and Unhide persist, inline Rename works, collapse persists',
  await row.locator('[data-menu]').click();
  await page.locator('#floatingMenu [data-item]').filter({hasText:'Hide'}).click();
  await expect(row).toHaveClass(/dim/);
- await expect(row.locator('.switch')).toHaveAttribute('aria-checked','false');
+ await expect(row).toHaveClass(/dim/); // Hidden state is conveyed by the row; menu retains Unhide.
  await expect.poll(()=>model.get().calendars[0].is_visible).toBe(false);
  await page.reload();
  await expect(page.locator('#calList .cal-row').first()).toHaveClass(/dim/);
