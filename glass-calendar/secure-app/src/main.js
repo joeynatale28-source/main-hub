@@ -642,6 +642,26 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   try{loading($('#quickSave',form),true,'Saving…');if(existing&&state.mode==='event'&&isNativeRepeat(existing._origin||existing)){loading($('#quickSave',form),false);occurrenceChoice(existing,'update',async scope=>{try{await mutateOccurrence(existing,scope,'update',data);dlg.close()}catch(ex){toast(ex.message||'Could not save event.')}});return}await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
+const remindersSeen=new Set();
+function checkReminders(){
+ if(!state.user||typeof Notification==='undefined'||Notification.permission!=='granted')return;
+ const current=Date.now(),windowMs=35000;
+ const show=(key,title,body)=>{if(remindersSeen.has(key))return;remindersSeen.add(key);try{new Notification(title,{body,tag:'daylight-'+key})}catch(error){console.warn('Notification unavailable',error)}};
+ if(state.settings.event_reminders){
+  for(const item of occurrences(add(now(),-1),add(now(),2))){
+   if(item._segment>0)continue;
+   const reminder=Number(item.reminder_offset_minutes??state.settings.default_reminder_minutes??15);
+   const when=Date.parse(item.starts_at)-reminder*60000;
+   if(when<=current&&current-when<=windowMs)show(item.id+'-'+item._occurrence,item.title,'Event starts '+prettyClock(item.starts_at));
+  }
+ }
+ if(state.settings.task_reminders){for(const task of state.tasks){
+  if(task.completed||!task.due_date)continue;
+  const when=new Date(task.due_date+'T09:00:00').getTime();
+  if(when<=current&&current-when<=windowMs)show('task-'+task.id,'Task due: '+task.title,'Due '+prettyShort(task.due_date+'T12:00:00'));
+ }}
+}
+if(typeof window!=='undefined')setInterval(checkReminders,30000);
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
 else sb.auth.getSession().then(({data})=>data.session?load():login());
