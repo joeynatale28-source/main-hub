@@ -60,7 +60,7 @@ export async function localApi(action,payload={}){
  const entity=payload.entity,operation=String(action||'');
  if(action==='auth_session')return {user:clone(read().user)};
  if(action==='user_update'){
-  const user=mutate(d=>{d.user={...d.user,...payload.data};return clone(d.user)});
+  const user=mutate(d=>{d.user={...d.user,...(payload.data||payload)};return clone(d.user)});
   return {user};
  }
  if(action==='data_list'){
