@@ -209,6 +209,7 @@ function closeTopmostOverlay(){
  const top=$("#overlayRoot").lastElementChild;
  if(top){const close=$("[data-x]",top)||$("[data-cancel]",top)||$(".settings-close",top);if(close)close.click();else top.remove();return true}
  if(popEl){closePopover();return true}
+ if(sidebarEl.classList.contains("drawer-open")){closeMobileDrawer();return true}
  return false;
 }
 
@@ -323,12 +324,27 @@ function viewRange(){
  if(state.view==="day")return {title:MONTHS[c.getMonth()]+" "+c.getFullYear(),sub:fmtDateLong(c)};
  const end=addDays(sod(c),20);return {title:"Agenda",sub:MONTHS_S[c.getMonth()]+" "+c.getDate()+" - "+MONTHS_S[end.getMonth()]+" "+end.getDate()+", "+end.getFullYear()};
 }
+
+function closeMobileDrawer(){sidebarEl.classList.remove("drawer-open");$("#navCurtain")?.remove()}
+function installMobileMenu(header){
+ const button=el('<button class="icon-btn mobile-menu" title="Open navigation" aria-label="Open navigation">'+icon("list",20)+'</button>');
+ button.onclick=()=>{
+  if(sidebarEl.classList.contains("drawer-open")){closeMobileDrawer();return}
+  sidebarEl.classList.add("drawer-open");
+  const cover=el('<div id="navCurtain"></div>');
+  cover.onclick=closeMobileDrawer;
+  document.body.append(cover);
+ };
+ header.prepend(button);
+}
+sidebarEl.addEventListener("click",e=>{if(innerWidth<640&&e.target.closest(".side-row,.mini-day,.cal-row,.profile-row"))closeMobileDrawer()});
 function renderHeader(){
  const hdr=$("#headerBand"),range=viewRange();hdr.innerHTML="";
  if(state.page==="tasks"){
   hdr.innerHTML='<div class="head-title-wrap"><span class="head-cal-icon">'+icon("list",22)+'</span><span><span class="head-title">Tasks</span><br><span class="head-sub">All your to-dos in one place</span></span></div><div class="head-right"><button class="icon-btn" id="settingsTasks" title="Settings">'+icon("settings",19)+'</button><button class="btn-primary" id="addTaskHeader">'+icon("plus",16)+' Add Task</button></div>';
   $("#settingsTasks",hdr).onclick=()=>openSettings("general");
   $("#addTaskHeader",hdr).onclick=()=>openTaskForm();
+  installMobileMenu(hdr);
   return;
  }
  if(state.view==="day"&&state.prevView){
@@ -343,7 +359,7 @@ function renderHeader(){
  const settings=el('<button class="icon-btn" title="Settings" aria-label="Settings">'+icon("settings",19)+'</button>');settings.onclick=()=>openSettings("general");
  const help=el('<button class="icon-btn" title="Help" aria-label="Help">'+icon("help",19)+'</button>');help.onclick=openHelp;
  const create=el('<button class="btn-primary" id="addEventHeader">'+icon("plus",16)+'<span class="bp-label">Add Event</span></button>');
- create.onclick=()=>openEventForm(null,state.selected);right.append(search,settings,help,create);hdr.append(right);
+ create.onclick=()=>openEventForm(null,state.selected);right.append(search,settings,help,create);hdr.append(right);installMobileMenu(hdr);
 }
 function goToday(){state.cursor=sod(TODAY());state.selected=sod(TODAY());state.miniCursor=dt(state.cursor.getFullYear(),state.cursor.getMonth(),1);renderAll(false)}
 function pageBy(dir){
