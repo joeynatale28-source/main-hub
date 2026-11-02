@@ -14,7 +14,7 @@ const raw=[
 ].join('\r\n');
 const result=parseCalendar(raw);
 assert.equal(result.name,'Swim Team');
-assert.equal(result.events.filter((x:any)=>x.title==='Swim practice').length,2);
+assert.equal(result.events.filter((x:any)=>x.title==='Swim practice'&&x.starts_at.includes('T23:00:00')).length,2);
 assert.ok(result.events.find((x:any)=>x.title==='Swim practice')?.starts_at.startsWith('2026-11-03T23:00:00'));
 assert.equal(result.events.filter((x:any)=>x.title==='Away meet').length,3);
 assert.ok(result.events.filter((x:any)=>x.title==='Away meet').every((x:any)=>x.all_day));
