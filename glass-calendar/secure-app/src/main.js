@@ -136,7 +136,7 @@ function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents
 function spanItems(from=iso(add(now(),-400)),to=iso(add(now(),450))){return instances(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+eventColor(e)+';';
-const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
+const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" data-status="'+h(e.status||'confirmed')+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>spanItems(iso(add(now(),-1000)),iso(add(now(),1200))).find(e=>e.id===id&&e._occurrence===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
@@ -375,7 +375,7 @@ function stopDrag(cancel=false){
   const r=track.getBoundingClientRect(),t=snap15((y-r.top)/r.height*1440),orig=start.getHours()*60+start.getMinutes();
   const difference=dayDelta(bounds(ev).first,targetDay),delta=t-orig;
   if(drag.resize==='start'){const shifted=shiftTime(ev.starts_at,difference,delta);if(new Date(shifted)>=end)return;changes.starts_at=shifted}
-  else if(drag.resize==='end'){const shifted=shiftTime(ev.ends_at,difference,delta);if(new Date(shifted)<=start)return;changes.ends_at=shifted}
+  else if(drag.resize==='end'){const endMinute=end.getHours()*60+end.getMinutes(),endDelta=t-endMinute;const shifted=shiftTime(ev.ends_at,difference,endDelta);if(new Date(shifted)<=start)return;changes.ends_at=shifted}
   else{changes.starts_at=shiftTime(ev.starts_at,difference,delta);changes.ends_at=shiftTime(ev.ends_at,difference,delta)}
  }
  if(changes.starts_at===ev.starts_at&&changes.ends_at===ev.ends_at)return;
@@ -658,7 +658,7 @@ async function commitOccurrence(e,scope,action,changes=null){
    // End original immediately before the selected occurrence. The replacement
    // series (for edits) starts from this instance, never from its original first day.
    await api('data_update',{entity:'events',id:root.id,data:{repeat_rule:{...r,ends:'on',until:previous}}});
-   if(action==='edit')await api('data_create',{entity:'events',data:{...changes,repeat_rule:{...r,exdates:(r.exdates||[]).filter(d=>d>=day),ends:r.ends==='count'?'never':r.ends,until:r.ends==='on'?r.until:undefined}}});
+   if(action==='edit')await api('data_create',{entity:'events',data:{...changes,repeat_rule:{...r,exdates:(r.exdates||[]).filter(d=>d>=day),ends:r.ends, count:r.ends==='count'?Math.max(1,(Number(r.count)||1)-e._index):r.count}}});
   }
  }
  await refreshData();toast(action==='delete'?'Event deleted':'Event updated');
