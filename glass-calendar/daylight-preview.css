@@ -307,3 +307,7 @@ select.picker-btn{appearance:none;-webkit-appearance:none;cursor:pointer}
 @media(max-height:800px){#sidebar{padding-top:9px;padding-bottom:7px}.brand-row{padding-bottom:8px}.mini-day{height:25px}.mini-weekdays span{padding:2px 0 3px}.side-label{padding-top:12px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 body.reduce-motion *,body.reduce-motion *:before,body.reduce-motion *:after{animation:none!important;transition:none!important}
+
+/* Make Settings pixel-identical in width and height in every section. */
+.settings-dialog{flex:0 0 min(880px,94vw)!important;width:min(880px,94vw)!important;min-width:min(880px,94vw)!important;max-width:min(880px,94vw)!important;height:min(640px,92dvh)!important;min-height:min(640px,92dvh)!important;max-height:min(640px,92dvh)!important}
+.settings-pane{min-width:0!important;flex:1 1 0!important;overflow-y:auto!important}
