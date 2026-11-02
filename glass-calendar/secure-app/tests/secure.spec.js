@@ -1,3 +1,4 @@
+import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
 const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',username:'example',is_admin:true};
@@ -196,4 +197,138 @@ test('Month today highlight and all-day event edit preserves a one-day date',asy
  await page.locator('#settingsModal .dialog-close').click();
  await page.locator('#brand').click();
  await expect(page.locator('.monthcells .datenum.today')).toHaveCount(1);
+});
+
+const plus=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
+test('month-grid picker commits Start and End and supports a three-day event',async({page})=>{
+ const model=await setup(page);await page.locator('#newEvent').click();
+ await page.locator('#quickTitle').fill('Three-day conference');
+ const original=await page.locator('#startDate').inputValue(),start=plus(original,3),end=plus(original,5);
+ await page.locator('#startDateBtn').click();
+ await expect(page.locator('#calendarDatePicker [data-date-choice]')).toHaveCount(42);
+ await page.locator('[data-date-choice="'+start+'"]').click();
+ await expect(page.locator('#startDate')).toHaveValue(start);
+ await expect(page.locator('#endDate')).toHaveValue(start);
+ await page.locator('#endDateBtn').click();await page.locator('[data-date-choice="'+end+'"]').click();
+ await expect(page.locator('#endDate')).toHaveValue(end);
+ await page.locator('#quickSave').click();await expect.poll(()=>model.get().events.length).toBe(1);
+ const e=model.get().events[0];expect(e.all_day).toBe(true);
+ expect(Math.round((new Date(e.ends_at)-new Date(e.starts_at))/864e5)).toBe(3);
+ await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
+ await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
+ await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
+ for(const d of [start,plus(start,1),end]){
+  await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Three-day conference'})).toHaveCount(1);
+ }
+});
+test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
+ const model=await setup(page);await page.locator('#newEvent').click();
+ await page.locator('#quickTitle').fill('Weekly swimming');
+ await page.locator('#repeatButton').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Weekly'}).click();
+ await page.locator('#quickSave').click();
+ await expect.poll(()=>model.get().events.length).toBe(1);
+ for(let i=0;i<3;i++){
+  await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Weekly swimming'})).toBeVisible();
+  await page.locator('#next').click();
+ }
+ await page.locator('.all-day-chip').filter({hasText:'Weekly swimming'}).first().click();
+ await expect(page.locator('dialog[open]').last()).toContainText('Repeats weekly');
+ await expect(page.locator('dialog[open]').last()).toContainText('Personal');
+});
+test('all-day subscribed events use civil DTSTART dates and week strip',async({page})=>{
+ const model=await setup(page);
+ const a=plus([new Date().getFullYear(),String(new Date().getMonth()+1).padStart(2,'0'),'01'].join('-'),7);
+ const event=(id,d)=>({id,calendar_id:calendar.id,source_subscription_id:'44444444-4444-4444-8444-444444444444',title:'Feed all-day',starts_at:d+'T00:00:00.000Z',ends_at:plus(d,1)+'T00:00:00.000Z',all_day:true,repeat_rule:{}});
+ model.get().events.push(event('one',a),event('two',plus(a,1)),event('three',plus(a,2)));
+ model.get().settings.default_view='month';
+ await page.reload();
+ for(const d of [a,plus(a,1),plus(a,2)])await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(1);
+ await expect(page.locator('[data-cell="'+plus(a,-1)+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(0);
+ await page.locator('[data-drill="'+a+'"]').first().click();
+ await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Feed all-day'})).toHaveCount(1);
+ await expect(page.locator('.daytrack .all-day-chip')).toHaveCount(0);
+});
+test('token revoke removes row immediately, across reload and from mock auth',async({page})=>{
+ const model=await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
+ await page.locator('#generateToken').click();await page.locator('#promptValue').fill('QA');
+ await page.locator('#promptSave').click();
+ await expect(page.locator('#tokenSecret')).toHaveValue('test-token-shown-once');
+ await page.locator('dialog:has(#tokenSecret) .dialog-close').click();
+ await expect(page.locator('#tokenList')).toContainText('QA');
+ await page.locator('#tokenList [data-revoke]').click();
+ await page.locator('#confirmYes').click();
+ await expect.poll(()=>model.get().tokens.length).toBe(0);
+ await expect(page.locator('#tokenList')).not.toContainText('QA');
+ await page.reload();await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
+ await expect(page.locator('#tokenList')).not.toContainText('QA');
+});
+test('calendar colors tint chips while primary remains monochrome',async({page})=>{
+ const model=await setup(page);
+ await page.locator('#newCalendar').click();
+ await expect(page.locator('.calendar-color-swatch')).toHaveCount(8);
+ await page.locator('#calendarFormName').fill('Swim Team');await page.locator('[data-color="teal"]').click();
+ await page.locator('#calendarFormSave').click();
+ await expect.poll(()=>model.get().calendars.length).toBe(2);
+ await page.locator('#newEvent').click();await page.locator('#quickTitle').fill('Pool workout');
+ await page.locator('#eventCalendarBtn').click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:'Swim Team'}).click();
+ await page.locator('#quickSave').click();
+ await expect.poll(()=>model.get().events.length).toBe(1);
+ await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
+ await page.locator('[data-select="default_view"]').click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
+ await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
+ const item=page.locator('.eventchip').filter({hasText:'Pool workout'});
+ await expect(item).toHaveCount(1);
+ const eventStyle=await item.getAttribute('style');expect(eventStyle.toLowerCase()).toContain(palette.teal.toLowerCase());
+ const primary=await page.locator('#newEvent').evaluate(x=>getComputedStyle(x).backgroundColor);
+ expect(primary).not.toEqual('rgb(74, 184, 182)');
+});
+test('Tasks filters show counts and friendly dates',async({page})=>{
+ const model=await setup(page);
+ model.get().tasks.push({id:'t1',title:'Spanish homework',due_date:'2026-11-02',completed:false},{id:'t2',title:'Completed project',due_date:'2026-11-01',completed:true});
+ await page.reload();await page.locator('[data-nav="tasks"]').click();
+ await expect(page.locator('[data-task-filter="all"]')).toContainText('2');
+ await expect(page.locator('[data-task-filter="todo"]')).toContainText('1');
+ await page.locator('[data-task-filter="todo"]').click();
+ await expect(page.locator('.task-row')).toHaveCount(1);
+ await expect(page.locator('.task-row')).toContainText('Spanish homework');
+ await expect(page.locator('.task-row')).not.toContainText('2026-11-02');
+ await page.locator('[data-task-filter="completed"]').click();
+ await expect(page.locator('.task-row')).toContainText('Completed project');
+});
+test('fixed Settings scrolls at 1366 x 768 and About stays structured',async({page})=>{
+ await page.setViewportSize({width:1366,height:768});await setup(page);await page.locator('#settings').click();
+ const box=await page.locator('#settingsModal').boundingBox();
+ for(const section of ['general','calendar','appearance','data','notifications','ai','about']){
+  await page.locator('[data-sec="'+section+'"]').click();
+  const after=await page.locator('#settingsModal').boundingBox();
+  expect(Math.abs(after.height-box.height)).toBeLessThan(1);expect(Math.abs(after.width-box.width)).toBeLessThan(1);
+ }
+ await page.locator('[data-sec="appearance"]').click();
+ await page.locator('#settingsPane').evaluate(el=>el.scrollTop=el.scrollHeight);
+ await expect(page.locator('#settingsPane')).toContainText('Reduce motion');
+});
+test('holiday greeting uses local time bands and holiday overrides',()=>{
+ const d=(h)=>new Date(2026,10,2,h,0,0);
+ expect(greeting('Alex',d(5))).toContain('Good morning');
+ expect(greeting('Alex',d(12))).toContain('Good afternoon');
+ expect(greeting('Alex',d(17))).toContain('Good evening');
+ expect(greeting('Alex',new Date(2026,9,31,9))).toContain('Happy Halloween');
+ expect(greeting('Alex',new Date(2026,10,26,9))).toContain('Happy Thanksgiving');
+ expect(greeting('Alex',new Date(2026,11,24,9))).toContain('Christmas Eve');
+});
+test('calendar delete requires exact name and exposes Undo',async({page})=>{
+ const model=await setup(page);
+ await page.locator('#calList [data-menu]').first().click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:'Delete calendar'}).click();
+ await expect(page.locator('#calendarDeleteConfirm')).toBeDisabled();
+ await page.locator('#calendarDeleteName').fill('Personal');
+ await expect(page.locator('#calendarDeleteConfirm')).toBeEnabled();
+ await page.locator('#calendarDeleteConfirm').click();
+ await expect(page.locator('#toast')).toContainText('Calendar deleted');
+ await expect(page.locator('#toast .undo-button')).toBeVisible();
+ await page.locator('#toast .undo-button').click();
+ await expect.poll(()=>model.get().calendars.length).toBe(1);
+ await expect(page.locator('#calList')).toContainText('Personal');
 });
