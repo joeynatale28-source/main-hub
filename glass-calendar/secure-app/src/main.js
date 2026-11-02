@@ -254,7 +254,7 @@ function renderMonth(){
    (covering+Math.max(0,visibleCount-3)>0?'<button class="month-more" data-drill="'+key+'">+'+(covering+Math.max(0,visibleCount-3))+' more</button>':'')+'</div>';
  }
  html+=multi.filter(s=>s.lane<3).map(s=>'<button class="month-span '+(s.start?'span-start':'span-continue')+' '+(s.end?'span-end':'span-continues')+'" '+eventAttr(s.event,'grid-row:'+(s.week+1)+';grid-column:'+((s.from%7)+1)+' / span '+(s.to-s.from+1)+';--span-lane:'+s.lane+';')+'><span>'+h(s.event.title)+'</span></button>').join('')+'</div>';
- $('#grid').innerHTML=html;bindEventButtons();
+ $('#grid').innerHTML=html;bindEventButtons();enableEventDrag();
 }
 function renderWeek(){
  const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7));
@@ -283,6 +283,78 @@ function renderAgenda(){
  const days=[...new Set(items.map(x=>eventDate(x)))];
  $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+
  items.filter(x=>eventOn(x,d)).map(x=>{const range=spanRange(x),multi=spanning(x);return '<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(multi?h(prettyShort(range.first+'T12:00:00')+' – '+prettyShort(range.last+'T12:00:00')):x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>'}).join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
+}
+let dragSession=null,skipNextClick=false;
+function enableEventDrag(){
+ if(state.view==='agenda')return;
+ $('.weekevent,.month-span,.monthcell .eventchip,.all-day-span').forEach(button=>{
+  button.addEventListener('pointerdown',e=>{
+   if(e.button!==0)return;
+   const ev=getOccurrence(button.dataset.detail,button.dataset.occ);
+   if(!ev||ev.source_subscription_id)return;
+   const edge=e.target.closest('[data-resize]')?.dataset.resize||'move';
+   initiateDrag(e,{button,event:ev,edge,kind:state.view==='month'?'month':'week'});
+  });
+  button.addEventListener('click',e=>{if(skipNextClick){e.preventDefault();e.stopImmediatePropagation();skipNextClick=false}},true);
+ });
+ if(state.view==='month')$('.monthcell').forEach(cell=>{
+  cell.addEventListener('pointerdown',e=>{
+   if(e.button!==0||e.target.closest('button'))return;
+   initiateDrag(e,{button:cell,event:null,edge:'create',kind:'month'});
+  });
+ });
+}
+function initiateDrag(e,info){
+ const startX=e.clientX,startY=e.clientY,previous=info.event,original=previous?previous._origin||previous:null;
+ const begin=previous?new Date(previous.starts_at):null,finish=previous?new Date(previous.ends_at):null;
+ const ms=begin&&finish?finish-begin:3600000;
+ const originDate=info.kind==='month'?(e.target.closest('[data-cell]')?.dataset.cell||info.event?._civilDate||iso(begin)):null;
+ let active=false,ghost=null,targetDate=originDate,minuteDelta=0,newBegin=null,newFinish=null;
+ const cancel=()=>{document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',up,true);document.removeEventListener('keydown',onKey,true);ghost?.remove();document.body.classList.remove('daylight-dragging');$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));dragSession=null};
+ const onKey=event=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancel()}};
+ const move=event=>{
+  const dx=event.clientX-startX,dy=event.clientY-startY;
+  if(!active&&Math.hypot(dx,dy)<6)return;
+  if(!active){
+   active=true;dragSession={cancel};document.body.classList.add('daylight-dragging');
+   ghost=document.createElement('div');ghost.className='daylight-drag-ghost';ghost.style.setProperty('--event-color',previous?eventColor(previous):'var(--primary)');document.body.append(ghost);
+  }
+  event.preventDefault();ghost.style.left=Math.max(8,Math.min(innerWidth-ghost.offsetWidth-8,event.clientX+14))+'px';ghost.style.top=Math.max(8,Math.min(innerHeight-ghost.offsetHeight-8,event.clientY+12))+'px';
+  const hovered=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-cell],[data-slot]');
+  $('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));
+  if(hovered){hovered.classList.add('daylight-drag-target');targetDate=hovered.dataset.cell||hovered.dataset.slot}
+  if(info.kind==='month'){
+   if(!targetDate)targetDate=originDate;
+   const offset=Math.round((date(targetDate)-date(originDate))/86400000);
+   newBegin=previous?new Date(begin.getTime()+offset*86400000):date(originDate);
+   newFinish=previous?new Date(finish.getTime()+offset*86400000):new Date(date(targetDate).getTime()+86400000);
+   if(!previous&&targetDate<originDate){newBegin=date(targetDate);newFinish=new Date(date(originDate).getTime()+86400000)}
+   ghost.innerHTML='<strong>'+h(previous?.title||'New event')+'</strong><small>'+h(prettyShort(newBegin))+' – '+h(prettyShort(new Date(newFinish-1)))+'</small>';
+  }else{
+   const track=hovered?.closest('.daytrack')||document.elementFromPoint(event.clientX,event.clientY)?.closest('.daytrack');
+   const base=track?.getBoundingClientRect();
+   const snapY=base?Math.round((event.clientY-base.top)/15)*15:Math.round(dy/15)*15;
+   const moveMinutes=info.edge==='move'&&base?Math.max(0,Math.min(1425,snapY))-(begin.getHours()*60+begin.getMinutes()):Math.round(dy/15)*15;
+   minuteDelta=moveMinutes;
+   if(info.edge==='top'){newBegin=new Date(begin.getTime()+minuteDelta*60000);newFinish=finish}
+   else if(info.edge==='bottom'){newBegin=begin;newFinish=new Date(finish.getTime()+minuteDelta*60000)}
+   else{const days=track?Math.round((date(track.dataset.slot)-date(iso(begin)))/86400000):0;newBegin=new Date(begin.getTime()+days*86400000+minuteDelta*60000);newFinish=new Date(newBegin.getTime()+ms)}
+   if(newFinish-newBegin<15*60000){newFinish=new Date(newBegin.getTime()+15*60000)}
+   ghost.innerHTML='<strong>'+h(previous?.title||'Event')+'</strong><small>'+h(prettyClock(newBegin))+' – '+h(prettyClock(newFinish))+'</small>';
+  }
+ };
+ const up=async(event)=>{
+  const didMove=active,beginning=newBegin,ending=newFinish,selected=previous;
+  cancel();if(!didMove||!beginning||!ending)return;
+  skipNextClick=true;setTimeout(()=>skipNextClick=false,350);
+  if(info.edge==='create'){openEditor(null,iso(beginning));const form=$('#quickForm');if(form){$('#startDate',form).value=iso(beginning);$('#endDate',form).value=iso(new Date(ending.getTime()-1));const startButton=$('[data-pick="start"]',form),endButton=$('[data-pick="end"]',form);if(startButton)startButton.textContent=label(beginning);if(endButton)endButton.textContent=label(new Date(ending.getTime()-1))}return}
+  const data={starts_at:beginning.toISOString(),ends_at:ending.toISOString()};
+  try{
+   if(isNativeRepeat(original))occurrenceChoice(selected,'update',async scope=>{try{await mutateOccurrence(selected,scope,'update',data)}catch(err){toast(err.message||'Could not update event.')}});
+   else{await safeChange('events',original.id,data,'update');toast('Event updated')}
+  }catch(err){toast(err.message||'Could not update event.')}
+ };
+ document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',up,true);document.addEventListener('keydown',onKey,true);
 }
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
