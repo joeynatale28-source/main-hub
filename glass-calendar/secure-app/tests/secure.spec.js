@@ -4,15 +4,17 @@ const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',la
 const calendar={id:'22222222-2222-4222-8222-222222222222',name:'Personal',client_id:'personal',shade:'gray-1',sort_order:0,is_visible:true};
 function makeSettings(){return{theme:'dark',default_view:'week',start_of_week:'sunday',accent:'graphite',custom_accent_hex:null,show_weekends:true,compact_mode:false,reduce_motion:false,mcp_allow_delete:false,default_reminder_minutes:15}}
 async function setup(page,{loggedIn=true,failLogin=false}={}){
- let settings=makeSettings(),calendars=[calendar],events=[],tasks=[],subscriptions=[];
+ let settings=makeSettings(),calendars=[{...calendar}],events=[],tasks=[],subscriptions=[],tokens=[],user={...account};
  await page.route('https://mock.supabase.co/functions/v1/daylight-release',async route=>{
   const req=route.request().postDataJSON(),action=req.action;
   const success=(obj)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(obj)});
   if(action==='auth_login')return failLogin?route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:"That username and password don't match"})}):success({token:'temporary-test-token',user:account});
-  if(action==='auth_session')return success({user:account});
+  if(action==='auth_session')return success({user});
+  if(action==='user_update'){user={...user,first_name:req.first_name,last_name:req.last_name};return success({user})}
   if(action==='auth_logout')return success({ok:true});
-  if(action==='mcp_list')return success({items:[]});
-  if(action==='mcp_generate')return success({item:{id:'tok1',name:req.name,created_at:new Date().toISOString()},token:'test-token-shown-once'});
+  if(action==='mcp_list')return success({items:tokens});
+  if(action==='mcp_generate'){const item={id:'tok'+(tokens.length+1),name:req.name,created_at:new Date().toISOString()};tokens.push(item);return success({item,token:'test-token-shown-once'})}
+  if(action==='mcp_revoke'){tokens=tokens.filter(t=>t.id!==req.id);return success({ok:true})}
   if(action==='data_list'){const map={calendars,events,tasks,subscriptions,settings:[settings]};return success({items:map[req.entity]||[]})}
   if(action==='data_update'&&req.entity==='settings'){settings={...settings,...req.data};return success({item:settings})}
   if(action==='data_create'){
@@ -23,14 +25,14 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
    const entity=req.entity;const list={events,tasks,calendars,subscriptions}[entity];const index=list.findIndex(x=>x.id===req.id);if(index>=0)list[index]={...list[index],...req.data};return success({item:list[index]||{}});
   }
   if(action==='data_delete'){
-   const list={events,tasks,calendars,subscriptions}[req.entity];const i=list.findIndex(x=>x.id===req.id);const [item]=list.splice(i,1);return success({item});
+   const list={events,tasks,calendars,subscriptions}[req.entity];const i=list.findIndex(x=>x.id===req.id);const [item]=list.splice(i,1);if(req.entity==='calendars')events=events.filter(e=>e.calendar_id!==req.id);return success({item});
   }
   if(action==='sub_refresh')return success({count:0,item:subscriptions.find(x=>x.id===req.id)});
   return success({ok:true});
  });
  if(loggedIn)await page.addInitScript(()=>localStorage.setItem('dl-release-session','temporary-test-token'));
  await page.goto('/');
- return{get:()=>({settings,calendars,events,tasks,subscriptions})};
+ return{get:()=>({settings,calendars,events,tasks,subscriptions,tokens,user})};
 }
 test('no session shows only login and no signup',async({page})=>{
  await setup(page,{loggedIn:false,failLogin:true});
@@ -39,7 +41,7 @@ test('no session shows only login and no signup',async({page})=>{
  await expect(page.locator('#newEvent')).toHaveCount(0);
  await page.locator('#username').fill('nonexistent');await page.locator('#password').fill('anything');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toHaveText("That username and password don't match");
+ await expect(page.locator('#authError')).toHaveText("That username and password don't match.");
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
@@ -122,15 +124,13 @@ test('Settings never changes size, remembers section, searches IANA time zones, 
  await page.reload();await page.locator('#settings').click();
  await expect(page.locator('#settingsPane h2')).toContainText('About');
 });
-test('appearance controls preview immediately, all switches are 44 x 24',async({page})=>{
+test('Appearance uses monochrome theme controls and no accent system',async({page})=>{
  const model=await setup(page);
  await page.locator('#settings').click();await page.locator('[data-sec="appearance"]').click();
- const toggles=await page.evaluate(()=>Array.from(document.querySelectorAll('#settingsPane .switch,#calList .switch')).slice(0,3).map(x=>{const r=x.getBoundingClientRect();return {w:r.width,h:r.height}}));
- for(const x of toggles){expect(x.w).toBe(44);expect(x.h).toBe(24)}
- await page.locator('[data-accent="#3B82F6"]').click();
- await expect(page.locator('[data-accent="#3B82F6"]')).toHaveAttribute('data-picked','true');
- const color=await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
- expect(color.toLowerCase()).toBe('#3b82f6');
+ await expect(page.locator('[data-accent],#customAccent')).toHaveCount(0);
+ await expect(page.locator('#settingsPane')).not.toContainText('Accent color');
+ const switches=await page.evaluate(()=>Array.from(document.querySelectorAll('#settingsPane .switch,#calList .switch')).slice(0,3).map(x=>{const r=x.getBoundingClientRect();return {w:r.width,h:r.height}}));
+ for(const x of switches){expect(x.w).toBe(44);expect(x.h).toBe(24)}
  await page.locator('.theme-card[data-theme="light"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
  await expect(page.locator('.theme-card[data-theme="light"]')).toHaveClass(/picked/);
