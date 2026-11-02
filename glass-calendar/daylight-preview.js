@@ -387,6 +387,7 @@ function segmentClass(o,day){
  return " seg-mid";
 }
 /* Month reference: 6 equal week rows, a Sunday-first grid and contiguous event segments. */
+let monthCreateDragStart=null;
 function renderMonth(){
  const wrap=el('<div class="month-wrap"></div>'),y=state.cursor.getFullYear(),m=state.cursor.getMonth();
  const headers=el('<div class="dow-row'+(state.weekNumbers?" has-wn":"")+'">'+(state.weekNumbers?"<span></span>":"")+DOWS_S.map(x=>'<span class="dow-cell">'+x+'</span>').join("")+'</div>');
@@ -408,12 +409,26 @@ function renderMonth(){
    items.slice(0,limit).forEach(o=>{
     const cal=calOf(o.ev.cal),seg=segmentClass(o,day),show=sameDay(o.start,day)||day.getDay()===0||!seg;
     const chip=el('<button class="chip'+seg+'" style="background:'+tintOf(cal)+';color:'+tintTextOf(cal)+'">'+(show?'<span class="chip-title">'+esc(o.ev.title)+'</span>'+(!o.ev.allDay&&!multiDay(o)?'<span class="chip-time">'+fmtTime(o.start)+'</span>':''):'<span class="chip-title">&nbsp;</span>')+'</button>');
-    chip.setAttribute("aria-label",o.ev.title);chip.onclick=e=>{e.stopPropagation();openPopover(o,chip)};events.append(chip);
+    chip.setAttribute("aria-label",o.ev.title);chip.onclick=e=>{e.stopPropagation();openPopover(o,chip)};installDragSource(chip,o);events.append(chip);
    });
    if(items.length>limit){
     const more=el('<button class="more-link">+'+(items.length-limit)+' more</button>');more.onclick=()=>drillToDay(day);events.append(more);
    }
    cell.append(events);cell.onclick=e=>{if(e.target.closest("button"))return;state.selected=sod(day);renderSidebar();$$(".day-cell.sel",viewWrap).forEach(x=>x.classList.remove("sel"));cell.classList.add("sel")};
+   cell.addEventListener("dragover",e=>{if(e.dataTransfer.types.includes("application/x-daylight-event"))e.preventDefault()});
+   cell.addEventListener("drop",async e=>{
+    const occ=dragPayload(e);if(!occ)return;e.preventDefault();e.stopPropagation();
+    const start=new Date(occ.start),end=new Date(occ.end);
+    const delta=Math.round((sod(day)-sod(start))/86400000);
+    start.setDate(start.getDate()+delta);end.setDate(end.getDate()+delta);
+    await moveOccurrence(occ,start,end);
+   });
+   cell.addEventListener("pointerdown",e=>{if(e.button!==0||e.target.closest("button"))return;monthCreateDragStart=day});
+   cell.addEventListener("pointerup",e=>{
+    if(!monthCreateDragStart)return;
+    const first=monthCreateDragStart;monthCreateDragStart=null;
+    if(dateKey(first)!==dateKey(day)&&!e.target.closest("button"))openEventForm(null,first,null,null,"all",day);
+   });
    row.append(cell);
   }grid.append(row);
  }wrap.append(grid);return wrap;
@@ -738,7 +753,7 @@ function customRepeat(f,dirty,sync){
   f.repeat=freq.toLowerCase();f.rrule=rule;dirty();sync();close();
  };
 }
-function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null,scope="all"){
+function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null,scope="all",presetEndDate=null){
  closePopover();closeMenu();closeDatePicker();
  if(existing&&calOf(existing.cal).subscribed){toast("Subscribed events are read-only");return}
  const src=existing,base=occ||src,now=TODAY(),nextHour=Math.min(23,now.getHours()+1);
@@ -747,7 +762,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
  const rawEnd=base?.end||null;
  const f={
   title:src?.title||"",cal:src?.cal||defaultCal.id,allDay:!!src?.allDay,
-  sDate:sod(base?.start||presetDate||state.selected),eDate:sod(rawEnd||presetDate||state.selected),
+  sDate:sod(base?.start||presetDate||state.selected),eDate:sod(rawEnd||presetEndDate||presetDate||state.selected),
   sMin:base&&!src?.allDay?base.start.getHours()*60+base.start.getMinutes():(presetMinutes??nextHour*60),
   eMin:base&&!src?.allDay?base.end.getHours()*60+base.end.getMinutes():Math.min(1430,(presetMinutes??nextHour*60)+60),
   repeat:src?.repeat||null,rrule:src?.rrule||null,loc:src?.loc||"",dirty:false
