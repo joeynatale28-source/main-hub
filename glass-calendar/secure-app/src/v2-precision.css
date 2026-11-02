@@ -156,3 +156,7 @@
 #root.collapsed #newEvent .dl-icon-slot{width:18px;height:18px;display:inline-grid!important}
 #root.collapsed .side-middle>.primary{font-size:0!important}
 #root.collapsed .side-middle>.primary svg{width:18px;height:18px}
+
+/* Settings must not scale on entrance: even transient transform changed its measured outer dimensions. */
+#settingsModal{animation:fade 150ms ease!important;transform:none!important}
+#settingsModal[open]{width:min(880px,94vw)!important;height:min(640px,92vh)!important}
