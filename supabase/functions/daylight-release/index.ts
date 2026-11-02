@@ -27,6 +27,10 @@ async function session(token:string){
 async function bootstrap(uid:string){
  const {error:se}=await db.from('dl_user_settings').upsert({user_id:uid},{onConflict:'user_id',ignoreDuplicates:true});
  if(se)throw se;
+ const {count,error:countError}=await db.from('dl_calendars').select('id',{head:true,count:'exact'}).eq('user_id',uid);
+ if(countError)throw countError;
+ // Seed only once: a calendar the owner deleted must never reappear at next login.
+ if(count&&count>0)return;
  for(const [i,c] of ['Personal','Work','Life & plans','US Holidays'].entries()){
   const {error:ce}=await db.from('dl_calendars').upsert({user_id:uid,name:c,shade:'gray-'+(i+1),sort_order:i,is_visible:true,client_id:['personal','work','life','us-holidays'][i]},{onConflict:'user_id,client_id',ignoreDuplicates:true});
   if(ce)throw ce;
