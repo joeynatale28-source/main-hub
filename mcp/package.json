@@ -11,7 +11,8 @@
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
     "@supabase/supabase-js": "2.49.10",
-    "zod": "4.1.12"
+    "zod": "4.1.12",
+    "@modelcontextprotocol/client": "2.4.0"
   },
   "devDependencies": {
     "@types/node": "22.15.30",
