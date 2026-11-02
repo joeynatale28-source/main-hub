@@ -709,6 +709,52 @@ function openSearch(){
 }
 const settingsState={section:"general",pendingView:null};
 function switchHTML(id,checked){return '<label class="switch"><input type="checkbox" id="'+id+'"'+(checked?" checked":"")+'><span class="track"></span><span class="knob"></span></label>'}
+
+async function persistTask(task,method){
+ try{
+  const data={title:task.title,notes:task.notes||"",due_date:task.due_date||null,completed:!!task.completed};
+  const r=await localApi("data_"+method,{entity:"tasks",id:method==="create"?null:task.id,data});
+  if(method==="create")task.id=r.item.id;
+  return true;
+ }catch(error){toast(error.message||"Could not save task");return false}
+}
+function renderTasks(){
+ const wrap=el('<div class="tasks-scroll"><div class="tasks-inner"><div class="tasks-filters"></div><div id="taskList"></div></div></div>');
+ const all=state.tasks||[];
+ const counts={all:all.length,todo:all.filter(t=>!t.completed).length,completed:all.filter(t=>t.completed).length};
+ const filters=$(".tasks-filters",wrap);
+ for(const [name,title] of [["all","All"],["todo","To do"],["completed","Completed"]]){
+  const b=el('<button class="task-filter'+(state.taskFilter===name?" active":"")+'">'+title+' <span>'+counts[name]+'</span></button>');
+  b.onclick=()=>{state.taskFilter=name;renderView(false)};
+  filters.append(b);
+ }
+ const list=$("#taskList",wrap);
+ const visible=all.filter(t=>state.taskFilter==="all"||(state.taskFilter==="todo"&&!t.completed)||(state.taskFilter==="completed"&&t.completed));
+ if(!visible.length)list.append(el('<div class="empty-state">'+icon("check",30)+'<p>'+(state.taskFilter==="all"?"No tasks yet":"No tasks in this filter")+'</p><p>Create a task using Add Task.</p></div>'));
+ for(const task of visible){
+  const row=el('<div class="task-entry"><label class="task-done"><input type="checkbox"'+(task.completed?" checked":"")+' aria-label="Complete '+esc(task.title)+'"></label><button class="task-title'+(task.completed?" completed":"")+'">'+esc(task.title)+(task.due_date?'<small>Due '+esc(new Date(task.due_date+"T12:00:00").toLocaleDateString())+'</small>':"")+'</button><button class="icon-btn task-remove" title="Delete task">'+icon("trash",16)+'</button></div>');
+  $(".task-done input",row).onchange=async e=>{const prior=task.completed;task.completed=e.target.checked;if(await persistTask(task,"update"))renderView(false);else{task.completed=prior;e.target.checked=prior}};
+  $(".task-title",row).onclick=()=>openTaskForm(task);
+  $(".task-remove",row).onclick=()=>openConfirm({title:"Delete task?",body:"Delete "+task.title+"?",confirmLabel:"Delete",danger:true,fn:async()=>{
+   try{await localApi("data_delete",{entity:"tasks",id:task.id});state.tasks=state.tasks.filter(t=>t.id!==task.id);renderView(false);toast("Task deleted")}catch(e){toast(e.message)}
+  }});
+  list.append(row);
+ }
+ return wrap;
+}
+function openTaskForm(existing=null){
+ const body='<div class="field"><label for="taskTitle">Task</label><input class="text-input" id="taskTitle" placeholder="Task title" value="'+esc(existing?.title||"")+'"><div class="field-err" id="taskErr"></div></div>'+
+ '<div class="field"><label for="taskNotes">Notes</label><textarea class="text-area" id="taskNotes" rows="3">'+esc(existing?.notes||"")+'</textarea></div>'+
+ '<div class="field"><label for="taskDue">Due date (optional)</label><input id="taskDue" class="text-input" type="date" value="'+esc(existing?.due_date||"")+'"></div>';
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true"><div class="dialog-head"><span class="dialog-title">'+(existing?"Edit task":"New task")+'</span><button class="icon-btn" data-close>'+icon("x",17)+'</button></div><div class="dialog-body">'+body+'</div><div class="dialog-foot"><button class="btn-ghost" data-close>Cancel</button><button class="btn-primary" id="saveTaskButton">'+(existing?"Save changes":"Create task")+'</button></div></div></div>');
+ overlayRoot.append(bd);$("[data-close]",bd).forEach(x=>x.onclick=()=>bd.remove());
+ $("#saveTaskButton",bd).onclick=async()=>{
+  const title=$("#taskTitle",bd).value.trim();if(!title){$("#taskErr",bd).textContent="Add a task title.";return}
+  const t={...existing,title,notes:$("#taskNotes",bd).value,due_date:$("#taskDue",bd).value||null,completed:existing?.completed||false};
+  if(await persistTask(t,existing?"update":"create")){if(existing)Object.assign(existing,t);else state.tasks.push(t);bd.remove();renderView(false);toast(existing?"Task updated":"Task created")}
+ };
+ $("#taskTitle",bd).focus();
+}
 function paneHead(pane,title,sub){
  pane.append(el('<h2>'+esc(title)+'</h2>'));if(sub)pane.append(el('<p class="pane-sub">'+esc(sub)+'</p>'));
 }
