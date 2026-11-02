@@ -277,16 +277,15 @@ test('theme quick toggle cycles all modes and system reacts to OS scheme',async(
   await page.locator('#quickThemeButton').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
 });
-test('Settings is a separate page with sticky matching subnavigation',async({page})=>{
-  await page.locator('#settingsHeaderButton').click();
-  await expect(page.locator('#settingsPage')).toBeVisible();
-  await expect(page.locator('#calendarContent')).toBeHidden();
-  await expect(page.locator('.settings-sections')).toHaveCSS('position','sticky');
-  await expect(page.locator('.settings-anchor[data-target="settingsCalendar"]')).toHaveText('Calendar');
-  await expect(page.locator('#settingsCalendar h2')).toHaveText('Calendar');
-  await page.locator('.nav[data-view="month"]').click();
-  await expect(page.locator('#calendarContent')).toBeVisible();
-  await expect(page.locator('#settingsPage')).toBeHidden();
+test('Settings uses a centered modal with navigation and the calendar remains visible',async({page})=>{
+ await page.locator('#settingsHeaderButton').click();
+ await expect(page.locator('#settingsModal')).toBeVisible();
+ await expect(page.locator('#calendarContent')).toBeVisible();
+ await expect(page.locator('.settings-sections')).toHaveCSS('position','static');
+ await page.locator('.settings-anchor[data-target="settingsCalendar"]').click();
+ await expect(page.locator('#settingsCalendar h2')).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.locator('#settingsModal')).toBeHidden();
 });
 test('provider logos are bounded, grey and not overlapping',async({page})=>{
   await page.locator('#integrationsNav').click();
@@ -332,27 +331,25 @@ test('search across dates resets completely on Escape and clear button',async({p
   await expect(page.locator('#searchResults')).toBeHidden();
 });
 
-test('visual QA captures Settings, Integrations and event editor in both themes',async({page})=>{
+test('visual QA captures Settings modal, Integrations and event editor in both themes',async({page})=>{
  await page.setViewportSize({width:1440,height:900});
  await page.locator('#settingsHeaderButton').click();
- await expect(page.locator('#settingsPage')).toBeVisible();
+ await expect(page.locator('#settingsModal')).toBeVisible();
  await page.screenshot({path:'test-results/settings-dark.png',fullPage:false});
- await page.locator('#settingsAppearance').scrollIntoViewIfNeeded();
+ await page.locator('.settings-anchor[data-target="settingsAppearance"]').click();
  await page.locator('[data-theme-choice="light"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
  await page.screenshot({path:'test-results/settings-light.png',fullPage:false});
- await page.locator('.nav[data-view="month"]').click();
+ await page.locator('#settingsModal .settings-close').click();
  await page.locator('#integrationsNav').click();
  await expect(page.locator('#settingsIntegrations')).toBeVisible();
  await page.screenshot({path:'test-results/integrations-light.png',fullPage:false});
  await page.locator('.nav[data-view="month"]').click();
- await page.locator('#quickThemeButton').click();
- await page.locator('#quickThemeButton').click();
+ await page.locator('#quickThemeButton').click();await page.locator('#quickThemeButton').click();
  await page.locator('#addSide').click();
  await expect(page.locator('#eventDialog')).toBeVisible();
  await page.screenshot({path:'test-results/event-modal-dark.png',fullPage:false});
 });
-
 test('event modal custom selects work inside dialog and save metadata',async({page})=>{
   await page.locator('#addSide').click();
   await page.locator('#eventName').fill('Weekly swim');
@@ -408,7 +405,7 @@ test('theme treatments respond live and holiday banner uses dates',async({page})
 });
 test('accent swatches, custom hex validation, and persistence',async({page})=>{
  await page.locator('#settingsHeaderButton').click();
- await page.locator('#settingsAppearance').scrollIntoViewIfNeeded();
+ await page.locator('.settings-anchor[data-target="settingsAppearance"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-accent','graphite');
  await page.locator('[data-accent-choice="#3B82F6"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-accent','custom');
@@ -419,7 +416,7 @@ test('accent swatches, custom hex validation, and persistence',async({page})=>{
  await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
  await page.reload();
  await expect(page.locator('html')).toHaveCSS('--accent','#8B7CFF');
- if(!(await page.locator('#settingsPage').isVisible()))await page.locator('#settingsHeaderButton').click();
+ await page.locator('#settingsHeaderButton').click();await page.locator('.settings-anchor[data-target="settingsAppearance"]').click();
  await page.locator('[data-accent-choice="graphite"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-accent','graphite');
 });
@@ -452,11 +449,12 @@ test('release polish legal pages are reachable and describe local-only storage',
  await page.getByRole('link',{name:'Back to calendar'}).click();
  await expect(page.locator('#calendarView')).toBeVisible();
 });
-test('page transitions scroll to the top',async({page})=>{
+test('page transitions scroll to the top without scrolling the root document',async({page})=>{
  await page.setViewportSize({width:1440,height:740});
  await page.locator('#settingsHeaderButton').click();
- await page.locator('#settingsAbout').scrollIntoViewIfNeeded();
- await page.locator('.nav[data-view="month"]').click();
+ await page.locator('.settings-anchor[data-target="settingsAbout"]').click();
+ await expect(page.locator('#settingsAbout')).toBeVisible();
+ await page.locator('#settingsModal .settings-close').click();
  await page.locator('#tasksNav').click();
  await expect(page.locator('#tasksPage')).toBeVisible();
  const positions=await page.evaluate(()=>({window:scrollY,main:document.querySelector('.main').scrollTop}));
@@ -485,16 +483,16 @@ test('v1 shell is viewport-locked with pinned account row on desktop',async({pag
  await page.locator('.sidebar-middle').evaluate(e=>e.scrollTop=1000);
  await expect(page.locator('.sidebar-bottom .profile')).toBeVisible();
 });
-test('Settings renders inside the main region with the sidebar still visible',async({page})=>{
-  await page.setViewportSize({width:1440,height:900});
-  await page.locator('#settingsHeaderButton').click();
-  await expect(page.locator('#settingsPage')).toBeVisible();
-  const layout=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect();const side=r(document.querySelector('.sidebar')),settings=r(document.querySelector('#settingsPage')),cols=r(document.querySelector('#settingsPage .settings-layout'));return{side:side.width,x:settings.x,w:settings.width,col:cols.width,stack:getComputedStyle(document.querySelector('.settings-stack')).overflowY}});
-  expect(layout.x).toBeGreaterThanOrEqual(layout.side-2);
-  expect(layout.w).toBeLessThan(1440);
-  expect(layout.col).toBeLessThanOrEqual(1160);
-  await page.locator('.nav[data-view="month"]').click();
-  await expect(page.locator('#calendarView')).toBeVisible();
+test('Settings popup is centered over a visible calendar without navigating away',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ await page.locator('#settingsHeaderButton').click();
+ await expect(page.locator('#settingsModal')).toBeVisible();
+ const layout=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect(),d=r(document.querySelector('#settingsModal')),w=innerWidth;return{x:d.x,width:d.width,center:d.x+d.width/2,windowCenter:w/2}});
+ expect(Math.abs(layout.center-layout.windowCenter)).toBeLessThan(20);
+ expect(layout.width).toBeLessThanOrEqual(900);
+ await expect(page.locator('#calendarContent')).toBeVisible();
+ await page.locator('#settingsModal .settings-close').click();
+ await expect(page.locator('#settingsModal')).toBeHidden();
 });
 test('mini month arrows leave the main header and selected date unchanged',async({page})=>{
  const start=await page.locator('#pageTitle').textContent();
