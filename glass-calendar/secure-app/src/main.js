@@ -297,7 +297,7 @@ function renderAgenda(){
 let dragSession=null,skipNextClick=false;
 function enableEventDrag(){
  if(state.view==='agenda')return;
- $('.weekevent,.month-span,.monthcell .eventchip,.all-day-span').forEach(button=>{
+ $$('.weekevent,.month-span,.monthcell .eventchip,.all-day-span').forEach(button=>{
   button.addEventListener('pointerdown',e=>{
    if(e.button!==0)return;
    const ev=getOccurrence(button.dataset.detail,button.dataset.occ);
@@ -307,7 +307,7 @@ function enableEventDrag(){
   });
   button.addEventListener('click',e=>{if(skipNextClick){e.preventDefault();e.stopImmediatePropagation();skipNextClick=false}},true);
  });
- if(state.view==='month')$('.monthcell').forEach(cell=>{
+ if(state.view==='month')$$('.monthcell').forEach(cell=>{
   cell.addEventListener('pointerdown',e=>{
    if(e.button!==0||e.target.closest('button'))return;
    initiateDrag(e,{button:cell,event:null,edge:'create',kind:'month'});
@@ -320,7 +320,7 @@ function initiateDrag(e,info){
  const ms=begin&&finish?finish-begin:3600000;
  const originDate=info.kind==='month'?(e.target.closest('[data-cell]')?.dataset.cell||info.event?._civilDate||iso(begin)):null;
  let active=false,ghost=null,targetDate=originDate,minuteDelta=0,newBegin=null,newFinish=null;
- const cancel=()=>{document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',up,true);document.removeEventListener('keydown',onKey,true);ghost?.remove();document.body.classList.remove('daylight-dragging');$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));dragSession=null};
+ const cancel=()=>{document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',up,true);document.removeEventListener('keydown',onKey,true);ghost?.remove();document.body.classList.remove('daylight-dragging');$$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));dragSession=null};
  const onKey=event=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancel()}};
  const move=event=>{
   const dx=event.clientX-startX,dy=event.clientY-startY;
@@ -331,7 +331,7 @@ function initiateDrag(e,info){
   }
   event.preventDefault();ghost.style.left=Math.max(8,Math.min(innerWidth-ghost.offsetWidth-8,event.clientX+14))+'px';ghost.style.top=Math.max(8,Math.min(innerHeight-ghost.offsetHeight-8,event.clientY+12))+'px';
   const hovered=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-cell],[data-slot]');
-  $('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));
+  $$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));
   if(hovered){hovered.classList.add('daylight-drag-target');targetDate=hovered.dataset.cell||hovered.dataset.slot}
   if(info.kind==='month'){
    if(!targetDate)targetDate=originDate;
@@ -514,7 +514,7 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{loading(b,true,'Removing…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}else loading(b,false)}));
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{loading(b,true,'Removing…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}else loading(b,false)}));
 }
 function legal(id){const text={
  privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
