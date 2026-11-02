@@ -78,13 +78,28 @@ const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
 function nav(page,title,ico){return '<button class="nav '+(state.page===page?'selected':'')+'" title="'+h(title)+'" data-tooltip="'+h(title)+'" aria-label="'+h(title)+'" data-nav="'+page+'"><span class="glyph">'+ico+'</span>'+title+'</button>'}
+function bindRailTooltips(){
+ document.querySelector('#railTooltip')?.remove();
+ const hide=()=>document.querySelector('#railTooltip')?.remove();
+ $('.sidebar [data-tooltip]').forEach(el=>{
+  el.addEventListener('mouseenter',()=>show(el));el.addEventListener('focus',()=>show(el));
+  el.addEventListener('mouseleave',hide);el.addEventListener('blur',hide);
+ });
+ function show(el){
+  hide();if(!state.collapsed)return;
+  const r=el.getBoundingClientRect(),node=document.createElement('span');
+  node.id='railTooltip';node.textContent=el.dataset.tooltip;document.body.append(node);
+  node.style.left=Math.min(innerWidth-node.offsetWidth-8,r.right+9)+'px';
+  node.style.top=Math.max(8,Math.min(innerHeight-node.offsetHeight-8,r.top+r.height/2-node.offsetHeight/2))+'px';
+ }
+}
 function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
  $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
  $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
  $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
  $('#collapseRail').onclick=()=>{state.collapsed=!state.collapsed;localStorage.setItem('daylight-rail-collapsed',state.collapsed?'1':'0');render()};
  $('#newCalendar').onclick=()=>calendarForm();
- renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();upgradeIcons();
+ renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();upgradeIcons();bindRailTooltips();
 }
 function renderMini(){
  const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
