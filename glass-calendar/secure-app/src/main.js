@@ -148,7 +148,7 @@ function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+(['declined','cancelled'].includes(e.status)?'#92929a':eventColor(e))+';';
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
-const compactClock=value=>new Date(value).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\\s?(AM|PM)$/,(match,part)=>part.toLowerCase());
+const compactClock=value=>new Date(value).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?(AM|PM)$/,(match,part)=>part.toLowerCase());
 const compactRange=e=>compactClock(e.starts_at)+' - '+compactClock(e.ends_at);
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
@@ -189,7 +189,7 @@ function renderMini(){
  const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=0,start=add(first,-first.getDay());
  const active=iso(now()),selected=iso(state.date),weekstart=add(state.date,-((state.date.getDay()-shift+7)%7)),weekend=add(weekstart,6),miniEvents=occurrences(add(start,-1),add(start,44));
  let html='<div class="mini-head"><button id="miniPrev" class="icon" aria-label="Previous mini-calendar month">'+icon('chevron-left',16)+'</button><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><button id="miniNext" class="icon" aria-label="Next mini-calendar month">'+icon('chevron-right',16)+'</button></div><div class="mini-grid">';
- for(let i=0;i<7;i++)html+='<span class="dayname" title="'+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][(i+shift)%7]+'">'+['S','M','T','W','T','F','S'][(i+shift)%7]+'</span>';
+ for(let i=0;i<7;i++)html+='<span class="dayname" title="'+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][(i+shift)%7]+'">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>';
  for(let i=0;i<42;i++){
   const day=add(start,i),key=iso(day),matches=miniEvents.filter(e=>eventOn(e,key));
   const dots=matches.length?'<i class="mini-event-dot"></i>':'';
@@ -393,7 +393,7 @@ function renderWeek(){
 function renderAgenda(){
  const today=iso(now()),items=uniqueInstances(occurrences(add(now(),-1),add(now(),370))).filter(x=>eventDate(x)>=today||x._lastCivil>=today);
  const days=[...new Set(items.map(x=>x._firstCivil))];
- $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._firstCivil===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(isLong(x)?h(rangeLabel(x)):x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>').join('')+'</div>').join('') :emptyState('No upcoming events yet','Create an event to see it in your agenda.','calendar'))+'</div>';bindEventButtons();
+ $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._firstCivil===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><span class="agenda-event-copy"><strong>'+h(x.title)+'</strong>'+(x.location_name||x.location_address?'<small class="agenda-location">'+h(x.location_name||x.location_address)+'</small>':'')+'</span></span><small class="agenda-time">'+(isLong(x)?h(rangeLabel(x)):x.all_day?'All day':h(compactRange(x)))+'</small></button>').join('')+'</div>').join('') :emptyState('No upcoming events yet','Create an event to see it in your agenda.','calendar'))+'</div>';bindEventButtons();
 }
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
