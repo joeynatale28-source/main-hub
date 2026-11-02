@@ -420,7 +420,7 @@ test('recurrence EXDATE removes only the selected weekly date',()=>{
  expect(all.map(x=>x._first)).toEqual(['2026-11-02','2026-11-16','2026-11-23']);
 });
 test('in-app Cmd/Ctrl+Comma handler opens Settings when the browser delivers the shortcut',async({page})=>{
- await setup(page);
+ await setup(page);await expect(page.locator('.weekwrapper')).toBeVisible();
  await page.evaluate(()=>document.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',ctrlKey:true,bubbles:true,cancelable:true})));
 
  await expect(page.locator('#settingsModal')).toBeVisible();
