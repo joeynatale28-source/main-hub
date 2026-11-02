@@ -370,7 +370,7 @@ function renderWeek(){
  $('#grid').innerHTML=html+'</div></div>';
  const current=now(),minutesNow=current.getHours()*60+current.getMinutes();
  const todayTrack=$('[data-slot="'+iso(current)+'"]',$('#grid'));
- if(todayTrack){const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*.8)+'px';todayTrack.append(line)}
+ if(todayTrack){const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*.8)+'px';todayTrack.append(line);const dot=document.createElement('div');dot.className='now-gutter-dot';dot.style.top=(minutesNow*.8)+'px';$('.hours',$('#grid')).append(dot)}
  if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
  bindEventButtons();enableCalendarDrag();
  $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/.8)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
@@ -419,8 +419,8 @@ function menu(button,items,filterable=false){
  (button.closest('dialog[open]')||document.body).append(el);
  const rect=button.getBoundingClientRect(),inSidebar=!!button.closest('#calList'),dialogRect=button.closest('dialog[open]')?.getBoundingClientRect(),minX=dialogRect?dialogRect.left+8:6,maxX=dialogRect?dialogRect.right-8:innerWidth-6,width=Math.min(Math.max(220,rect.width),maxX-minX,innerWidth-12);
  el.style.width=width+'px';
- const availableBelow=innerHeight-rect.bottom-12,needed=Math.min(filterable?390:285,items.length*38+20);
- const top=availableBelow>=Math.min(needed,185)?rect.bottom+5:Math.max(7,rect.top-Math.min(needed,innerHeight-18)-5);
+ const availableBelow=(dialogRect?Math.min(innerHeight-12,dialogRect.bottom-8):innerHeight-12)-rect.bottom,needed=Math.min(filterable?390:285,items.length*38+20);
+ const top=availableBelow>=Math.min(needed,185)?rect.bottom+5:Math.max(dialogRect?dialogRect.top+8:7,rect.top-Math.min(needed,innerHeight-18)-5);
  el.style.top=top+'px';
  const x=inSidebar?rect.right+7:rect.left;
  el.style.left=Math.max(minX,Math.min(maxX-width,x))+'px';
@@ -491,7 +491,7 @@ const selectOptions={
 const readableTime=v=>{const [hour,minute]=String(v||'09:00').split(':').map(Number);return (hour%12||12)+':'+String(minute||0).padStart(2,'0')+' '+(hour>=12?'PM':'AM')};
 const row=(title,description,control)=>'<div class="setting-row"><div><strong>'+h(title)+'</strong><small>'+h(description||'')+'</small></div><div class="row-control">'+control+'</div></div>';
 function switchHtml(key,value){const dis=['task_reminders','event_reminders','notification_sound'].includes(key)&&!(typeof Notification!=='undefined'&&Notification.permission==='granted');return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'" '+(dis?'disabled title="Enable browser notifications first"':'')+'><span></span></button>'}
-function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'"><span class="select-value">'+h(text)+'</span>'+icon('chevron-down',16)+'</button>'}
+function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'" title="'+h(text)+'"><span class="select-value">'+h(text)+'</span>'+icon('chevron-down',16)+'</button>'}
 function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
  const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
