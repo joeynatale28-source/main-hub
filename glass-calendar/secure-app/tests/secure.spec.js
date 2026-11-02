@@ -362,6 +362,7 @@ test('search shows no-match copy and Escape closes without losing the calendar',
  await expect(page.locator('.weekwrapper')).toBeVisible();
 });
 test('changing start time shifts end by one hour and saves correct duration',async({page})=>{
+ await page.clock.setFixedTime(new Date('2026-11-02T11:12:00-05:00'));
  const model=await setup(page);await page.locator('#addEventHeader').click();await page.locator('#quickTitle').fill('Time shift');
  await page.locator('#addTime').click();
  const oldStart=await page.locator('#startTime').inputValue();
