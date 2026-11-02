@@ -490,3 +490,20 @@ test('UI overhaul calendar bars are 28px and page motion respects Reduce motion'
  const duration=await page.locator('#grid').evaluate(el=>getComputedStyle(el).animationDuration);
  expect(duration).toBe('0s');
 });
+
+test('password recovery link opens new-password form and updates Supabase Auth',async({page})=>{
+ await setup(page,{loggedIn:false});
+ const claim=Buffer.from(JSON.stringify({sub:account.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url');
+ const access='eyJhbGciOiJIUzI1NiJ9.'+claim+'.test';
+ await page.goto('/#access_token='+access+'&expires_in=3600&refresh_token=mock-refresh-token&token_type=bearer&type=recovery');
+ await expect(page.locator('#recoveryForm')).toBeVisible();
+ await expect(page.locator('#login')).toHaveCount(0);
+ await page.locator('#recoveryPassword').fill('Example-New-Password-123');
+ await page.locator('#recoveryConfirm').fill('different-password');
+ await page.locator('#recoverySave').click();
+ await expect(page.locator('#recoveryError')).toContainText('Passwords do not match.');
+ await page.locator('#recoveryConfirm').fill('Example-New-Password-123');
+ await page.locator('#recoverySave').click();
+ await expect(page.locator('#login')).toBeVisible();
+ await expect(page.locator('#authError')).toContainText('Password updated.');
+});
