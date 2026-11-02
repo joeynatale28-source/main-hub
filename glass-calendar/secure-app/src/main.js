@@ -27,15 +27,41 @@ function login(){root.innerHTML='<main class="center"><form class="login" id="lo
 async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
+function reflect(){
+ const hasSettings=document.querySelector('#settingsModal')?.open;
+ if(hasSettings){
+  renderMini();renderCalList();
+  if(state.page==='calendar')renderCalendar();
+  else if(state.page==='tasks')renderTasks();
+  else renderIntegrations();
+  renderSettings();
+ }else render();
+ upgradeIcons();
+}
 async function change(entity,id,data,action){
  const result=await api('data_'+action,{entity,...(id?{id}:{}),...(data?{data}:{})});
  if(entity==='settings')state.settings=result.item;
  else if(action==='create')state[entity].push(result.item);
  else if(action==='delete')state[entity]=state[entity].filter(x=>x.id!==id);
  else if(action==='update')state[entity]=state[entity].map(x=>x.id===id?result.item:x);
- render();return result.item;
+ reflect();return result.item;
 }
-function safeChange(...args){return change(...args).catch(()=>toast("Couldn't save — check your connection"))}
+function safeChange(entity,id,data,action){
+ const previous=structuredClone(state[entity]||[]);
+ if(action==='update'&&data&&Array.isArray(state[entity])){
+  state[entity]=state[entity].map(x=>x.id===id?{...x,...data}:x);
+  reflect();
+ }
+ return api('data_'+action,{entity,...(id?{id}:{}),...(data?{data}:{})}).then(result=>{
+  if(action==='create')state[entity].push(result.item);
+  else if(action==='delete')state[entity]=state[entity].filter(x=>x.id!==id);
+  else if(action==='update')state[entity]=state[entity].map(x=>x.id===id?result.item:x);
+  reflect();return result.item;
+ }).catch(e=>{
+  state[entity]=previous;reflect();
+  toast("Couldn't save — check your connection");return null;
+ });
+}
 function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true))}
 function nav(page,title,ico){return '<button class="nav '+(state.page===page?'selected':'')+'" data-nav="'+page+'"><span class="glyph">'+ico+'</span>'+title+'</button>'}
 function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="Collapse sidebar" title="Collapse sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block">+ New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
@@ -55,9 +81,34 @@ function renderMini(){
  $('#miniPrev').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()-1,1);renderMini()};$('#miniNext').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()+1,1);renderMini()};$$('[data-date]',$('#mini')).forEach(x=>x.onclick=()=>drill(x.dataset.date));
 }
 function renderCalList(){
- $('#calList').innerHTML=state.calendars.map(c=>'<div class="cal-row '+(c.is_visible?'':'dim')+'" data-cal="'+c.id+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+c.is_visible+'" data-hide="'+c.id+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon" data-menu="'+c.id+'">⋮</button></div>').join('');
- $$('[data-hide]').forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.hide);safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')});
- $$('[data-menu]').forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.menu);menu(x,[['Rename',()=>promptForm('Rename calendar','Name',v=>safeChange('calendars',c.id,{name:v},'update'),c.name)],[(c.is_visible?'Hide':'Unhide'),()=>safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')],['Delete',()=>confirmAction('Delete '+c.name+'?','All events in this calendar will be deleted.',()=>safeChange('calendars',c.id,null,'delete'))]])});
+ const container=$('#calList');if(!container)return;
+ container.innerHTML=state.calendars.map(c=>
+  '<div class="cal-row '+(c.is_visible?'':'dim')+'" data-cal="'+h(c.id)+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+!!c.is_visible+'" data-hide="'+h(c.id)+'" aria-label="'+(c.is_visible?'Hide ':'Show ')+h(c.name)+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon compact" data-menu="'+h(c.id)+'" aria-label="Actions for '+h(c.name)+'" title="Actions for '+h(c.name)+'">'+icon('more-vertical',16)+'</button></div>'
+ ).join('');
+ $$('[data-hide]',container).forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.hide);if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')});
+ $$('[data-menu]',container).forEach(x=>x.onclick=()=>{
+  const c=state.calendars.find(c=>c.id===x.dataset.menu);if(!c)return;
+  const subscribed=state.subscriptions.some(sub=>sub.calendar_id===c.id);
+  menu(x,[['Rename',()=>inlineRename(c)],[(c.is_visible?'Hide':'Unhide'),()=>safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')],
+   [subscribed?'Remove subscription':'Delete calendar',()=>subscribed?confirmAction('Remove subscription?','Remove this read-only calendar and its feed?',async()=>{const sub=state.subscriptions.find(x=>x.calendar_id===c.id);if(sub){await safeChange('subscriptions',sub.id,null,'delete');await refreshData()}}):confirmAction('Delete '+c.name+'?','This removes the calendar and its events.',()=>safeChange('calendars',c.id,null,'delete')),true]
+  ]);
+ });
+ upgradeIcons();
+}
+function inlineRename(c){
+ const row=state.calendars.some(x=>x.id===c.id)?[...$$('#calList .cal-row')].find(x=>x.dataset.cal===c.id):null;if(!row)return;
+ const label=$('.cal-name',row);label.hidden=true;const old=c.name;
+ const input=document.createElement('input');input.className='calendar-rename';input.type='text';input.maxLength=120;input.value=old;input.setAttribute('aria-label','Rename '+old);
+ const yes=document.createElement('button');yes.type='button';yes.className='icon compact';yes.setAttribute('aria-label','Save calendar name');yes.innerHTML=icon('check',16);
+ const no=document.createElement('button');no.type='button';no.className='icon compact';no.setAttribute('aria-label','Cancel rename');no.innerHTML=icon('x',16);
+ const controls=row.querySelector('[data-menu]');label.after(input,yes,no);controls.hidden=true;
+ const cancel=()=>{input.remove();yes.remove();no.remove();label.hidden=false;controls.hidden=false};
+ const done=async()=>{
+  const name=input.value.trim();if(!name){input.classList.add('shake');setTimeout(()=>{input.classList.remove('shake');input.value=old},230);return}
+  cancel();if(name!==old){const saved=await safeChange('calendars',c.id,{name},'update');if(saved)toast('Calendar renamed')}
+ };
+ input.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();cancel()}if(e.key==='Enter'){e.preventDefault();done()}});
+ yes.onclick=done;no.onclick=cancel;input.focus();input.select();
 }
 function drill(key){state.date=date(key);state.drilled=true;state.view='day';state.page='calendar';render()}
 function header(title,subtitle){return '<header class="view-header"><div><h1>'+h(title)+'</h1><p>'+h(subtitle)+'</p></div><div class="tools">'+(state.drilled?'<button id="backDrill" class="secondary">← Back to '+h(state.settings.default_view||'week')+'</button>':'')+'<button class="icon" id="prev">‹</button><button class="icon" id="next">›</button><button class="secondary" id="today">Today</button><button class="icon" id="searchButton">⌕</button><button class="icon" id="themeButton">◐</button><button class="icon" id="settingsButton">⚙</button></div></header>'}
