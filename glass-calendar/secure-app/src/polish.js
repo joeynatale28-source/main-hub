@@ -36,7 +36,7 @@ export function expandEvents(events,from,to){
    const en=new Date(st.getTime()+span);
    if(en.getTime()<lower-86400000)continue;
    const civil=!native&&original.source_subscription_id&&original.all_day?String(original.starts_at).slice(0,10):daykey(st);
-   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
+   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=original.source_subscription_id&&original.all_day?1:Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
    for(let j=0;j<Math.min(366,days)&&out.length<3000;j++){
     const key=daykey(addDays(noon(civil),j));
     if(noon(key).getTime()<lower-86400000||noon(key).getTime()>upper+86400000)continue;
