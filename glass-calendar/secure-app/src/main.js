@@ -132,11 +132,20 @@ function render(){if(!state.user)return;root.classList.toggle('collapsed',state.
 }
 function renderMini(){
  const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
- const active=iso(now()),selected=iso(state.date),weekstart=add(state.date,-((state.date.getDay()-shift+7)%7)),weekend=add(weekstart,6),miniEvents=occurrences(add(start,-1),add(start,44));let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon">‹</button><button id="miniNext" class="icon">›</button></span></div><div class="mini-grid">';
+ const active=iso(now()),selected=iso(state.date),weekstart=add(state.date,-((state.date.getDay()-shift+7)%7)),weekend=add(weekstart,6),miniEvents=occurrences(add(start,-1),add(start,44));
+ let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon" aria-label="Previous mini-calendar month">'+icon('chevron-left',16)+'</button><button id="miniNext" class="icon" aria-label="Next mini-calendar month">'+icon('chevron-right',16)+'</button></span></div><div class="mini-grid">';
  for(let i=0;i<7;i++)html+='<span class="dayname">'+['S','M','T','W','T','F','S'][(i+shift)%7]+'</span>';
- for(let i=0;i<42;i++){const day=add(start,i),key=iso(day);html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+(key===selected?'selected ':'')+(key>=iso(weekstart)&&key<=iso(weekend)?'selected-week ':'')+'" data-date="'+key+'">'+day.getDate()+(miniEvents.some(e=>eventOn(e,key))?'<i style="background:'+eventColor(miniEvents.find(e=>eventOn(e,key)))+'"></i>':'')+'</button>'}
- $('#mini').innerHTML=html+'</div>';upgradeIcons();
- $('#miniPrev').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()-1,1);renderMini()};$('#miniNext').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()+1,1);renderMini()};$$('[data-date]',$('#mini')).forEach(x=>x.onclick=()=>drill(x.dataset.date));
+ for(let i=0;i<42;i++){
+  const day=add(start,i),key=iso(day),matches=miniEvents.filter(e=>eventOn(e,key));
+  const calendarIds=[...new Set(matches.map(e=>e.calendar_id))],dots=calendarIds.slice(0,3).map(id=>'<i style="background:'+colorFor(state.calendars.find(c=>c.id===id))+'"></i>').join('')+(calendarIds.length>3?'<i class="overflow-dot"></i>':'');
+  html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+(key===selected?'selected ':'')+(key>=iso(weekstart)&&key<=iso(weekend)?'selected-week ':'')+'" data-date="'+key+'" aria-label="'+h(label(day))+'">'+day.getDate()+(dots?'<span class="mini-dots">'+dots+'</span>':'')+'</button>';
+ }
+ $('#mini').innerHTML=html+'</div>';
+ if(uiMiniDirection){$('#mini').classList.add(uiMiniDirection>0?'ui-mini-next':'ui-mini-prev');uiMiniDirection=0}
+ upgradeIcons();
+ $('#miniPrev').onclick=()=>{uiMiniDirection=-1;state.date=new Date(d.getFullYear(),d.getMonth()-1,1);renderMini()};
+ $('#miniNext').onclick=()=>{uiMiniDirection=1;state.date=new Date(d.getFullYear(),d.getMonth()+1,1);renderMini()};
+ $$('[data-date]',$('#mini')).forEach(x=>x.onclick=()=>drill(x.dataset.date));
 }
 function renderCalList(){
  const container=$('#calList');if(!container)return;
@@ -311,7 +320,7 @@ function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
- $$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
+ $('[data-detail]').forEach(x=>{x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)};x.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(!ev)return;const readOnly=state.subscriptions.some(sub=>sub.calendar_id===ev.calendar_id);menu(x,[['View details',()=>details(ev)],...(!readOnly?[['Edit event',()=>openEditor(ev._origin||ev,null,null,'event',ev)],['Delete event',()=>changeOccurrence(ev,'delete'),true]]:[])]);}});
 }
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
@@ -322,7 +331,7 @@ document.addEventListener('keydown',e=>{
 });
 
 function modal(html,wide=false){
- const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');
+ const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');dlg.setAttribute('aria-modal','true');
  dlg.innerHTML='<div class="dialog-body">'+html+'</div><button type="button" class="dialog-close icon" data-close aria-label="Close dialog">'+icon('x',16)+'</button>';
  document.body.append(dlg);dlg.showModal();
  $$('[data-close]',dlg).forEach(b=>b.onclick=()=>dlg.close());
@@ -330,7 +339,7 @@ function modal(html,wide=false){
  dlg.addEventListener('close',()=>dlg.remove());
  return dlg;
 }
-function confirmAction(title,body,act){const dlg=modal('<div class="warning-circle">'+icon('warning')+'</div><h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
+function confirmAction(title,body,act){const dlg=modal('<div class="warning-circle">'+icon('warning')+'</div><h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');dlg.classList.add('alert-dialog');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
 function promptForm(title,placeholder,cb,value=''){
  const dlg=modal('<h2>'+h(title)+'</h2><input class="text-input" id="promptValue" placeholder="'+h(placeholder)+'" value="'+h(value)+'" maxlength="120"><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="promptSave">Save</button></footer>');
  const field=$('#promptValue',dlg);field.focus();field.select();
@@ -339,9 +348,9 @@ function promptForm(title,placeholder,cb,value=''){
 }
 function menu(button,items,filterable=false){
  $('#floatingMenu')?.remove();
- const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
+ const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';el.setAttribute('role','menu');el.setAttribute('aria-label','Options');
  const search=filterable?'<div class="menu-search"><span>'+icon('search',16)+'</span><input aria-label="Search time zones" placeholder="Search time zones..." type="search"></div>':'';
- el.innerHTML=search+'<div class="menu-options">'+items.map((x,i)=>'<button type="button" class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('')+'</div>';
+ el.innerHTML=search+'<div class="menu-options">'+items.map((x,i)=>'<button type="button" role="menuitem" class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('')+'</div>';
  (button.closest('dialog[open]')||document.body).append(el);
  const rect=button.getBoundingClientRect(),inSidebar=!!button.closest('#calList'),width=Math.min(Math.max(220,rect.width),innerWidth-12);
  el.style.width=width+'px';
@@ -361,13 +370,14 @@ function menu(button,items,filterable=false){
  }
  el.onkeydown=e=>{
   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);return}
+  if(e.key==='Home'||e.key==='End'){const buttons=$('[data-item]:not([hidden])',el);if(buttons.length){e.preventDefault();buttons[e.key==='Home'?0:buttons.length-1].focus()}return}
   if(e.key==='ArrowDown'||e.key==='ArrowUp'){
    const buttons=$$('[data-item]:not([hidden])',el);if(!buttons.length)return;
    e.preventDefault();const i=buttons.indexOf(document.activeElement);
    buttons[(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();
   }
  };
- upgradeIcons();
+ upgradeIcons();if(!filterable)el.querySelector('[data-item]')?.focus();
 }
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&document.querySelector('#floatingMenu')){
@@ -488,7 +498,7 @@ function renderTasks(){
  $$('[data-task]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.task);openEditor(t,null,null,'task')});
 }
 function renderIntegrations(){
- $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
+ $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">'+icon('plus',16)+' Add subscription</button></header>'+(state.subscriptions.length?'':emptyState('No integrations yet','Connect a published calendar feed using Add subscription.','plug'))+'<div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
  $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
 const nativeRecurring=e=>!e.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(e.repeat_rule?.frequency||e.repeat_rule?.freq);
