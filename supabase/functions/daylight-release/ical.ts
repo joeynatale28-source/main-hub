@@ -1,4 +1,4 @@
-export type FeedEvent={title:string,description:string,location_name:string,location_address:string,starts_at:string,ends_at:string,all_day:boolean,repeat_rule:Record<string,unknown>,external_uid:string};
+export type FeedEvent={title:string,description:string,location_name:string,location_address:string,starts_at:string,ends_at:string,all_day:boolean,repeat_rule:Record<string,unknown>,external_uid:string,status?:string};
 const pad=(x:number)=>String(x).padStart(2,'0');
 const unescapeText=(x:string)=>x.replace(/\\[nN]/g,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
 type Parts={y:number,m:number,d:number,h:number,min:number,sec:number,z:boolean,all:boolean};
@@ -66,6 +66,7 @@ export function parseCalendar(text:string):{name:string,events:FeedEvent[]}{
   const until=rule.UNTIL?part(rule.UNTIL):null,untilMS=until?epoch(until,until.z?undefined:tz):Infinity;
   const excluded=new Set<number>();findAll('EXDATE').forEach(x=>x.value.split(',').forEach(v=>{const p=part(v);if(p)excluded.add(epoch(p,x.params.TZID||tz))}));
   const title=unescapeText(find('SUMMARY')?.value||'Untitled event'),description=unescapeText(find('DESCRIPTION')?.value||''),location=unescapeText(find('LOCATION')?.value||''),uid=find('UID')?.value||title+'-'+beginning?.value;
+  const status=(find('STATUS')?.value||'CONFIRMED').toLowerCase();
   const hasRule=Boolean(rule.FREQ);
   const maxCount=rule.COUNT?Math.max(0,Number(rule.COUNT)):Infinity;
   const endHorizon=Date.UTC(base.y+3,base.m-1,base.d);
@@ -79,13 +80,13 @@ export function parseCalendar(text:string):{name:string,events:FeedEvent[]}{
     // Preserve DTSTART VALUE=DATE and DTEND's exclusive end in one record.
     // Rendering expands this one record into a continuous bar without UTC shifting.
     const start=Date.UTC(p.y,p.m-1,p.d),end=start+Math.max(1,Math.round(duration/864e5))*864e5;
-    output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms});
+    output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms,status});
    }else{
     const start=ms,end=ms+duration;
     let cursor=start,j=0;
     while(cursor<end&&j<366){
      const midnight=Math.ceil((cursor+1)/864e5)*864e5,next=Math.min(midnight,end);
-     output.push({title,description,location_name:location,location_address:location,starts_at:new Date(cursor).toISOString(),ends_at:new Date(next).toISOString(),all_day:false,repeat_rule:{},external_uid:uid+'::'+ms+'::'+j});
+     output.push({title,description,location_name:location,location_address:location,starts_at:new Date(cursor).toISOString(),ends_at:new Date(next).toISOString(),all_day:false,repeat_rule:{},external_uid:uid+'::'+ms+'::'+j,status});
      cursor=next;j++;
     }
    }
