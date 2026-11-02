@@ -55,3 +55,21 @@ jobs:
         run: npm run check
       - name: Run parser acceptance tests
         run: npm run test:ical
+
+  api-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check signup disabled and unauthenticated requests rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://qrqemjgpzoqhtmsowmqv.supabase.co/functions/v1"
+          login=$(curl -fsS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{"action":"auth_login","username":"definitelynotanaccount","password":"wrong"}' "$base/daylight-release" -w '\n%{http_code}' || true)
+          echo "$login" | grep -q "That username and password don't match"
+          echo "$login" | tail -1 | grep -q '^401$'
+          session=$(curl -fsS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{"action":"data_list","entity":"events","token":"invalid"}' "$base/daylight-release" -w '\n%{http_code}' || true)
+          echo "$session" | grep -q 'Session expired'
+          echo "$session" | tail -1 | grep -q '^401$'
+          signup=$(curl -fsS --retry 2 --max-time 20 -X POST -H 'content-type: application/json' -d '{}' "$base/daylight-signup" -w '\n%{http_code}' || true)
+          echo "$signup" | grep -q 'Registration is disabled'
+          echo "$signup" | tail -1 | grep -q '^410$'
