@@ -682,7 +682,7 @@ function checkReminders(){
  }
 }
 setInterval(checkReminders,30000);
-document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.key===','||e.code==='Comma')){e.preventDefault();if(state.user)settings()}});
+window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.code==='Comma'||e.key===','||e.key==='<')){e.preventDefault();e.stopPropagation();if(state.user)settings()}},{capture:true});
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
 else load();
