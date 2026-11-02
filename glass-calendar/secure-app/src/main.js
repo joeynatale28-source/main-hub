@@ -1,16 +1,9 @@
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/+esm';
+import {localApi,localReset} from './local-store.js';
 import {icon,upgradeIcons,startIcons} from './icons.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey,uniqueInstances,rangeLabel} from './polish.js';
 const root=document.querySelector('#root');
-const runtimeConfig={...(window.__DAYLIGHT_CONFIG||{}),...(import.meta.env||{})};
-// GitHub Pages is the canonical public host. Its existing /glass-calendar/ path
-// handles both ordinary email/password sign-in and redirected Auth callbacks.
-const publicSiteUrl=runtimeConfig.VITE_PUBLIC_SITE_URL||'https://joeynatale28-source.github.io/main-hub/glass-calendar/';
-const authRedirectUrl=new URL(publicSiteUrl).href;
-const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
-const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
-const endpoint=runtimeConfig.VITE_DAYLIGHT_API_URL||url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
-const supabase=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}}):null;
+// UI-only workspace. No remote accounts, databases, API keys, or online session.
+
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
@@ -21,85 +14,22 @@ const shimmer=()=>'<span class="ui-skeleton wide"></span><span class="ui-skeleto
 let uiGridDirection=0,uiMiniDirection=0,uiPreviousView='',uiHasWaved=false,uiLastPage='';
 const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
 const toast=(message)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}const label=String(message||'').replace(/\.$/,'');const bad=/couldn.t|error|fail|invalid|required|blocked|denied|not found|check your connection/i.test(label);el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.innerHTML='<span class="toast-icon">'+icon(bad?'alert-circle':'check-circle',16)+'</span><span class="toast-message">'+h(label)+'</span><button type="button" class="toast-dismiss" aria-label="Dismiss notification">'+icon('x',16)+'</button>';el.querySelector('.toast-dismiss').onclick=()=>{clearTimeout(toast.timer);el.classList.remove('show')};el.classList.remove('show');void el.offsetWidth;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),bad?6500:3200)};
-async function api(action,data={}){
- const {data:session}=await supabase.auth.getSession();
- const access=session.session?.access_token;
- if(!access)throw Error('Session expired. Log in again.');
- const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key,Authorization:'Bearer '+access},body:JSON.stringify({...data,action})});
- let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable.')}
- if(!r.ok)throw Error(body.error||'Request failed.');return body;
-}
+async function api(action,data={}){return localApi(action,data)}
 async function load(){
  try{
-  if(passwordRecoveryActive){showPasswordRecovery();return}
-  const {data:auth,error:authError}=await supabase.auth.getUser();
-  if(passwordRecoveryActive){showPasswordRecovery();return}
-  if(authError||!auth?.user){login();return}
-  const result=await api('auth_session');
-  state.user=result.user;
+  const {user}=await api('auth_session');
   const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
-  Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
-  if(passwordRecoveryActive){showPasswordRecovery();return}
+  Object.assign(state,{user,calendars,events,tasks,subscriptions,settings:settings[0]||{},drilled:false,view:settings[0]?.default_view||'week'});
   applyTheme();render();
- }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);login();const field=$('#authError');if(field){field.hidden=false;field.textContent='Signed in, but your calendar could not load. '+(error?.message||'Please try again.')}}
+ }catch(error){
+  console.error('Daylight local workspace could not start',error);
+  root.innerHTML='<main class="center"><div class="login"><div class="mark">'+icon('brand',28)+'</div><h1>daylight.</h1><p>Local browser storage is unavailable. Enable site storage and reload.</p></div></main>';
+ }
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor',20)}
-function login(){
- root.innerHTML='<main class="center"><form class="login" id="login" novalidate><div class="mark">'+icon('brand',28)+'</div><h1>daylight.</h1><p>Welcome back.</p><label for="email">Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"><span class="field-help" id="emailHelp" aria-live="polite"></span></label><label for="password">Password<div class="password"><input id="password" type="password" required autocomplete="current-password"><button type="button" id="eye" aria-label="Show password" title="Show password">'+icon('eye',20)+'</button></div><span class="field-help" id="passwordHelp" aria-live="polite"></span></label><p id="authError" class="error" aria-live="polite" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" id="forgotPassword" class="link-action" aria-expanded="false" aria-controls="passwordHelpPanel">Forgot password?</button><div id="passwordHelpPanel" class="auth-help-panel" hidden><strong>Reset by email</strong><span>Enter the email on your account, then choose Send reset email. We’ll email you a secure link.</span><button type="button" class="secondary" id="sendReset" style="margin-top:12px">Send reset email</button><p id="resetStatus" role="status"></p></div><small>Accounts are created by the owner.</small></form></main>';
- const email=$('#email'),password=$('#password'),error=$('#authError'),btn=$('#loginBtn');
- const fieldError=(field,reason)=>{const help=$('#'+field.id+'Help');field.classList.toggle('invalid',!!reason);field.setAttribute('aria-invalid',String(!!reason));help.textContent=reason||'';help.classList.toggle('visible',!!reason)};
- for(const field of [email,password])field.oninput=()=>{fieldError(field,'');error.hidden=true};
- $('#eye').onclick=()=>{password.type=password.type==='password'?'text':'password';$('#eye').innerHTML=icon(password.type==='password'?'eye':'eye-off',20);$('#eye').setAttribute('aria-label',password.type==='password'?'Show password':'Hide password')};
- $('#login').onsubmit=async event=>{
-  event.preventDefault();error.hidden=true;fieldError(email,'');fieldError(password,'');
-  let invalid=false;
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())){fieldError(email,'Enter a valid email address.');invalid=true}
-  if(!password.value){fieldError(password,'Enter your password.');invalid=true}
-  if(invalid){(email.classList.contains('invalid')?email:password).focus();return}
-  btn.disabled=true;btn.textContent='Logging in…';
-  try{
-   const {error:authError}=await supabase.auth.signInWithPassword({email:email.value.trim().toLowerCase(),password:password.value});
-   if(authError){error.textContent=authError.code==='invalid_credentials'?'Email or password not recognized. Check the account email in Supabase Authentication > Users.':authError.message;error.hidden=false;return}
-   await load();
-  }catch(err){error.textContent=err?.message||'Unable to sign in. Check your connection.';error.hidden=false}
-  finally{btn.disabled=false;btn.textContent='Log in'}
- };
- $('#forgotPassword').onclick=()=>{const panel=$('#passwordHelpPanel');panel.hidden=!panel.hidden;$('#forgotPassword').setAttribute('aria-expanded',String(!panel.hidden))};
- $('#sendReset').onclick=async()=>{
-  fieldError(email,'');const status=$('#resetStatus');
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())){fieldError(email,'Enter your account email first.');email.focus();return}
-  const send=$('#sendReset');send.disabled=true;send.textContent='Sending…';
-  try{const {error:resetError}=await supabase.auth.resetPasswordForEmail(email.value.trim().toLowerCase(),{redirectTo:authRedirectUrl});status.textContent=resetError?resetError.message:'If the address belongs to an account, a reset email is on its way.'}
-  catch(err){status.textContent=err?.message||'Could not send reset email.'}
-  finally{send.disabled=false;send.textContent='Send reset email'}
- };
- upgradeIcons();
+function resetLocalWorkspace(){
+ confirmAction('Reset local preview?','This removes events, tasks, calendars and preferences stored in this browser. It does not affect anything online.',async()=>{localReset();state.date=now();state.page='calendar';await load();toast('Local workspace reset')});
 }
-let passwordRecoveryActive=false;
-function showPasswordRecovery(){
- root.innerHTML='<main class="center"><form class="login" id="recoveryForm"><div class="mark">'+icon('brand',24)+'</div><h1>Set a new password</h1><p>Enter a new password for your Daylight account.</p><label>New password<input id="recoveryPassword" type="password" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></label><label>Confirm new password<input id="recoveryConfirm" type="password" required autocomplete="new-password" minlength="8" placeholder="Enter it again"></label><p id="recoveryError" class="error" hidden></p><button type="submit" class="primary block" id="recoverySave">Update password</button></form></main>';
- const form=$('#recoveryForm'),err=$('#recoveryError'),btn=$('#recoverySave');
- form.onsubmit=async e=>{
-  e.preventDefault();
-  const pass=$('#recoveryPassword').value,confirm=$('#recoveryConfirm').value;
-  if(pass!==confirm){err.textContent='Passwords do not match.';err.hidden=false;return}
-  btn.disabled=true;btn.textContent='Updating…';err.hidden=true;
-  try{
-   const {error}=await supabase.auth.updateUser({password:pass});
-   if(error)throw error;
-   await supabase.auth.signOut();
-   passwordRecoveryActive=false;
-   history.replaceState({},'',location.pathname);
-   login();
-   const msg=$('#authError');msg.hidden=false;msg.textContent='Password updated. Log in with your new password.';
-  }catch(error){
-   err.textContent=error?.message?.endsWith('.')?error.message:(error?.message||'Could not update password')+'.';
-   err.hidden=false;btn.disabled=false;btn.textContent='Update password';
-  }
- };
- upgradeIcons();$('#recoveryPassword').focus();
-}
-async function logout(){await supabase.auth.signOut();Object.assign(state,{user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{}});login()}
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
 function reflect(){
@@ -148,8 +78,6 @@ function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+(['declined','cancelled'].includes(e.status)?'#92929a':eventColor(e))+';';
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
-const compactClock=value=>new Date(value).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?(AM|PM)$/,(match,part)=>part.toLowerCase());
-const compactRange=e=>compactClock(e.starts_at)+' - '+compactClock(e.ends_at);
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
@@ -169,30 +97,22 @@ function bindRailTooltips(){
   node.style.top=Math.max(8,Math.min(innerHeight-node.offsetHeight-8,r.top+r.height/2-node.offsetHeight/2))+'px';
  }
 }
-function render(){
- if(!state.user)return;
- root.classList.toggle('collapsed',state.collapsed);
- root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">'+icon('brand',24)+'</span><span class="brand-copy"><strong>daylight.</strong><small>Personal calendar</small></span></button><button id="workspaceMenu" class="icon compact workspace-chevron" aria-label="Navigate workspace" title="Navigate workspace" data-tooltip="Navigate workspace">'+icon('chevron-down',16)+'</button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">'+icon(state.collapsed?'panel-left-open':'panel-left-close',16)+'</button></div><div class="side-middle"><div id="mini"></div><div class="micro cal-section-label">MY CALENDARS <button class="mini-add" id="newCalendar" aria-label="Add calendar" title="Add calendar">'+icon('plus',15)+'</button></div><div id="calList"></div><div class="side-fill" aria-hidden="true"></div><div class="micro support-label">SUPPORT</div><button class="nav" id="about" title="Help center" data-tooltip="Help center"><span class="glyph">'+icon('life-buoy',19)+'</span>Help center</button><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">'+icon('settings',19)+'</span>Settings</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>'+h(state.user.email||'')+'</small></span><button class="icon" id="profileMenu" aria-label="Profile menu" title="Profile menu">'+icon('more-vertical',18)+'</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
- $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};
- const go=page=>{state.page=page;state.drilled=false;render()};
- $('#workspaceMenu').onclick=e=>menu(e.currentTarget,[['Calendar',()=>go('calendar')],['Tasks',()=>go('tasks')],['Integrations',()=>go('integrations')]]);
- $('#settings').onclick=()=>settings();
- $('#about').onclick=()=>settings('about');
- $('#profileMenu').onclick=e=>menu(e.currentTarget,[['Calendar',()=>go('calendar')],['Tasks',()=>go('tasks')],['Integrations',()=>go('integrations')],['Appearance',()=>settings('appearance')],['Cycle theme',()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3])}],['Settings',()=>settings()],['Log out',logout]]);
+function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">'+icon('brand',22)+'</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">'+icon(state.collapsed?'panel-left-open':'panel-left-close',16)+'</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar')+nav('integrations','Integrations')+nav('tasks','Tasks')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar" aria-label="Add calendar">'+icon('plus',16)+'</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">'+icon('settings')+'</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">'+icon('info')+'</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>'+h(state.user.email||'')+'</small></span><button class="icon" id="profileMenu" aria-label="Profile menu">'+icon('more-horizontal')+'</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
+ $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
+ $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
+ $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Reset local workspace',resetLocalWorkspace,true]]);
  $('#collapseRail').onclick=()=>{state.collapsed=!state.collapsed;localStorage.setItem('daylight-rail-collapsed',state.collapsed?'1':'0');render()};
  $('#newCalendar').onclick=()=>calendarForm();
- renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();
- if(uiLastPage!==state.page){$('#content')?.firstElementChild?.classList.add('ui-view-enter');uiLastPage=state.page}
- upgradeIcons();bindRailTooltips();
+ renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();if(uiLastPage!==state.page){$('#content')?.firstElementChild?.classList.add('ui-view-enter');uiLastPage=state.page}upgradeIcons();bindRailTooltips();
 }
 function renderMini(){
- const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=0,start=add(first,-first.getDay());
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
  const active=iso(now()),selected=iso(state.date),weekstart=add(state.date,-((state.date.getDay()-shift+7)%7)),weekend=add(weekstart,6),miniEvents=occurrences(add(start,-1),add(start,44));
- let html='<div class="mini-head"><button id="miniPrev" class="icon" aria-label="Previous mini-calendar month">'+icon('chevron-left',16)+'</button><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><button id="miniNext" class="icon" aria-label="Next mini-calendar month">'+icon('chevron-right',16)+'</button></div><div class="mini-grid">';
- for(let i=0;i<7;i++)html+='<span class="dayname" title="'+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][(i+shift)%7]+'">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>';
+ let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon" aria-label="Previous mini-calendar month">'+icon('chevron-left',16)+'</button><button id="miniNext" class="icon" aria-label="Next mini-calendar month">'+icon('chevron-right',16)+'</button></span></div><div class="mini-grid">';
+ for(let i=0;i<7;i++)html+='<span class="dayname" title="'+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][(i+shift)%7]+'">'+['S','M','T','W','T','F','S'][(i+shift)%7]+'</span>';
  for(let i=0;i<42;i++){
   const day=add(start,i),key=iso(day),matches=miniEvents.filter(e=>eventOn(e,key));
-  const dots=matches.length?'<i class="mini-event-dot"></i>':'';
+  const calendarIds=[...new Set(matches.map(e=>e.calendar_id))],dots=calendarIds.slice(0,3).map(id=>'<i style="background:'+colorFor(state.calendars.find(c=>c.id===id))+'"></i>').join('')+(calendarIds.length>3?'<i class="overflow-dot"></i>':'');
   html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+(key===selected?'selected ':'')+(key>=iso(weekstart)&&key<=iso(weekend)?'selected-week ':'')+'" data-date="'+key+'" aria-label="'+h(label(day))+'">'+day.getDate()+(dots?'<span class="mini-dots">'+dots+'</span>':'')+'</button>';
  }
  $('#mini').innerHTML=html+'</div>';
@@ -205,7 +125,7 @@ function renderMini(){
 function renderCalList(){
  const container=$('#calList');if(!container)return;
  container.innerHTML=state.calendars.length?state.calendars.map(c=>
-  '<div class="cal-row '+(c.is_visible?'':'dim')+'" style="--event-color:'+colorFor(c)+'" data-cal="'+h(c.id)+'" title="'+h(c.name)+'" data-tooltip="'+h(c.name)+'"><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon compact" data-menu="'+h(c.id)+'" aria-label="Actions for '+h(c.name)+'" title="Actions for '+h(c.name)+'">'+icon('more-vertical',16)+'</button></div>'
+  '<div class="cal-row '+(c.is_visible?'':'dim')+'" style="--event-color:'+colorFor(c)+'" data-cal="'+h(c.id)+'" title="'+h(c.name)+'" data-tooltip="'+h(c.name)+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+!!c.is_visible+'" data-hide="'+h(c.id)+'" aria-label="'+(c.is_visible?'Hide ':'Show ')+h(c.name)+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon compact" data-menu="'+h(c.id)+'" aria-label="Actions for '+h(c.name)+'" title="Actions for '+h(c.name)+'">'+icon('more-vertical',16)+'</button></div>'
  ).join(''):'<div class="ui-empty"><span class="ui-empty-icon">'+icon('calendar',20)+'</span><strong>No calendars yet</strong><p>Create a calendar to organize your events.</p><button class="cal-empty-add" type="button" id="emptyAddCalendar">'+icon('plus',16)+' Add calendar</button></div>';
  $('#emptyAddCalendar',container)?.addEventListener('click',()=>calendarForm());
  $$('[data-hide]',container).forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.hide);if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')});
@@ -283,15 +203,10 @@ function drill(key){
 const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const year=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-year)/86400000)+1)/7)};
 function header(title){
  const first=state.user?.first_name||'there',holidays=occurrences(add(now(),-2),add(now(),2)).filter(x=>state.calendars.find(c=>c.id===x.calendar_id)?.client_id==='us-holidays');
- const msg=greeting(first,now(),holidays),greetingMarkup=uiHasWaved?h(msg):h(msg).replace('👋','<span class="greeting-wave">👋</span>');
- uiHasWaved=true;
- const d=state.date,month=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
- const shift=state.settings.start_of_week==='monday'?1:0,firstDay=add(d,-((d.getDay()-shift+7)%7)),lastDay=add(firstDay,6);
- const dayText=x=>x.toLocaleDateString('en-US',{month:'long',day:'2-digit'});
- const range=state.view==='week'?dayText(firstDay)+' - '+dayText(lastDay)+(firstDay.getFullYear()===lastDay.getFullYear()?', '+lastDay.getFullYear():', '+firstDay.getFullYear()+' - '+lastDay.getFullYear()):state.view==='day'?d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):state.view==='agenda'?'Upcoming 12 months':month;
- const heading=state.view==='agenda'?'Agenda':month;
- const back=state.drilled&&state.returnView&&state.view==='day'?'<button id="backDrill" class="secondary">'+icon('arrow-left',16)+' Back to '+h(state.returnView[0].toUpperCase()+state.returnView.slice(1))+'</button>':'';
- return '<div class="main-greeting greeting">'+greetingMarkup+'</div><header class="view-header"><div class="heading-copy"><span class="header-calendar-icon">'+icon('calendar',18)+'</span><div class="heading-text"><h1>'+h(heading)+'</h1><p class="view-range">'+h(range)+'</p></div></div><div class="header-period">'+back+'<div class="period-pill" role="group" aria-label="Calendar period navigation"><button type="button" id="prev" aria-label="Previous period">'+icon('chevron-left',16)+'</button><button type="button" id="today">Today</button><button type="button" id="next" aria-label="Next period">'+icon('chevron-right',16)+'</button></div></div><div class="tools"><button class="icon" id="searchButton" aria-label="Search">'+icon('search',19)+'</button><button class="icon" id="settingsButton" aria-label="Settings">'+icon('settings',19)+'</button><button class="icon" id="helpButton" aria-label="Help center">'+icon('life-buoy',19)+'</button><button class="primary header-add" id="addEventHeader">'+icon('plus',18)+' Add Event</button></div></header>';
+ const msg=greeting(first,now(),holidays),greetingMarkup=uiHasWaved?h(msg):h(msg).replace('👋','<span class="greeting-wave">👋</span>'),theme=state.settings.theme||'system',themeName=theme==='dark'?'Midnight':theme==='light'?'Daylight':'System';
+ uiHasWaved=true;const returnChip=state.drilled&&state.returnView&&state.view==='day'?'<button id="backDrill" class="secondary">'+icon('arrow-left',16)+' Back to '+h(state.returnView[0].toUpperCase()+state.returnView.slice(1))+'</button>':'';
+ const viewNames={month:'Month',week:'Week',day:'Day',agenda:'Agenda'};const shift=state.settings.start_of_week==='monday'?1:0;const weekStart=add(state.date,-((state.date.getDay()-shift+7)%7));const weekEnd=add(weekStart,6);const fmt=x=>x.toLocaleDateString('en-US',{month:'short',day:'numeric'});const range=state.view==='week'?fmt(weekStart)+' – '+fmt(weekEnd)+', '+weekEnd.getFullYear():state.view==='day'?state.date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):state.view==='agenda'?'Upcoming 12 months':state.date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  return '<header class="view-header"><div class="heading-copy"><div class="greeting">'+greetingMarkup+'</div><h1>'+h(viewNames[state.view]||title)+'</h1><p class="view-range">'+h(range)+'</p></div><div class="tools">'+returnChip+'<button class="icon" id="prev" aria-label="Previous period">'+icon('chevron-left')+'</button><button class="icon" id="next" aria-label="Next period">'+icon('chevron-right')+'</button><button class="secondary" id="today">Today</button><div class="view-segment" role="group" aria-label="Calendar view">'+['day','week','month','agenda'].map(v=>'<button type="button" data-view-switch="'+v+'" aria-pressed="'+(state.view===v)+'" class="'+(state.view===v?'active':'')+'">'+v[0].toUpperCase()+v.slice(1)+'</button>').join('')+'</div><button class="icon" id="searchButton" aria-label="Search">'+icon('search')+'</button><button class="icon" id="themeButton" aria-label="Theme: '+themeName+'" title="Theme: '+themeName+'">'+icon(theme==='dark'?'moon':theme==='light'?'sun':'monitor')+'</button><button class="icon" id="settingsButton" aria-label="Settings">'+icon('settings')+'</button></div></header>';
 }
 function exitDrill(){
  if(state.drilled){state.drilled=false;state.view=state.returnView||state.settings.default_view||'week';state.returnView=null;render();return true}return false;
@@ -299,12 +214,12 @@ function exitDrill(){
 function renderCalendar(){
  const d=state.date,title=state.view==='day'?label(d):d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
  $('#content').innerHTML=header(title)+'<div id="searchBar" hidden><input id="searchQuery" aria-label="Search events" placeholder="Search all dates"><button id="searchClose" class="icon" aria-label="Close search">'+icon('x',16)+'</button><div class="micro">All dates</div><div id="searchResults"></div></div><section id="grid" class="calendar-grid"></section>';
- $('#backDrill')?.addEventListener('click',exitDrill);$('#addEventHeader').onclick=()=>openEditor();$('#helpButton').onclick=()=>settings('about');if(state.view==='agenda'){for(const id of ['prev','next','today'])$('#'+id).hidden=true}
+ $('#backDrill')?.addEventListener('click',exitDrill);$('[data-view-switch]').forEach(b=>b.onclick=()=>{if(state.view===b.dataset.view)return;state.view=b.dataset.view;state.drilled=false;state.returnView=null;uiGridDirection=0;render()});if(state.view==='agenda'){for(const id of ['prev','next','today'])$('#'+id).hidden=true}
  $('#today').onclick=()=>{state.date=now();render()};
  const move=n=>{uiGridDirection=n>0?1:-1;uiMiniDirection=n>0?1:-1;state.date=state.view==='month'?new Date(d.getFullYear(),d.getMonth()+n,1):add(d,n*(state.view==='week'?7:1));render()};
  $('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1);
  $('#settingsButton').onclick=()=>settings();
- 
+ $('#themeButton').onclick=()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3]);};
  const searchBar=$('#searchBar');searchBar.setAttribute('role','dialog');searchBar.insertAdjacentHTML('beforeend','<small class="search-hint">Search by event name · ↑↓ to navigate · Enter to open · Esc to close</small>');searchBar.setAttribute('aria-label','Search all dates');
  $('#searchQuery').setAttribute('role','combobox');$('#searchQuery').setAttribute('aria-controls','searchResults');$('#searchQuery').setAttribute('aria-autocomplete','list');
  let activeResult=0;
@@ -347,7 +262,7 @@ function renderMonth(){
  const items=occurrences(add(start,-1),add(start,count+1));
  let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
  for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside ':'')+([0,6].includes(t.getDay())?'weekend':'')+'" data-cell="'+key+'" style="grid-column:'+(i%7+1)+';grid-row:'+(Math.floor(i/7)+1)+'">';
+  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">';
   if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
   html+='<button class="datenum '+(key===iso(now())?'today ':'')+(key===iso(state.date)?'selected':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button></div>';
  }
@@ -359,7 +274,7 @@ function renderMonth(){
    let lane=0;while(lanes[lane]?.some(([a,b])=>a<=e._right&&e._left<=b))lane++;
    if(lane>=3)continue;
    (lanes[lane]??=[]).push([e._left,e._right]);
-   html+='<button class="month-span-bar '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'"><span class="span-title">'+(e._continuationLeft?'':h(e.title))+'</span>'+(!e.all_day&&!e._continuationLeft?'<span class="span-time">'+h(compactClock(e.starts_at))+'</span>':'')+'</button>';
+   html+='<button class="month-span-bar '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--week-row:'+(week+1)+';--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';--span-lane:'+lane+';')+' data-drag-event="'+h(e.id)+'" title="'+h(e.title)+'">'+h(e.title)+'</button>';
   }
   for(let i=0;i<7;i++){
    const day=iso(days[i]),extra=items.filter(e=>eventOn(e,day)).length-3;
@@ -369,32 +284,31 @@ function renderMonth(){
  $('#grid').innerHTML=html+'</div>';bindEventButtons();enableCalendarDrag();
 }
 function renderWeek(){
- const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1)),tz=Intl.DateTimeFormat('en-US',{timeZoneName:'short'}).formatToParts(now()).find(x=>x.type==='timeZoneName')?.value||'Local';
- let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div class="week-zone" title="'+h(tz)+'">'+h(tz)+'</div>'+days.map(t=>'<div class="week-day-header '+(iso(t)===iso(now())?'is-today':'')+'"><small>'+t.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()+'</small><button class="week-date '+(iso(t)===iso(now())?'is-today':'')+'" data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
+ const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
+ let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
  const all=spansFor(events.filter(e=>(e.all_day||isLong(e))&&days.some(d=>eventOn(e,iso(d)))),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
  for(const e of all)html+='<button class="all-day-span '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
- html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*80)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
+ html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*48)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
-  const key=iso(t);html+='<div class="daytrack '+([0,6].includes(t.getDay())?'weekend':'')+'" data-slot="'+key+'">';
+  const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
   for(const e of events.filter(x=>!x.all_day&&!isLong(x)&&eventOn(x,key))){
    const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
-   html+='<button class="weekevent '+(height<=30?'short-event':'')+'" '+eventAttr(e,'top:'+(minute*80/60)+'px;height:'+(height*80/60)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><small class="event-card-time">'+h(compactRange(e))+'</small>'+(height>=60&&(e.location_name||e.location_address)?'<small class="event-card-location">'+h(e.location_name||e.location_address)+'</small>':'')+'<span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+(minute*.8)+'px;height:'+(height*.8)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
   }html+='</div>';
  }
  $('#grid').innerHTML=html+'</div></div>';
  const current=now(),minutesNow=current.getHours()*60+current.getMinutes();
  const todayTrack=$('[data-slot="'+iso(current)+'"]',$('#grid'));
- if(todayTrack){const body=$('.weekbody',$('#grid'));const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*80/60)+'px';body.append(line);const time=document.createElement('div');time.className='now-time-pill';time.style.top=(minutesNow*80/60)+'px';time.textContent=current.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});$('.hours',$('#grid')).append(time)}
+ if(todayTrack){const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*.8)+'px';todayTrack.append(line);const dot=document.createElement('div');dot.className='now-gutter-dot';dot.style.top=(minutesNow*.8)+'px';$('.hours',$('#grid')).append(dot)}
  if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
  bindEventButtons();enableCalendarDrag();
- $('.weekwrapper',$('#grid')).scrollTop=7.5*80; // Leave the 8 AM hour label fully visible below the sticky all-day strip.
- $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/(80/60))/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
+ $$$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/.8)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
  const today=iso(now()),items=uniqueInstances(occurrences(add(now(),-1),add(now(),370))).filter(x=>eventDate(x)>=today||x._lastCivil>=today);
  const days=[...new Set(items.map(x=>x._firstCivil))];
- $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._firstCivil===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><span class="agenda-event-copy"><strong>'+h(x.title)+'</strong>'+(x.location_name||x.location_address?'<small class="agenda-location">'+h(x.location_name||x.location_address)+'</small>':'')+'</span></span><small class="agenda-time">'+(isLong(x)?h(rangeLabel(x)):x.all_day?'All day':h(compactRange(x)))+'</small></button>').join('')+'</div>').join('') :emptyState('No upcoming events yet','Create an event to see it in your agenda.','calendar'))+'</div>';bindEventButtons();
+ $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._firstCivil===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(isLong(x)?h(rangeLabel(x)):x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>').join('')+'</div>').join('') :emptyState('No upcoming events yet','Create an event to see it in your agenda.','calendar'))+'</div>';bindEventButtons();
 }
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
@@ -511,18 +425,19 @@ function customSelect(name,current,items){const text=items.find(x=>String(x[0])=
 function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
  const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
- if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account',u.email||'','<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
+ if(which==='general')return '<h2>General</h2><p>Personal preferences, saved only in this browser.</p>'+row('Storage','This device only','<span class="local-status">'+icon('hard-drive',16)+' Local preview</span>')+row('First name','Used in your greeting','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Shown in your profile','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
  if(which==='calendar')return '<h2>Calendar</h2><p>Plan how your calendar is displayed.</p>'+row('Default Calendar View','View when Daylight opens',customSelect('default_view',s.default_view,selectOptions.default_view))+switchRows+row('Work hours','Beginning and end of the workday','<span class="worktime"><button class="pill-select" data-time="work_hours_start">'+h(readableTime(s.work_hours_start||'09:00'))+'</button> – <button class="pill-select" data-time="work_hours_end">'+h(readableTime(s.work_hours_end||'17:00'))+'</button></span>');
  if(which==='appearance')return '<h2>Appearance</h2><p>Make Daylight feel like yours.</p>'+themeCards()+switchRows;
- if(which==='data')return '<h2>Data & sync</h2><p>Manage calendar subscriptions and information.</p>'+row('Connected calendars','Manage the calendars in your workspace','<button class="secondary" id="goIntegrations">Manage connected calendars '+icon('chevron-right',16)+'</button>')+row('US Holidays','Show federal holidays',switchHtml('holidays',state.calendars.find(x=>x.client_id==='us-holidays')?.is_visible!==false))+'<h3>Subscriptions</h3><div id="settingsSubs">'+(state.subscriptions.length?state.subscriptions.map(x=>'<div class="sub-item"><strong>'+h(x.name)+'</strong><small>'+h(x.url)+'</small><small>Last fetched: '+h(x.last_fetched_at?prettyStamp(x.last_fetched_at):'Never')+'</small><button class="secondary" data-refresh="'+x.id+'">Refresh</button><button class="danger outline" data-remove="'+x.id+'">Remove</button></div>').join('') :emptyState('No subscriptions yet','Add a public .ics feed to see its events here.','calendar-days'))+'</div>'+row('Add subscription','Read-only .ics calendar link','<button class="secondary" id="addSub">Add subscription</button>')+row('Last sync',state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)?prettyStamp(state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)):'Never','<button class="secondary" id="refreshAll">Refresh all</button>');
- if(which==='notifications')return '<h2>Notifications</h2><p>Control browser notifications.</p>'+row('Permission',(typeof Notification!=='undefined'&&Notification.permission==='granted')?'Notifications are enabled':'Permission is required','<button class="secondary" id="enableNotify">'+(typeof Notification!=='undefined'&&Notification.permission==='granted'?'Enabled':'Enable notifications')+'</button>')+(typeof Notification!=='undefined'&&Notification.permission==='denied'?'<p class="notification-error">Notifications are blocked. Allow them in your browser site settings.</p>':'')+switchRows+row('Default reminder','Used for new events',customSelect('default_reminder_minutes',s.default_reminder_minutes,selectOptions.default_reminder_minutes));
- if(which==='ai')return '<h2>AI access</h2><p>AI agents with a token can read and edit your calendars and tasks through MCP.</p>'+row('AI deletes','Allow irreversible event and task deletion',switchHtml('mcp_allow_delete',s.mcp_allow_delete))+'<h3>MCP tokens</h3><p class="quiet">Tokens are shown once. Protect them like passwords.</p><button class="primary" id="generateToken">Generate token</button><div id="tokenList" aria-live="polite">'+shimmer()+'</div>';
- return '<div class="about-layout"><h2>About daylight.</h2><div class="about-head"><span class="about-mark">'+icon('brand',26)+'</span><div><strong>daylight.</strong><small>Version 2.2 · Your personal calendar</small><p>Carefully designed time, beautifully organized.</p></div></div><section class="about-history" aria-label="Changelog"><h3>Version 2.2 — Refined experience</h3><ul><li>Connected multi-day calendar bars and clearer event details</li><li>Updated desktop controls, menus and accessible dialogs</li><li>Polished Midnight and Daylight themes</li></ul><h3>Version 2.1 — Calendar tools</h3><ul><li>Month grid date picker and recurring event controls</li><li>Per-calendar colors, personal greetings and Tasks filters</li></ul><h3>Version 2.0 — Daylight foundation</h3><ul><li>Calendar visibility, inline renaming and fixed Settings</li><li>Supabase Auth and private calendar workspace</li></ul></section><div class="about-legal">'+row('Privacy Policy','How Daylight handles your data','<button class="secondary" data-legal="privacy">Read '+icon('chevron-right',16)+'</button>')+row('Terms of Service','Using Daylight','<button class="secondary" data-legal="terms">Read '+icon('chevron-right',16)+'</button>')+'</div></div>';
+ if(which==='data')return '<h2>Local data</h2><p>All calendars, events, tasks and settings are stored in this browser only. No accounts or online database.</p>'+row('Storage','Local to this device','<span class="local-status">'+icon('hard-drive',16)+' Saved locally</span>')+row('Calendars',state.calendars.length+' local calendars','<button class="secondary" id="goIntegrations">View workspace</button>')+row('Reset preview','Remove this browser\'s edited and sample data','<button class="secondary" id="resetLocalData">Reset local data</button>')+'<p class="quiet">Clearing site storage will erase this preview. Nothing syncs between browsers.</p>';
+
+if(which==='notifications')return '<h2>Notifications</h2><p>Control browser notifications.</p>'+row('Permission',(typeof Notification!=='undefined'&&Notification.permission==='granted')?'Notifications are enabled':'Permission is required','<button class="secondary" id="enableNotify">'+(typeof Notification!=='undefined'&&Notification.permission==='granted'?'Enabled':'Enable notifications')+'</button>')+(typeof Notification!=='undefined'&&Notification.permission==='denied'?'<p class="notification-error">Notifications are blocked. Allow them in your browser site settings.</p>':'')+switchRows+row('Default reminder','Used for new events',customSelect('default_reminder_minutes',s.default_reminder_minutes,selectOptions.default_reminder_minutes));
+ // Server-backed AI access is intentionally absent from this local-only preview.
+return '<div class="about-layout"><h2>About daylight.</h2><div class="about-head"><span class="about-mark">'+icon('brand',26)+'</span><div><strong>daylight.</strong><small>Local UI preview · Personal calendar</small><p>Carefully designed time, beautifully organized.</p></div></div><section class="about-history" aria-label="Changelog"><h3>Version 2.2 — Refined experience</h3><ul><li>Connected multi-day calendar bars and clearer event details</li><li>Updated desktop controls, menus and accessible dialogs</li><li>Polished Midnight and Daylight themes</li></ul><h3>Version 2.1 — Calendar tools</h3><ul><li>Month grid date picker and recurring event controls</li><li>Per-calendar colors, personal greetings and Tasks filters</li></ul><h3>Version 2.0 — Daylight foundation</h3><ul><li>Calendar visibility, inline renaming and fixed Settings</li><li>Browser-only editable calendar and task preview</li></ul></section><div class="about-legal">'+row('Privacy Policy','How Daylight handles your data','<button class="secondary" data-legal="privacy">Read '+icon('chevron-right',16)+'</button>')+row('Terms of Service','Using Daylight','<button class="secondary" data-legal="terms">Read '+icon('chevron-right',16)+'</button>')+'</div></div>';
 }
 function settings(which){
- state.setting=which||'general';localStorage.setItem('daylight-settings-section',state.setting);
+ state.setting=which||localStorage.getItem('daylight-settings-section')||'general';if(state.setting==='ai')state.setting='general';localStorage.setItem('daylight-settings-section',state.setting);
  const existing=$('#settingsModal');existing?.remove();
- const sections=[['general','General','settings'],['calendar','Calendar','calendar'],['appearance','Appearance','palette'],['data','Data & sync','database'],['notifications','Notifications','bell'],['ai','AI access','sparkles'],['about','About','info']];
+ const sections=[['general','General','settings'],['calendar','Calendar','calendar'],['appearance','Appearance','palette'],['data','Local data','hard-drive'],['notifications','Notifications','bell'],['about','About','info']];
  const dlg=modal('<div class="settings-grid"><nav class="settings-nav"><h2>Settings</h2>'+sections.map(x=>'<button data-sec="'+x[0]+'" class="'+(x[0]===state.setting?'selected':'')+'" ><span class="glyph">'+icon(x[2],18)+'</span>'+x[1]+'</button>').join('')+'</nav><div class="settings-pane" id="settingsPane"></div></div>',true);dlg.id='settingsModal';dlg.addEventListener('close',()=>{if(state.page==='calendar'&&state.user){renderCalendar();renderMini()}});
  $$('[data-sec]',dlg).forEach(b=>b.onclick=()=>{state.setting=b.dataset.sec;localStorage.setItem('daylight-settings-section',state.setting);$$('[data-sec]',dlg).forEach(x=>x.classList.toggle('selected',x===b));renderSettings()});
  renderSettings();
@@ -538,36 +453,22 @@ function renderSettings(){
  for(const id of ['firstName','lastName']){const input=$('#'+id,pane);if(input){input.onblur=()=>{const first=$('#firstName',pane).value,last=$('#lastName',pane).value;if(!first.trim()||!last.trim())return;api('user_update',{first_name:first,last_name:last}).then(x=>{state.user=x.user;const profile=$('.profile');if(profile){$('strong',profile).textContent=state.user.first_name+' '+state.user.last_name;$('.avatar',profile).textContent=state.user.first_name[0]||'?'}const greeter=$('.greeting');if(greeter)greeter.textContent=greeting(state.user.first_name);toast('Saved')}).catch(()=>toast("Couldn't save — check your connection"))};input.onkeydown=e=>{if(e.key==='Enter')input.blur()}}}
  $('#goIntegrations',pane)?.addEventListener('click',()=>{$('#settingsModal').close();state.page='integrations';render()});
  $('#enableNotify',pane)?.addEventListener('click',async()=>{if(typeof Notification!=='undefined'){try{state.notification=await Notification.requestPermission()}catch{state.notification='denied'}renderSettings()}else toast('Notifications are unavailable in this browser')});
- $('#generateToken',pane)?.addEventListener('click',()=>promptForm('Generate MCP token','Token name',async name=>{try{toast('Creating token…');const x=await api('mcp_generate',{name});toast('Token created');const pop=modal('<h2>Copy your token</h2><p>You won’t see this again.</p><textarea readonly id="tokenSecret">'+h(x.token)+'</textarea><button id="copyToken" class="primary">Copy token</button>');$('#copyToken',pop).onclick=()=>navigator.clipboard.writeText(x.token);renderSettings()}catch{toast('Token could not be created')}}));
+ $('#resetLocalData',pane)?.addEventListener('click',resetLocalWorkspace);
  upgradeIcons();
- if(state.setting==='ai')api('mcp_list').then(x=>{const box=$('#tokenList',dlg);if(box)box.innerHTML=(x.items.length?x.items.map(t=>'<div class="token-row">'+h(t.name)+' <small>'+h(prettyShort(t.created_at))+'</small><button data-revoke="'+t.id+'" class="danger">Revoke</button></div>').join('') :emptyState('No tokens yet','Generate a token to connect a trusted AI agent.','sparkles'));$$('[data-revoke]',box).forEach(b=>b.onclick=()=>confirmAction('Revoke token?','This agent will lose access immediately.',async()=>{loading(b,true,'Revoking…');try{await api('mcp_revoke',{id:b.dataset.revoke});b.closest('.token-row')?.remove();toast('Token revoked');renderSettings()}catch{loading(b,false);toast('Token revoke failed')}}))}).catch(()=>{});
- $$('[data-legal]',pane).forEach(b=>b.onclick=()=>legal(b.dataset.legal));
- $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
- $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
- $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}}));
+
+$$('[data-legal]',pane).forEach(b=>b.onclick=()=>legal(b.dataset.legal));
+ $('#goIntegrations',pane)?.addEventListener('click',()=>{$('#settingsModal')?.close();state.page='integrations';render()});
+
 }
-function legal(id){const text={
- privacy:'Daylight stores calendars, events, tasks and settings in Supabase. Authentication and password resets are handled by Supabase Auth; Daylight does not store your password. MCP tokens are stored as hashes. Your browser stores the authenticated session to keep you signed in. Public calendar subscriptions may expose their contents to the feed provider.',
- terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
- changelog:''
- };const title=id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog',body=id==='changelog'?'<div class="changelog"><h3>Version 2.1</h3><ul><li>Month-grid date picking and native repeat rendering</li><li>Calendar colors and contextual greetings</li><li>Tasks filters, event details, and updated Settings</li></ul><h3>Version 2.0</h3><ul><li>Improved calendar visibility, inline renaming, and fixed Settings sizing</li></ul><h3>Version 1.1</h3><ul><li>Login-only accounts, Supabase storage, and AI access controls</li></ul></div>':'<p>'+h(text[id])+'</p>';modal('<h2>'+h(title)+'</h2>'+body+'<div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
-function subscriptionDialog(){
- const dlg=modal('<h2>Add subscription</h2><p>Add a published iCalendar feed.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><p class="sub-inline-error" id="subInlineError" hidden></p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');
- const error=$('#subInlineError',dlg),button=$('#subSave',dlg);
- button.onclick=async()=>{
-  error.hidden=true;
-  let feed;try{feed=new URL($('#subURL',dlg).value.replace(/^webcal:/i,'https:'));if(feed.protocol!=='https:')throw Error()}catch{error.hidden=false;error.textContent='Enter a valid HTTPS feed URL.';return}
-  if(state.subscriptions.some(x=>x.url===feed.href)){error.hidden=false;error.textContent='That feed is already added.';return}
-  loading(button,true,'Adding…');
-  try{
-   const result=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:feed.href}});
-   await refreshData();
-   if($('#settingsModal'))renderSettings();
-   dlg.close();toast(result.refresh_error?'Subscription added; feed refresh failed':'Subscription added');
-  }catch(e){loading(button,false);error.hidden=false;error.textContent=e.message==='That feed is already added.'?e.message:'Could not add the subscription. Check the feed URL.'}
+function legal(id){
+ const text={
+  privacy:'Daylight saves its example calendars, events, tasks and preferences in this browser’s local storage. There is no account, server database, sync or external data collection in the design preview. Clearing browser storage removes local data.',
+  terms:'Daylight is a local UI preview. Changes remain on this device and are not backed up or synchronized. Online integrations are disabled.'
  };
+ const title=id==='privacy'?'Privacy Policy':'Terms of Use';
+ modal('<h2>'+title+'</h2><p>'+h(text[id]||'Local preview only.')+'</p><div class="footer-actions"><button class="primary" data-close>Done</button></div>');
 }
+
 function renderTasks(){
  const counts={all:state.tasks.length,todo:state.tasks.filter(t=>!t.completed).length,completed:state.tasks.filter(t=>t.completed).length};
  const choices=[['all','All'],['todo','To do'],['completed','Completed']];
@@ -580,7 +481,7 @@ function renderTasks(){
 }
 function renderIntegrations(){
  $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">'+icon('plus',16)+' Add subscription</button></header>'+(state.subscriptions.length?'':emptyState('No integrations yet','Connect a published calendar feed using Add subscription.','plug'))+'<div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more '+icon('external-link',16)+'</button></div>').join('')+'</div></div>';
- $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
+ $('#connect').onclick=()=>modal('<h2>Integrations preview</h2><p>Online subscriptions and service connections are not enabled in this browser-only UI. Calendars and tasks remain editable locally.</p><button class="primary" data-close>Done</button>');$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. Online syncing is disabled while developing this local interface.')+'</p><button class="primary" data-close>Done</button>'));
 }
 const nativeRecurring=e=>!e.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(e.repeat_rule?.frequency||e.repeat_rule?.freq);
 function chooseOccurrence(e,action){
@@ -633,7 +534,7 @@ function enableCalendarDrag(){
   if(!drag||e.pointerId!==drag.id)return;
   if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
   if(!drag.started){drag.started=true;grid.setPointerCapture(e.pointerId);document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
-  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round(((e.clientY-drag.y)/(80/60))/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round(((e.clientY-drag.y)/.8)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
   e.preventDefault();
  };
  grid.onpointerup=async e=>{
@@ -647,7 +548,7 @@ function enableCalendarDrag(){
   const ev=d.original,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
   let nextStart=new Date(start),nextEnd=new Date(end);
   if(d.item?.classList.contains('weekevent')){
-   const minutes=Math.round(((e.clientY-d.y)/(80/60))/15)*15;
+   const minutes=Math.round(((e.clientY-d.y)/.8)/15)*15;
    const days=endCell?Math.round((date(endCell)-date(daykey(start)))/86400000):0;
    if(d.edge==='start')nextStart=new Date(Math.min(end.getTime()-900000,start.getTime()+minutes*60000));
    else if(d.edge==='end')nextEnd=new Date(Math.max(start.getTime()+900000,end.getTime()+minutes*60000));
@@ -779,67 +680,5 @@ function checkReminders(){
 }
 setInterval(checkReminders,30000);
 window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.code==='Comma'||e.key===','||e.key==='<')){e.preventDefault();e.stopPropagation();if(state.user)settings()}},{capture:true});
-const cleanAuthLocation=()=>{
- // Never retain one-time auth codes or access/refresh tokens in browser history.
- const next=new URL(location.href);
- for(const key of ['code','type','error','error_code','error_description','auth_callback'])next.searchParams.delete(key);
- next.hash='';
- history.replaceState(history.state,'',next.pathname+next.search);
-};
-const showAuthFailure=message=>{
- login();
- const field=$('#authError');
- if(field){field.hidden=false;field.textContent=String(message||'Authentication could not be completed.').replace(/[. ]*$/,'')+'.'}
-};
-const authCallbackParams=()=>{
- const params=new URLSearchParams(location.search),hash=new URLSearchParams(location.hash.replace(/^#/,''));
- return {query:params,hash,code:params.get('code'),error:params.get('error_description')||params.get('error')||hash.get('error_description')||hash.get('error'),type:hash.get('type')||params.get('type')};
-};
-async function initializeAuth(){
- const callback=authCallbackParams();
- if(callback.error){
-  cleanAuthLocation();
-  showAuthFailure(callback.error);
-  return;
- }
- const hasCode=Boolean(callback.code),hasTokens=Boolean(callback.hash.get('access_token')&&callback.hash.get('refresh_token'));
- try{
-  if(hasCode||hasTokens){
-   root.innerHTML='<main class="center"><div class="login" role="status"><div class="mark">'+icon('brand',24)+'</div><h1>Signing you in</h1><p>Completing secure authentication…</p></div></main>';
-   let result;
-   if(hasCode){
-    // GoTrue returns ?code= for PKCE email/OAuth callbacks. Exchange exactly
-    // once and allow supabase-js to persist the resulting session.
-    result=await supabase.auth.exchangeCodeForSession(callback.code);
-   }else{
-    // Accept legacy implicit-flow email links too, without keeping tokens
-    // visible in the URL or writing them to our own storage.
-    result=await supabase.auth.setSession({
-     access_token:callback.hash.get('access_token'),
-     refresh_token:callback.hash.get('refresh_token')
-    });
-   }
-   if(result.error)throw result.error;
-   if(!result.data?.session)throw Error('The sign-in link did not provide a valid session.');
-   cleanAuthLocation();
-   if(callback.type==='recovery'){passwordRecoveryActive=true;showPasswordRecovery();return}
-  }
-  if(passwordRecoveryActive){showPasswordRecovery();return}
-  await load();
- }catch(error){
-  cleanAuthLocation();
-  console.error('DAYLIGHT AUTH CALLBACK ERROR',error?.message||error);
-  showAuthFailure('The sign-in link could not be completed. Please log in again.');
- }
-}
 startIcons();
-if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">'+icon('brand',24)+'</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else{
- supabase.auth.onAuthStateChange(event=>{
-  if(event==='PASSWORD_RECOVERY'){
-   passwordRecoveryActive=true;
-   showPasswordRecovery();
-  }
- });
- initializeAuth();
-}
+load();
