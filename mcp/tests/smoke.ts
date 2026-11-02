@@ -6,7 +6,7 @@ await client.connect(transport);
 async function call(name:string,args:Record<string,unknown>={}){
  const result=await client.callTool({name,arguments:args});
  const value=result.content?.find((x:any)=>x.type==='text');
- const content=String(value?.text||'');
+ const content=String((value as {text?:string}|undefined)?.text||'');
  if(result.isError)throw new Error(name+': '+content);
  return JSON.parse(content);
 }
