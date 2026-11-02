@@ -120,7 +120,7 @@ async function handle(req:Request){
   if(error)throw error;return json({ok:true,user:{...pair.user,first_name:first,last_name:last}});
  }
  if(action==='mcp_list'){
-  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).order('created_at',{ascending:false});
+  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).eq('revoked',false).order('created_at',{ascending:false});
   if(error)throw error;return json({items:data});
  }
  if(action==='mcp_generate'){
@@ -130,7 +130,7 @@ async function handle(req:Request){
  }
  if(action==='mcp_revoke'){
   if(!/^[0-9a-f-]{36}$/i.test(plain(body.id)))return fail('Invalid token');
-  const {data,error}=await db.from('dl_mcp_tokens').update({revoked:true}).eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
+  const {data,error}=await db.from('dl_mcp_tokens').delete().eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
   if(error)throw error;return data?json({ok:true}):fail('Token not found',404);
  }
  if(action==='sub_refresh'){
