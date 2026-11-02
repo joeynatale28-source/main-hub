@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#131518">
-  <meta name="description" content="daylight. — your private calendar and tasks, securely synced to your account.">
+  <meta name="description" content="daylight. — a local-only visual calendar workspace.">
   <title>Daylight — Calendar</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./secure-app/src/style.css?v=secure-1101"><link rel="stylesheet" href="./secure-app/src/v2-precision.css?v=precision-2"><link rel="stylesheet" href="./secure-app/src/final-polish.css?v=polish-3"><link rel="stylesheet" href="./secure-app/src/logic-overhaul.css?v=logic-1"><link rel="stylesheet" href="./secure-app/src/ui-overhaul.css?v=ui-2"><link rel="stylesheet" href="./secure-app/src/perfection.css?v=perfection-1"><link rel="stylesheet" href="./secure-app/src/calendex.css?v=calendex-3">
+  <link rel="stylesheet" href="./secure-app/src/style.css?v=secure-1101"><link rel="stylesheet" href="./secure-app/src/v2-precision.css?v=precision-2"><link rel="stylesheet" href="./secure-app/src/final-polish.css?v=polish-3"><link rel="stylesheet" href="./secure-app/src/logic-overhaul.css?v=logic-1"><link rel="stylesheet" href="./secure-app/src/ui-overhaul.css?v=ui-2"><link rel="stylesheet" href="./secure-app/src/perfection.css?v=perfection-1"><link rel="stylesheet" href="./secure-app/src/local-ui.css?v=local-preview-1">
   <script>
     try {
       const theme=localStorage.getItem('daylight-theme')||'system';
@@ -19,11 +19,11 @@
         : theme;
     } catch {}
   </script>
-  <script src="./site-config.js?v=auth-callback-1"></script>
+  
 </head>
 <body>
   <div id="root"></div>
   <noscript>JavaScript is required to use Daylight.</noscript>
-  <script type="module" src="./secure-app/src/main.js?v=calendex-3"></script>
+  <script type="module" src="./secure-app/src/main.js?v=local-preview-1"></script>
 </body>
 </html>
