@@ -502,6 +502,66 @@ function renderAgenda(){
 }
 
 /* === Event popover and working confirmations === */
+
+async function saveOccurrenceException(ev,occ,type,replacement={}){
+ const original=(occ.originalStart||occ.start).toISOString();
+ let record=state.exceptions.find(x=>x.event_id===ev.id&&new Date(x.original_start).getTime()===new Date(original).getTime());
+ const data={event_id:ev.id,original_start:original,exception_type:type,replacement};
+ const method=record?"update":"create";
+ try{
+  const result=await localApi("data_"+method,{entity:"exceptions",id:record?.id||null,data});
+  if(record)Object.assign(record,result.item);else state.exceptions.push(result.item);
+  return true;
+ }catch(error){toast(error.message||"Could not save recurring exception");return false}
+}
+function ruleBefore(ev,occ){
+ const original=String(ev.rrule||"FREQ="+ev.repeat.toUpperCase()).replace(/^RRULE:/,"");
+ const cutoff=new Date((occ.originalStart||occ.start).getTime()-1000);
+ const stamp=cutoff.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
+ return original.replace(/;?UNTIL=[^;]*/gi,"").replace(/;?COUNT=\d+/gi,"")+";UNTIL="+stamp;
+}
+async function splitFollowing(ev,occ,replacement=null){
+ const original={...ev},futureStart=occ.originalStart||occ.start;
+ if(futureStart.getTime()<=ev.start.getTime()){
+  if(replacement){
+   Object.assign(ev,replacement);return saveEvent(ev,"update");
+  }
+  if(!await removeEvent(ev))return false;
+  state.events=state.events.filter(x=>x.id!==ev.id);return true;
+ }
+ const newRule=String(ev.rrule||"FREQ="+ev.repeat.toUpperCase()).replace(/^RRULE:/,"").replace(/;?UNTIL=[^;]*/gi,"").replace(/;?COUNT=\d+/gi,"");
+ ev.rrule=ruleBefore(original,occ);
+ if(!await saveEvent(ev,"update")){Object.assign(ev,original);return false}
+ if(replacement){
+  const next={...original,...replacement,id:id(),rrule:newRule,start:replacement.start||occ.start,end:replacement.end||occ.end,exdates:[]};
+  if(!await saveEvent(next,"create")){
+   Object.assign(ev,original);await saveEvent(ev,"update");return false;
+  }
+  state.events.push(next);
+ }
+ return true;
+}
+function chooseSeriesAction(label,run){
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:410px"><div class="dialog-head"><span class="dialog-title">'+esc(label)+'</span><button class="icon-btn" data-cancel>'+icon("x",17)+'</button></div><div class="dialog-body"><p class="inline-note">Which events should be affected?</p><div id="scopeChoices" style="display:flex;flex-direction:column;gap:8px"></div></div><div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button></div></div></div>');
+ const close=()=>bd.remove();
+ for(const [scope,text] of [["only","Only this event"],["following","This and following"],["all","All events"]]){
+  const b=el('<button class="btn-ghost" style="justify-content:flex-start;text-align:left">'+text+'</button>');
+  b.onclick=async()=>{close();await run(scope)};
+  $("#scopeChoices",bd).append(b);
+ }
+ $("[data-cancel]",bd).forEach(x=>x.onclick=close);
+ bd.onmousedown=e=>{if(e.target===bd)close()};
+ overlayRoot.append(bd);
+}
+async function deleteWithScope(ev,occ,scope){
+ if(scope==="only"){if(await saveOccurrenceException(ev,occ,"skipped")){renderAll(false);toast("Occurrence deleted")}return}
+ if(scope==="following"){if(await splitFollowing(ev,occ,null)){renderAll(false);toast("Following occurrences removed")}return}
+ const snapshot={...ev};
+ if(!await removeEvent(ev))return;
+ state.events=state.events.filter(x=>x.id!==ev.id);
+ renderAll(false);
+ toast("Recurring series deleted",{label:"Undo",fn:async()=>{const copy={...snapshot};if(await saveEvent(copy,"create")){state.events.push(copy);renderAll(false)}}});
+}
 function openPopover(occ,anchor){
  closeMenu();if(popEl?.dataset.id===occ.ev.id&&popEl?.dataset.start===String(occ.start.getTime())){closePopover();return}closePopover();
  const e=occ.ev,cal=calOf(e.cal),dateLine=sameDay(occ.start,occ.end)?fmtDateLong(occ.start):fmtDateShort(occ.start)+" - "+fmtDateShort(occ.end);
