@@ -98,7 +98,7 @@ function safeChange(entity,id,data,action){
 function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(!state.settings.show_declined_events?!['declined','cancelled'].includes(e.status):true))}
 function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
-const eventStyle=e=>'--event-color:'+eventColor(e)+';';
+const eventStyle=e=>'--event-color:'+(['declined','cancelled'].includes(e.status)?'#92929a':eventColor(e))+';';
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
@@ -398,7 +398,7 @@ async function saveSetting(field,value){
  return task;
 }
 const switches={
- calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar']],
+ calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Display declined or cancelled events greyed out']],
  appearance:[['show_weekends','Show weekends','Include Saturday and Sunday'],['compact_mode','Compact mode','Use tighter spacing'],['reduce_motion','Reduce motion','Minimize movement and animations']],
  notifications:[['task_reminders','Task reminders','Notifications for due tasks'],['event_reminders','Event reminders','Notifications for upcoming events'],['notification_sound','Notification sound','Play a sound when a reminder appears']]
 };
@@ -449,14 +449,29 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();toast('Subscription removed')}}));
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}}));
 }
 function legal(id){const text={
  privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
  terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
  changelog:''
  };const title=id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog',body=id==='changelog'?'<div class="changelog"><h3>Version 2.1</h3><ul><li>Month-grid date picking and native repeat rendering</li><li>Calendar colors and contextual greetings</li><li>Tasks filters, event details, and updated Settings</li></ul><h3>Version 2.0</h3><ul><li>Improved calendar visibility, inline renaming, and fixed Settings sizing</li></ul><h3>Version 1.1</h3><ul><li>Login-only accounts, Supabase storage, and AI access controls</li></ul></div>':'<p>'+h(text[id])+'</p>';modal('<h2>'+h(title)+'</h2>'+body+'<div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
-function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{loading($('#subSave',dlg),true,'Adding…');const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();const r=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:u.href}});dlg.close();await refreshData();if(r.refresh_error)toast(r.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");else toast('Subscription added')}catch{loading($('#subSave',dlg),false);toast('Enter a valid HTTPS feed URL')}}}
+function subscriptionDialog(){
+ const dlg=modal('<h2>Add subscription</h2><p>Add a published iCalendar feed.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><p class="sub-inline-error" id="subInlineError" hidden></p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');
+ const error=$('#subInlineError',dlg),button=$('#subSave',dlg);
+ button.onclick=async()=>{
+  error.hidden=true;
+  let feed;try{feed=new URL($('#subURL',dlg).value.replace(/^webcal:/i,'https:'));if(feed.protocol!=='https:')throw Error()}catch{error.hidden=false;error.textContent='Enter a valid HTTPS feed URL.';return}
+  if(state.subscriptions.some(x=>x.url===feed.href)){error.hidden=false;error.textContent='That feed is already added.';return}
+  loading(button,true,'Adding…');
+  try{
+   const result=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:feed.href}});
+   await refreshData();
+   if($('#settingsModal'))renderSettings();
+   dlg.close();toast(result.refresh_error?'Subscription added; feed refresh failed':'Subscription added');
+  }catch(e){loading(button,false);error.hidden=false;error.textContent=e.message==='That feed is already added.'?e.message:'Could not add the subscription. Check the feed URL.'}
+ };
+}
 function renderTasks(){
  const counts={all:state.tasks.length,todo:state.tasks.filter(t=>!t.completed).length,completed:state.tasks.filter(t=>t.completed).length};
  const choices=[['all','All'],['todo','To do'],['completed','Completed']];
@@ -641,6 +656,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',i
   try{loading($('#quickSave',form),true,'Saving…');if(existing&&instance&&nativeRecurring(instance)){const changed=await changeOccurrence(instance,'update',data);if(!changed){loading($('#quickSave',form),false);return}}else await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();if(state.user)settings()}});
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
 else load();
