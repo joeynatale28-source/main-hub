@@ -533,7 +533,7 @@ function occurrenceChoice(event,action,callback){
 }
 async function mutateOccurrence(event,scope,mode,changes=null){
  const base=event._origin||event;
- const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,...(changes?{changes}:{})});
+ const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,occurrence_date:event._civilDate||iso(new Date(event._occurrence||event.starts_at)),...(changes?{changes}:{})});
  await refreshData();toast(mode==='delete'?'Event deleted':'Event updated');return result;
 }
 function deleteEventSafely(e,closeDetail){
