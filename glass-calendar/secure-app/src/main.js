@@ -1,31 +1,50 @@
 import {icon,upgradeIcons,startIcons} from './icons.js';
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.10';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
 const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
 const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
+const sb=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
 const date=s=>new Date(s+'T12:00:00'),add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const label=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
+const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
 const toast=(text)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}el.textContent=text;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200);upgradeIcons()};
-async function api(action,data={},include=true){
- const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key},body:JSON.stringify({...data,action,...(include?{token:state.token}:{})})});
- let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable')}
- if(!r.ok)throw Error(body.error||'Request failed');return body;
+async function api(action,data={}){
+ const {data:sessionData}=await sb.auth.getSession();const token=sessionData?.session?.access_token;
+ if(!token)throw Error('Session expired. Log in again.');
+ const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key,authorization:'Bearer '+token},body:JSON.stringify({...data,action})});
+ let result;try{result=await response.json()}catch{throw Error('Service temporarily unavailable.')}
+ if(!response.ok)throw Error(result.error||'Request failed.');return result;
 }
 async function load(){
- try{const result=await api('auth_session');state.user=result.user;const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});applyTheme();render()}catch(error){console.error('DAYLIGHT STARTUP ERROR',error?.stack||error);localStorage.removeItem('dl-release-session');state.token='';login()}
+ try{
+  const {data:sessionData}=await sb.auth.getSession();if(!sessionData.session){state.user=null;login();return}
+  const result=await api('auth_session');state.user=result.user;
+  const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
+  Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
+  applyTheme();render();
+ }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);state.user=null;login()}
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor')}
-function login(){root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Username<input id="username" required autocomplete="username" placeholder="Username"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">◉</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><small>Accounts are created by Joey — there’s no sign-up.</small></form></main>';
- $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
- $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match.";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
+function login(){
+ root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">'+icon('brand')+'</div><h1>daylight.</h1><p>Log in to your account</p><label>Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye" aria-label="Show password">'+icon('eye')+'</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" class="forgot-link" id="forgotPassword">Forgot password?</button></form></main>';
+ $('#eye').onclick=()=>{const p=$('#password');p.type=p.type==='password'?'text':'password';$('#eye').innerHTML=icon(p.type==='password'?'eye':'eye-off')};
+ $('#login').onsubmit=async e=>{e.preventDefault();const b=$('#loginBtn');loading(b,true,'Logging in…');const email=$('#email').value,password=$('#password').value;
+  try{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await load()}
+  catch(error){const el=$('#authError');el.hidden=false;el.textContent=(error?.message||'Could not log in.').replace(/\.*$/,'.');loading(b,false)}
+ };
+ $('#forgotPassword').onclick=async()=>{const email=$('#email').value.trim();if(!email){$('#email').focus();$('#authError').hidden=false;$('#authError').textContent='Enter your email address first.';return}
+  const b=$('#forgotPassword');loading(b,true,'Sending…');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});loading(b,false);
+  $('#authError').hidden=false;$('#authError').textContent=error?'Unable to send a reset email.':'If this email belongs to an account, password reset instructions have been sent.';
+ };
+ upgradeIcons();
 }
-async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
+async function logout(){await sb.auth.signOut();state.user=null;state.events=[];state.calendars=[];login()}
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
 function reflect(){
@@ -93,7 +112,7 @@ function bindRailTooltips(){
   node.style.top=Math.max(8,Math.min(innerHeight-node.offsetHeight-8,r.top+r.height/2-node.offsetHeight/2))+'px';
  }
 }
-function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
+function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>'+h(state.user.email||'')+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
  $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
  $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
  $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
@@ -520,4 +539,4 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
 };
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else if(state.token)load();else login();
+else sb.auth.getSession().then(({data})=>data.session?load():login());
