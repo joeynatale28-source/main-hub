@@ -227,3 +227,12 @@ html[data-reduce-motion=true] *,html[data-reduce-motion=true] *:before,html[data
 #settingsModal .theme-mini.system{background:linear-gradient(90deg,#14161a 0 50%,#f9f9fa 50% 100%)}
 #settingsModal .theme-mini.system strong{left:59%!important;width:22%!important}
 @media(min-width:901px) and (max-height:780px){.monthcells{grid-template-rows:repeat(var(--weeks),116px)!important}.monthcell{height:116px!important;min-height:116px!important}.month-more{margin-top:98px!important}}
+
+/* Command dialog: full-theme floating search, never an inline layout jump. */
+#searchScrim.search-scrim{position:fixed;inset:0;background:var(--backdrop);z-index:2147481000}
+#searchBar:not([hidden]){position:fixed!important;top:min(18vh,150px)!important;left:50%!important;translate:-50% 0!important;width:min(520px,calc(100vw - 32px))!important;max-height:min(640px,72vh)!important;display:flex!important;flex-direction:column!important;transform:none!important;z-index:2147481100!important;margin:0!important;box-shadow:var(--dl-shadow)!important;animation:uiDialog 160ms ease-out both}
+#searchBar #searchQuery{flex:none}
+#searchResults{max-height:min(460px,57vh)!important;overflow:auto!important}
+#searchBar .search-hint{flex:none;border-top:1px solid var(--line);padding:9px 12px!important}
+#searchBar[hidden],#searchScrim[hidden]{display:none!important}
+@media(max-width:760px){#searchBar:not([hidden]){top:8vh!important}}
