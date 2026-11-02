@@ -438,6 +438,7 @@ test('Only this event recurring delete saves EXDATE without deleting the series'
 });
 test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up',async({page})=>{
  await setup(page);
+ await expect(page.locator('#newEvent')).toBeVisible();
  await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',ctrlKey:true,bubbles:true,cancelable:true})));
  // Verify the app's handler directly: Chromium may reserve Ctrl+, for browser Settings.
  await expect(page.locator('#settingsModal')).toBeVisible();
