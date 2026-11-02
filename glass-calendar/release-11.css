@@ -78,3 +78,7 @@
 #settingsAbout .version{font-weight:600}
 :root[data-reduce-motion=true] .release-pane-enter,:root[data-reduce-motion=true] #settingsModal{animation:none!important}
 @media(max-width:650px){#settingsModal{width:calc(100vw - 16px);height:90dvh}#settingsModal #settingsPage{padding:14px!important}#settingsModal #settingsPage .settings-layout{grid-template-columns:112px minmax(0,1fr)!important;gap:10px!important}#settingsModal #settingsPage .settings-sections{padding:39px 5px 0 0!important}#settingsModal .settings-anchor{font-size:11px!important;padding:8px 5px!important;gap:6px}#settingsModal .settings-nav-icon{width:15px;flex-basis:15px}#settingsModal #settingsPage .settings-stack{padding-top:39px!important}#settingsModal .setting-item{flex-wrap:wrap;gap:7px}}
+
+/* Toast actions stay above the interactive calendar, so Undo is actually clickable. */
+body>#toast,body>.toast,#toast{position:fixed!important;z-index:2147483000!important;pointer-events:auto!important;isolation:isolate!important}
+#toast button{position:relative!important;z-index:2!important;pointer-events:auto!important}
