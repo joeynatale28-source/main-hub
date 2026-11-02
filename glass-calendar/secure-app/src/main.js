@@ -347,7 +347,7 @@ function renderMonth(){
  const items=occurrences(add(start,-1),add(start,count+1));
  let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
  for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside ':'')+([0,6].includes(t.getDay())?'weekend':'')+'" data-cell="'+key+'">';
+  const t=add(start,i),key=iso(t);html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside ':'')+([0,6].includes(t.getDay())?'weekend':'')+'" data-cell="'+key+'" style="grid-column:'+(i%7+1)+';grid-row:'+(Math.floor(i/7)+1)+'">';
   if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
   html+='<button class="datenum '+(key===iso(now())?'today ':'')+(key===iso(state.date)?'selected':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button></div>';
  }
@@ -388,7 +388,7 @@ function renderWeek(){
  if(todayTrack){const body=$('.weekbody',$('#grid'));const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*80/60)+'px';body.append(line);const time=document.createElement('div');time.className='now-time-pill';time.style.top=(minutesNow*80/60)+'px';time.textContent=current.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});$('.hours',$('#grid')).append(time)}
  if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
  bindEventButtons();enableCalendarDrag();
- $('.weekwrapper',$('#grid')).scrollTop=8*80; // Present the reference's 8 AM starting viewport; the full 24 hours remain scrollable.
+ $('.weekwrapper',$('#grid')).scrollTop=7.5*80; // Leave the 8 AM hour label fully visible below the sticky all-day strip.
  $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/(80/60))/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
