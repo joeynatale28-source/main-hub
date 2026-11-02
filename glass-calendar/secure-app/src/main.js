@@ -359,16 +359,21 @@ function renderWeek(){
  const all=spansFor(events.filter(e=>(e.all_day||isLong(e))&&days.some(d=>eventOn(e,iso(d)))),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
  for(const e of all)html+='<button class="all-day-span '+(e._continuationLeft?'continue-left ':'')+(e._continuationRight?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
- html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
+ html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*48)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
   for(const e of events.filter(x=>!x.all_day&&!isLong(x)&&eventOn(x,key))){
    const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+(minute*.8)+'px;height:'+(height*.8)+'px;')+' data-drag-event="'+h(e.id)+'"><strong>'+h(e.title)+'</strong><span class="resize-edge top" data-resize="start"></span><span class="resize-edge bottom" data-resize="end"></span></button>';
   }html+='</div>';
  }
- $('#grid').innerHTML=html+'</div></div>';bindEventButtons();enableCalendarDrag();
- $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor((e.clientY-el.getBoundingClientRect().top)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
+ $('#grid').innerHTML=html+'</div></div>';
+ const current=now(),minutesNow=current.getHours()*60+current.getMinutes();
+ const todayTrack=$('[data-slot="'+iso(current)+'"]',$('#grid'));
+ if(todayTrack){const line=document.createElement('div');line.className='now-line';line.setAttribute('aria-label','Current time');line.style.top=(minutesNow*.8)+'px';todayTrack.append(line)}
+ if(state.view==='day'&&!events.some(e=>eventOn(e,iso(d)))){const empty=document.createElement('div');empty.className='day-view-empty';empty.innerHTML=emptyState('No events yet','Create an event to plan this day.','calendar');$('.weekbody',$('#grid')).append(empty)}
+ bindEventButtons();enableCalendarDrag();
+ $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor(((e.clientY-el.getBoundingClientRect().top)/.8)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
  const today=iso(now()),items=uniqueInstances(occurrences(add(now(),-1),add(now(),370))).filter(x=>eventDate(x)>=today||x._lastCivil>=today);
@@ -611,7 +616,7 @@ function enableCalendarDrag(){
   if(!drag||e.pointerId!==drag.id)return;
   if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
   if(!drag.started){drag.started=true;grid.setPointerCapture(e.pointerId);document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
-  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round((e.clientY-drag.y)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round(((e.clientY-drag.y)/.8)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
   e.preventDefault();
  };
  grid.onpointerup=async e=>{
@@ -625,7 +630,7 @@ function enableCalendarDrag(){
   const ev=d.original,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
   let nextStart=new Date(start),nextEnd=new Date(end);
   if(d.item?.classList.contains('weekevent')){
-   const minutes=Math.round((e.clientY-d.y)/15)*15;
+   const minutes=Math.round(((e.clientY-d.y)/.8)/15)*15;
    const days=endCell?Math.round((date(endCell)-date(daykey(start)))/86400000):0;
    if(d.edge==='start')nextStart=new Date(Math.min(end.getTime()-900000,start.getTime()+minutes*60000));
    else if(d.edge==='end')nextEnd=new Date(Math.max(start.getTime()+900000,end.getTime()+minutes*60000));
