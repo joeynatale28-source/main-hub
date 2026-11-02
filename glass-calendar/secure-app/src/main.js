@@ -523,7 +523,7 @@ async function changeOccurrence(e,action,data={}){
 }
 function enableCalendarDrag(){
  const grid=$('#grid');if(!grid)return;let drag=null;
- const cleanup=()=>{drag?.ghost?.remove();drag=null;document.body.classList.remove('daylight-dragging')};
+ const cleanup=()=>{if(drag&&grid.hasPointerCapture(drag.id))grid.releasePointerCapture(drag.id);drag?.ghost?.remove();drag=null;document.body.classList.remove('daylight-dragging')};
  grid.onpointerdown=e=>{
   if(e.button!==0)return;
   const item=e.target.closest('[data-drag-event]'),cell=e.target.closest('[data-cell]');
@@ -531,7 +531,7 @@ function enableCalendarDrag(){
   if(item&&state.subscriptions.some(s=>s.calendar_id===getOccurrence(item.dataset.detail,item.dataset.occ)?.calendar_id))return;
   const original=item?getOccurrence(item.dataset.detail,item.dataset.occ):null;
   const startCell=cell?.dataset.cell;
-  drag={id:e.pointerId,x:e.clientX,y:e.clientY,item,original,startCell,edge:e.target.dataset.resize||null,started:false};
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,item,original,startCell,edge:e.target.dataset.resize||null,started:false};grid.setPointerCapture(e.pointerId);
  };
  grid.onpointermove=e=>{
   if(!drag||e.pointerId!==drag.id)return;
