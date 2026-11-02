@@ -9,7 +9,7 @@ const publicSiteUrl=runtimeConfig.VITE_PUBLIC_SITE_URL||'https://joeynatale28-so
 const authRedirectUrl=new URL(publicSiteUrl).href;
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
-const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
+const endpoint=runtimeConfig.VITE_DAYLIGHT_API_URL||url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
 const supabase=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}}):null;
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
@@ -41,7 +41,7 @@ async function load(){
   Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
   if(passwordRecoveryActive){showPasswordRecovery();return}
   applyTheme();render();
- }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);login()}
+ }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);login();const field=$('#authError');if(field){field.hidden=false;field.textContent='Signed in, but your calendar could not load. '+(error?.message||'Please try again.')}}
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor')}
 function login(){
@@ -49,8 +49,8 @@ function login(){
  $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
  $('#login').onsubmit=async e=>{
   e.preventDefault();const btn=$('#loginBtn'),err=$('#authError');btn.disabled=true;btn.textContent='Logging in…';err.hidden=true;
-  const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});
-  if(error){err.textContent=error.code==='invalid_credentials'?'Email or password not recognized. Re-enter your credentials or choose Forgot password.':error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
+  const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim().toLowerCase(),password:$('#password').value});
+  if(error){err.textContent=error.code==='invalid_credentials'?'Email or password not recognized. Check the exact email address listed in Supabase Authentication > Users.':error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
   await load();
  };
  $('#forgotPassword').onclick=async()=>{
