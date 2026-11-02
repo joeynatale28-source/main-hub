@@ -52,6 +52,28 @@ export async function localApi(action,payload={}){
  }
  throw Error('Unsupported action');
 }
+export async function feedAction(action,payload={}){
+ ensure();
+ const {data,error}=await supabase.functions.invoke('daylight-feeds',{body:{action,...payload}});
+ if(error){
+  let message=error.message;
+  try{if(error.context&&typeof error.context.json==='function'){const detail=await error.context.json();message=detail.error||message}}catch{}
+  throw Error(message);
+ }
+ if(data?.error)throw Error(data.error);
+ return data;
+}
+export async function refreshFeeds(){
+ ensure();
+ const {data,error}=await supabase.from('calendars').select('id').eq('user_id',currentUser.id).neq('source_type','local');
+ if(error)throw error;
+ let changed=false;
+ for(const cal of data||[]){
+  try{await feedAction('refresh',{calendar_id:cal.id});changed=true}
+  catch(err){console.warn('Calendar feed sync:',err instanceof Error?err.message:err)}
+ }
+ return changed;
+}
 export function localReset(){throw Error('Authenticated data cannot be reset without confirmation')}
 export async function bootAuth(ready){
  const app=document.getElementById('app'),overlay=document.createElement('div');
@@ -61,7 +83,7 @@ export async function bootAuth(ready){
  function fail(e){document.getElementById('authError').textContent=e?.message||String(e)}
  async function start(){
   overlay.style.display='none';
-  try{check(await supabase.rpc('daylight_ensure_workspace'));await ready()}
+  try{check(await supabase.rpc('daylight_ensure_workspace'));await ready();if(await refreshFeeds())await ready()}
   catch(e){overlay.style.display='grid';fail(e)}
  }
  const {data:{session}}=await supabase.auth.getSession();
