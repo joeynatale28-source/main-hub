@@ -727,7 +727,7 @@ function openSettings(section="general"){
  draw();
 }
 function paneGeneral(pane){
- paneHead(pane,"General","Personal preferences for this local calendar.");
+ paneHead(pane,"General","Personal preferences for your Daylight account.");
  const profile=el('<div class="set-group"><div class="set-group-title">Profile</div>'+
   '<div class="field"><label for="gsName">First name</label><input class="text-input" id="gsName" style="max-width:300px" value="'+esc(state.firstName)+'"><p class="inline-note">Used in the greeting at the top of your calendar.</p></div>'+
   '<div class="field"><label for="gsLast">Last name</label><input class="text-input" id="gsLast" style="max-width:300px" value="'+esc(state.lastName)+'"></div>'+
@@ -802,33 +802,10 @@ function exportData(){
  }catch{toast("Could not export local data")}
 }
 function paneData(pane,close){
- paneHead(pane,"Local data","Your calendars and events are saved in this browser only.");
- const g=el('<div class="set-group">'+
- '<div class="set-group-title">Browser storage</div>'+
- '<div class="feed-row">'+icon("download",18)+'<div style="flex:1"><strong>'+state.calendars.length+' calendars · '+state.events.length+' events</strong><div class="inline-note">No account, database, sync, or MCP tokens are used.</div></div></div>'+
- '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">'+
- '<button class="btn-primary" id="exportData" style="margin-left:0">'+icon("download",16)+'Export data</button>'+
- '<button class="btn-ghost" id="importData">Import data</button>'+
- '<input type="file" id="localImport" accept=".json,application/json" hidden>'+
- '</div><p class="inline-note">Export regularly if you want a backup or to move to another device.</p></div>'+
- '<div class="set-group"><div class="set-group-title">Reset</div><button class="btn-ghost" id="resetData">Reset local workspace</button><p class="inline-note">This affects only Daylight data in this browser.</p></div>');
+ paneHead(pane,"Data & sync","Your calendar data is saved securely to your Supabase account.");
+ const g=el('<div class="set-group"><div class="set-group-title">Account data</div><p class="inline-note">'+state.calendars.length+' calendars · '+state.events.length+' events</p><p class="inline-note">Changes save to your private account. To sign out, use the button below.</p><button class="btn-ghost" id="signout">Log out</button></div>');
  pane.append(g);
- $("#exportData",g).onclick=exportData;
- $("#importData",g).onclick=()=>$("#localImport",g).click();
- $("#localImport",g).onchange=async e=>{
-  const file=e.target.files?.[0];if(!file)return;
-  try{
-   const content=JSON.parse(await file.text()),data=content.kind==="daylight-local-backup"?content.data:content;
-   if(!data||!Array.isArray(data.events)||!Array.isArray(data.calendars)||!Array.isArray(data.tasks)||!data.settings||!data.user)throw Error("Invalid backup format.");
-   openConfirm({title:"Import calendar backup?",body:"This replaces the existing local calendars, events, tasks, and preferences in this browser.",confirmLabel:"Import",fn:async()=>{
-    try{localStorage.setItem("daylight-local-ui-v1",JSON.stringify(data));close();await loadLocal();toast("Local data imported")}
-    catch{toast("Import failed. Check browser storage.")}
-   }});
-  }catch(err){toast(err.message||"Invalid backup file")}
- };
- $("#resetData",g).onclick=()=>openConfirm({title:"Reset local workspace?",body:"All calendars, events and preferences stored in this browser will be replaced with sample data. Export a backup first if needed.",confirmLabel:"Reset",danger:true,fn:async()=>{
-  localReset();close();state.cursor=sod(TODAY());state.selected=sod(TODAY());await loadLocal();toast("Workspace reset");
- }});
+ $("#signout",g).onclick=async()=>{close();await signOut();location.reload()};
 }
 function paneAbout(pane){
  paneHead(pane,"About","");
@@ -836,15 +813,15 @@ function paneAbout(pane){
  '<div class="set-group"><div class="set-group-title">What’s new</div><ul class="changelog">'+
  '<li>The supplied SquareUi-style HTML is now Daylight’s complete interface.</li>'+
  '<li>Month, Week, Day, and Agenda use the same flat styling.</li>'+
- '<li>Calendars and events persist locally between reloads.</li>'+
+ '<li>Calendars and events persist in your private account.</li>'+
  '<li>Settings opens in a fixed-size popup from anywhere in the app.</li>'+
- '<li>Online accounts, synchronization, and server tokens are removed.</li>'+
+ '<li>Account authentication and per-user calendar storage are enabled.</li>'+
  '</ul></div><div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:6px">'+
  '<button class="btn-primary" style="margin-left:0" id="abExport">'+icon("download",15)+'Export UI code</button>'+
  '<button class="btn-ghost" id="abCheck">Check for updates</button></div>'+
  '<p class="inline-note">Daylight is your calendar, kept simple on purpose.</p></div>');
  pane.append(g);$("#abExport",g).onclick=exportUI;
- $("#abCheck",g).onclick=()=>toast("You’re viewing the installed local UI preview");
+ $("#abCheck",g).onclick=()=>toast("You are using the current Daylight UI");
 }
 async function exportUI(){
  try{
