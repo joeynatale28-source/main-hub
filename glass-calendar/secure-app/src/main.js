@@ -283,7 +283,7 @@ function renderMonth(){
 function renderWeek(){
  const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
  let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
- const all=spansFor(events.filter(e=>e.all_day||isLong(e)),days);
+ const all=spansFor(events.filter(e=>(e.all_day||isLong(e))&&days.some(d=>eventOn(e,iso(d)))),days);
  html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span><div class="day-spans">';
  for(const e of all)html+='<button class="all-day-span '+(e._left===0?'continue-left ':'')+(e._right===days.length-1?'continue-right ':'')+'" '+eventAttr(e,'--span-col:'+(e._left+1)+';--span-length:'+(e._right-e._left+1)+';')+' data-drag-event="'+h(e.id)+'" >'+h(e.title)+'</button>';
  html+='</div></div><div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
