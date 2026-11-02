@@ -86,3 +86,101 @@ function renderAgenda(){
  $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>iso(new Date(x.starts_at))===d).map(x=>'<button class="agenda-item" data-detail="'+x.id+'"><strong>'+h(x.title)+'</strong><small>'+(x.all_day?'All day':new Date(x.starts_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty">No upcoming events</div>')+'</div>';bindEventButtons();
 }
 function bindEventButtons(){$$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});$$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});$$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});$$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=state.events.find(e=>e.id===x.dataset.detail);if(ev)details(ev)})}
+
+function modal(html,wide=false){
+ const dlg=document.createElement('dialog');dlg.className='dialog '+(wide?'wide':'');dlg.innerHTML='<div class="dialog-body">'+html+'</div>';document.body.append(dlg);dlg.showModal();
+ $$('[data-close]',dlg).forEach(b=>b.onclick=()=>dlg.close());
+ dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close()});
+ dlg.addEventListener('close',()=>dlg.remove());
+ return dlg;
+}
+function confirmAction(title,body,act){const dlg=modal('<h2>'+h(title)+'</h2><p>'+h(body)+'</p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button id="confirmYes" class="danger">Confirm</button></footer>');$('#confirmYes',dlg).onclick=async()=>{dlg.close();await act()}}
+function promptForm(title,placeholder,cb,value=''){
+ const dlg=modal('<h2>'+h(title)+'</h2><input class="text-input" id="promptValue" placeholder="'+h(placeholder)+'" value="'+h(value)+'" maxlength="120"><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="promptSave">Save</button></footer>');
+ const field=$('#promptValue',dlg);field.focus();field.select();
+ const save=async()=>{if(!field.value.trim())return field.classList.add('shake');const val=field.value.trim();dlg.close();await cb(val)};
+ $('#promptSave',dlg).onclick=save;field.onkeydown=e=>{if(e.key==='Enter')save()};
+}
+function menu(button,items){
+ $('#floatingMenu')?.remove();const el=document.createElement('div');el.id='floatingMenu';el.className='floating-menu';
+ el.innerHTML=items.map((x,i)=>'<button class="'+(x[2]?'danger-text':'')+'" data-item="'+i+'">'+h(x[0])+'</button>').join('');
+ document.body.append(el);
+ const rect=button.getBoundingClientRect();el.style.top=Math.min(innerHeight-180,rect.bottom+6)+'px';el.style.left=Math.max(5,Math.min(innerWidth-204,rect.right-194))+'px';
+ $$('[data-item]',el).forEach(b=>b.onclick=()=>{const fn=items[+b.dataset.item][1];el.remove();fn()});
+ const dismiss=e=>{if(!el.contains(e.target)&&e.target!==button){el.remove();document.removeEventListener('pointerdown',dismiss,true)}};setTimeout(()=>document.addEventListener('pointerdown',dismiss,true),0);
+ el.onkeydown=e=>{if(e.key==='Escape'){el.remove();button.focus()}};
+}
+async function saveSetting(field,value){
+ try{const result=await api('data_update',{entity:'settings',data:{[field]:value}});state.settings=result.item;applyTheme();render();settings(state.setting)}catch{toast("Couldn't save — check your connection")}
+}
+const switches={
+ calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Include events that you declined']],
+ appearance:[['show_weekends','Show weekends','Include Saturday and Sunday'],['compact_mode','Compact mode','Use tighter spacing'],['reduce_motion','Reduce motion','Minimize movement and animations']],
+ notifications:[['task_reminders','Task reminders','Notifications for due tasks'],['event_reminders','Event reminders','Notifications for upcoming events'],['notification_sound','Notification sound','Play a sound when a reminder appears']]
+};
+const selectOptions={
+ default_view:[['day','Day'],['week','Week'],['month','Month'],['agenda','Agenda']],
+ start_of_week:[['sunday','Sunday'],['monday','Monday']],
+ default_reminder_minutes:[['-1','None'],['5','5 minutes'],['15','15 minutes'],['30','30 minutes'],['60','1 hour'],['1440','1 day']],
+ time_zone:[[Intl.DateTimeFormat().resolvedOptions().timeZone,'Device time zone']]
+};
+const row=(title,description,control)=>'<div class="setting-row"><div><strong>'+h(title)+'</strong><small>'+h(description||'')+'</small></div><div class="row-control">'+control+'</div></div>';
+function switchHtml(key,value){return '<button role="switch" aria-checked="'+!!value+'" class="switch '+(value?'on':'')+'" data-setting-switch="'+key+'"><span></span></button>'}
+function customSelect(name,current,items){const text=items.find(x=>String(x[0])===String(current))?.[1]||items[0]?.[1]||'Choose';return '<button class="pill-select" data-select="'+name+'">'+h(text)+' <span>⌄</span></button>'}
+function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span></button>').join('')+'</div>'}
+function settingsContent(which){
+ const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
+ if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account','@'+u.username,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||Intl.DateTimeFormat().resolvedOptions().timeZone,selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
+ if(which==='calendar')return '<h2>Calendar</h2><p>Plan how your calendar is displayed.</p>'+row('Default Calendar View','View when Daylight opens',customSelect('default_view',s.default_view,selectOptions.default_view))+switchRows+row('Work hours','Beginning and end of the workday','<span class="worktime"><button class="pill-select" data-time="work_hours_start">'+h(s.work_hours_start||'09:00')+'</button> – <button class="pill-select" data-time="work_hours_end">'+h(s.work_hours_end||'17:00')+'</button></span>');
+ if(which==='appearance')return '<h2>Appearance</h2><p>Make Daylight feel like yours.</p>'+themeCards()+'<h3>Accent color</h3><div class="swatches">'+['graphite','#3B82F6','#8B7CFF','#34C759','#F5A623','#FF453A'].map(c=>'<button class="swatch" data-accent="'+c+'" title="'+h(c)+'" style="--swatch:'+(c==='graphite'?'#777777':c)+'"></button>').join('')+'<label class="swatch custom-swatch" title="Custom color"><input id="customAccent" type="color" value="'+h(s.custom_accent_hex||'#737373')+'"></label></div><div class="micro">PREVIEW</div><div class="accent-preview"><button class="primary">Primary button</button>'+switchHtml('preview',true)+'</div>'+switchRows;
+ if(which==='data')return '<h2>Data & sync</h2><p>Manage calendar subscriptions and information.</p>'+row('Connected calendars','Manage the calendars in your workspace','<button class="secondary" id="goIntegrations">Manage connected calendars ›</button>')+row('US Holidays','Show federal holidays',switchHtml('holidays',state.calendars.find(x=>x.client_id==='us-holidays')?.is_visible!==false))+'<h3>Subscriptions</h3><div id="settingsSubs">'+(state.subscriptions.length?state.subscriptions.map(x=>'<div class="sub-item"><strong>'+h(x.name)+'</strong><small>'+h(x.url)+'</small><small>Last fetched: '+h(x.last_fetched_at||'Never')+'</small><button class="secondary" data-refresh="'+x.id+'">Refresh</button><button class="danger outline" data-remove="'+x.id+'">Remove</button></div>').join(''):'<p class="quiet">No subscriptions added.</p>')+'</div>'+row('Add subscription','Read-only .ics calendar link','<button class="secondary" id="addSub">Add subscription</button>')+row('Last sync','Last updated for this account','<button class="secondary" id="refreshAll">Refresh all</button>');
+ if(which==='notifications')return '<h2>Notifications</h2><p>Control browser notifications.</p>'+row('Permission',state.notification==='granted'?'Notifications are enabled':'Permission is required','<button class="secondary" id="enableNotify">'+(state.notification==='granted'?'Enabled':'Enable notifications')+'</button>')+switchRows+row('Default reminder','Used for new events',customSelect('default_reminder_minutes',s.default_reminder_minutes,selectOptions.default_reminder_minutes));
+ if(which==='ai')return '<h2>AI access</h2><p>AI agents with a token can read and edit your calendars and tasks through MCP.</p>'+row('AI deletes','Allow irreversible event and task deletion',switchHtml('mcp_allow_delete',s.mcp_allow_delete))+'<h3>MCP tokens</h3><p class="quiet">Tokens are shown once. Protect them like passwords.</p><button class="primary" id="generateToken">Generate token</button><div id="tokenList"><p>Loading tokens…</p></div>';
+ return '<h2>About daylight.</h2><p>Version 1.1</p><div class="about-mark">✳</div>'+row('Privacy Policy','How Daylight handles your data','<button class="secondary" data-legal="privacy">Read ›</button>')+row('Terms of Service','Using Daylight','<button class="secondary" data-legal="terms">Read ›</button>')+row('Changelog','What changed in each release','<button class="secondary" data-legal="changelog">Read ›</button>');
+}
+function settings(which){
+ state.setting=which||state.setting||'general';
+ const existing=$('#settingsModal');existing?.remove();
+ const sections=[['general','General','⚙'],['calendar','Calendar','▦'],['appearance','Appearance','◈'],['data','Data & sync','▤'],['notifications','Notifications','♧'],['ai','AI access','✳'],['about','About','ⓘ']];
+ const dlg=modal('<div class="settings-grid"><nav class="settings-nav"><h2>Settings</h2>'+sections.map(x=>'<button data-sec="'+x[0]+'" class="'+(x[0]===state.setting?'selected':'')+'"><span class="glyph">'+x[2]+'</span>'+x[1]+'</button>').join('')+'</nav><div class="settings-pane" id="settingsPane"></div></div><button class="close-settings icon" data-close>×</button>',true);dlg.id='settingsModal';
+ $$('[data-sec]',dlg).forEach(b=>b.onclick=()=>{state.setting=b.dataset.sec;$$('[data-sec]',dlg).forEach(x=>x.classList.toggle('selected',x===b));renderSettings()});
+ renderSettings();
+}
+function renderSettings(){
+ const dlg=$('#settingsModal');if(!dlg)return;const pane=$('#settingsPane',dlg);pane.innerHTML=settingsContent(state.setting);
+ pane.scrollTop=0;
+ $$('[data-setting-switch]',pane).forEach(b=>b.onclick=()=>{const key=b.dataset.settingSwitch;if(key==='preview')return;if(key==='holidays'){const c=state.calendars.find(x=>x.client_id==='us-holidays');if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update');return}if(key==='mcp_allow_delete'&&!state.settings[key])return confirmAction('Allow AI agents to delete?','An AI holding a token could permanently delete events and tasks. Deletes are logged and cannot be undone.',()=>saveSetting(key,true));saveSetting(key,!state.settings[key])});
+ $$('[data-select]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.select;menu(b,selectOptions[name].map(x=>[x[1],()=>saveSetting(name,name==='default_reminder_minutes'?Number(x[0]):x[0])]))});
+ $$('[data-time]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.time;menu(b,Array.from({length:48},(_,i)=>{const time=('0'+Math.floor(i/2)).slice(-2)+':'+(i%2?'30':'00');return[time,()=>saveSetting(name,time)]}))});
+ $$('[data-theme]',pane).forEach(b=>b.onclick=()=>saveSetting('theme',b.dataset.theme));
+ $$('[data-accent]',pane).forEach(b=>b.onclick=()=>{saveSetting('accent',b.dataset.accent);if(b.dataset.accent==='graphite')saveSetting('custom_accent_hex',null);else saveSetting('custom_accent_hex',b.dataset.accent)});
+ $('#customAccent',pane)?.addEventListener('input',e=>saveSetting('custom_accent_hex',e.target.value));
+ $('#logoutBtn',pane)?.addEventListener('click',logout);
+ for(const id of ['firstName','lastName']){const input=$('#'+id,pane);if(input){input.onblur=()=>{const first=$('#firstName',pane).value,last=$('#lastName',pane).value;if(!first.trim()||!last.trim())return;api('user_update',{first_name:first,last_name:last}).then(x=>{state.user=x.user;toast('Saved')}).catch(()=>toast("Couldn't save — check your connection"))};input.onkeydown=e=>{if(e.key==='Enter')input.blur()}}}
+ $('#goIntegrations',pane)?.addEventListener('click',()=>{$('#settingsModal').close();state.page='integrations';render()});
+ $('#enableNotify',pane)?.addEventListener('click',async()=>{if(typeof Notification!=='undefined'){state.notification=await Notification.requestPermission();renderSettings()}});
+ $('#generateToken',pane)?.addEventListener('click',()=>promptForm('Generate MCP token','Token name',async name=>{try{const x=await api('mcp_generate',{name});const pop=modal('<h2>Copy your token</h2><p>You won’t see this again.</p><textarea readonly id="tokenSecret">'+h(x.token)+'</textarea><button id="copyToken" class="primary">Copy token</button>');$('#copyToken',pop).onclick=()=>navigator.clipboard.writeText(x.token);renderSettings()}catch{toast('Token could not be created')}}));
+ if(state.setting==='ai')api('mcp_list').then(x=>{const box=$('#tokenList',dlg);if(box)box.innerHTML=(x.items.length?x.items.map(t=>'<div class="token-row">'+h(t.name)+' <small>'+h(t.created_at.slice(0,10))+'</small><button data-revoke="'+t.id+'" class="danger">Revoke</button></div>').join(''):'No tokens yet.');$$('[data-revoke]',box).forEach(b=>b.onclick=()=>confirmAction('Revoke token?','This agent will lose access immediately.',async()=>{await api('mcp_revoke',{id:b.dataset.revoke});renderSettings()}))}).catch(()=>{});
+ $$('[data-legal]',pane).forEach(b=>b.onclick=()=>legal(b.dataset.legal));
+ $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
+ $('#refreshAll',pane)?.addEventListener('click',()=>toast('Subscription refresh requires a server-side feed worker'));
+ $$('[data-refresh]',pane).forEach(b=>b.onclick=()=>toast('Subscription refresh requires a server-side feed worker'));
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',()=>safeChange('subscriptions',b.dataset.remove,null,'delete')));
+}
+function legal(id){const text={
+ privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
+ terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
+ changelog:'Version 1.1: Login-only accounts, Supabase storage, AI token controls, redesigned Settings, one-step event editor and refreshed calendar interface. Version 1.0: Local calendar, tasks and calendar subscriptions.'
+ };modal('<h2>'+h(id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog')+'</h2><p>'+h(text[id])+'</p><div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
+function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();await safeChange('subscriptions',null,{name:$('#subName',dlg).value||u.hostname,url:u.href},'create');dlg.close()}catch{toast('Enter a valid HTTPS feed URL')}}}
+function renderTasks(){
+ $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Tasks</h1><p>Stay on top of what matters.</p></div><button class="primary" id="newTask">+ New task</button></header><div class="task-list">'+(state.tasks.length?state.tasks.map(t=>'<div class="task-row"><button data-done="'+t.id+'" role="checkbox" aria-checked="'+t.completed+'" class="check '+(t.completed?'checked':'')+'">'+(t.completed?'✓':'')+'</button><button data-task="'+t.id+'" class="task-title '+(t.completed?'done':'')+'"><strong>'+h(t.title)+'</strong><small>'+h(t.due_date||'No due date')+'</small></button></div>').join(''):'<div class="whole-empty">No tasks yet</div>')+'</div></div>';
+ $('#newTask').onclick=()=>openEditor(null,null,null,'task');
+ $$('[data-done]').forEach(x=>x.onclick=()=>{const t=state.tasks.find(t=>t.id===x.dataset.done);safeChange('tasks',t.id,{completed:!t.completed},'update')});
+ $$('[data-task]').forEach(x=>x.onclick=()=>{const t=state.tasks.find(t=>t.id===x.dataset.task);openEditor(t,null,null,'task')});
+}
+function renderIntegrations(){
+ $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
+ $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>Find the calendar sharing or publishing settings in your provider and copy its .ics feed URL. Private authorization is not connected.</p><button class="primary" data-close>Done</button>'));
+}
+function details(e){const readOnly=state.subscriptions.some(s=>s.calendar_id===e.calendar_id);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(label(new Date(e.starts_at)))+'</p><p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>Close</button>'+(readOnly?'':'<button class="primary" id="editEvent">Edit</button>')+'</div>');$('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e)})}
