@@ -6,7 +6,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "check": "tsc --noEmit",
-    "smoke": "tsx tests/smoke.ts"
+    "smoke": "tsx tests/smoke.ts",
+    "test:ical": "tsx tests/ical.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
