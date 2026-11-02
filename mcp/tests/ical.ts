@@ -17,7 +17,7 @@ assert.equal(result.name,'Swim Team');
 assert.equal(result.events.filter((x:any)=>x.title==='Swim practice').length,2);
 assert.ok(result.events.find((x:any)=>x.title==='Swim practice')?.starts_at.startsWith('2026-11-03T23:00:00'));
 assert.equal(result.events.filter((x:any)=>x.title==='Away meet').length,3);
-assert.ok(result.events.filter((x:any)=>x.title==='Away meet').every(x=>x.all_day));
+assert.ok(result.events.filter((x:any)=>x.title==='Away meet').every((x:any)=>x.all_day));
 assert.ok(result.events.some((x:any)=>x.starts_at.startsWith('2026-12-15T11:00:00')));
 assert.throws(()=>parseCalendar('<html>404 Not Found</html>'));
 console.log('PASS: ICS timezone / RRULE COUNT / EXDATE / multi-day / next-month / invalid-HTML');
