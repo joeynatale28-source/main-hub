@@ -34,6 +34,6 @@ function localISO(d){return[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0
 export function spanRange(event){
  const start=event._origin||event;
  const st=new Date(start.starts_at),en=new Date(start.ends_at);
- const first=localISO(st),last=localISO(new Date(en.getTime()-1));
+ const first=start.source_subscription_id&&start.all_day?String(start.starts_at).slice(0,10):localISO(st),last=start.source_subscription_id&&start.all_day?new Date(Date.parse(String(start.ends_at).slice(0,10)+'T12:00:00')-86400000).toISOString().slice(0,10):localISO(new Date(en.getTime()-1));
  return {first,last,durationMs:en-st};
 }
