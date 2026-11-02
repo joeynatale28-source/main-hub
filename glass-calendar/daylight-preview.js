@@ -660,7 +660,37 @@ function openDatePicker(anchor,current,onPick){
  const close=()=>{pop.remove();if(closeDatePickerFn===close)closeDatePickerFn=null};
  closeDatePickerFn=close;
 }
-function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null){
+
+function customRepeat(f,dirty,sync){
+ const form='<div class="form-grid"><div class="field"><label for="crFrequency">Frequency</label><select class="picker-btn" id="crFrequency"><option value="DAILY">Daily</option><option value="WEEKLY" selected>Weekly</option><option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option></select></div><div class="field"><label for="crInterval">Every</label><input class="text-input" type="number" min="1" max="365" value="1" id="crInterval"></div></div>'+
+ '<div class="field"><label>On days (weekly)</label><div style="display:flex;flex-wrap:wrap;gap:10px" id="crDays">'+["MO","TU","WE","TH","FR","SA","SU"].map(d=>'<label style="font-size:12px"><input type="checkbox" value="'+d+'"> '+d+'</label>').join("")+'</div></div>'+
+ '<div class="field"><label for="crEndType">Ends</label><select class="picker-btn" id="crEndType"><option value="never">Never</option><option value="count">After a number of occurrences</option><option value="until">On a date</option></select></div>'+
+ '<div class="form-grid"><div class="field" id="crCountWrap" hidden><label for="crCount">Number of occurrences</label><input class="text-input" id="crCount" type="number" min="1" max="999" value="10"></div><div class="field" id="crUntilWrap" hidden><label for="crUntil">End date</label><input class="text-input" id="crUntil" type="date"></div></div><p class="field-err" id="crError"></p>';
+ const bd=el('<div class="backdrop"><div class="dialog" role="dialog" aria-modal="true" style="width:430px"><div class="dialog-head"><span class="dialog-title">Custom repeat</span><button class="icon-btn" data-cancel>'+icon("x",17)+'</button></div><div class="dialog-body">'+form+'</div><div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button><button class="btn-primary" data-save>Apply repeat</button></div></div></div>');
+ const close=()=>bd.remove();overlayRoot.append(bd);
+ $("[data-cancel]",bd).forEach(x=>x.onclick=close);
+ $("#crEndType",bd).onchange=e=>{ $("#crCountWrap",bd).hidden=e.target.value!=="count";$("#crUntilWrap",bd).hidden=e.target.value!=="until" };
+ $("[data-save]",bd).onclick=()=>{
+  const freq=$("#crFrequency",bd).value,interval=Number($("#crInterval",bd).value);
+  if(!Number.isInteger(interval)||interval<1||interval>365){$("#crError",bd).textContent="Choose an interval from 1–365";return}
+  let rule="FREQ="+freq+";INTERVAL="+interval;
+  const days=$("#crDays input:checked",bd).map(x=>x.value);
+  if(freq==="WEEKLY"&&days.length)rule+=";BYDAY="+days.join(",");
+  const end=$("#crEndType",bd).value;
+  if(end==="count"){
+   const count=Number($("#crCount",bd).value);
+   if(!Number.isInteger(count)||count<1||count>999){$("#crError",bd).textContent="Choose 1–999 occurrences";return}
+   rule+=";COUNT="+count;
+  }
+  if(end==="until"){
+   const value=$("#crUntil",bd).value;
+   if(!value){$("#crError",bd).textContent="Choose an end date";return}
+   rule+=";UNTIL="+value.replaceAll("-","")+"T235959Z";
+  }
+  f.repeat=freq.toLowerCase();f.rrule=rule;dirty();sync();close();
+ };
+}
+function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null,scope="all"){
  closePopover();closeMenu();closeDatePicker();
  if(existing&&calOf(existing.cal).subscribed){toast("Subscribed events are read-only");return}
  const src=existing,base=occ||src,now=TODAY(),nextHour=Math.min(23,now.getHours()+1);
@@ -672,7 +702,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
   sDate:sod(base?.start||presetDate||state.selected),eDate:sod(rawEnd||presetDate||state.selected),
   sMin:base&&!src?.allDay?base.start.getHours()*60+base.start.getMinutes():(presetMinutes??nextHour*60),
   eMin:base&&!src?.allDay?base.end.getHours()*60+base.end.getMinutes():Math.min(1430,(presetMinutes??nextHour*60)+60),
-  repeat:src?.repeat||null,loc:src?.loc||"",dirty:false
+  repeat:src?.repeat||null,rrule:src?.rrule||null,loc:src?.loc||"",dirty:false
  };
  if(f.eMin<=f.sMin)f.eMin=Math.min(1430,f.sMin+60);
  const bd=el('<div class="backdrop"></div>'),dlg=el('<div class="dialog" role="dialog" aria-modal="true"></div>');
@@ -714,7 +744,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
  endTime.onchange=()=>{f.eMin=Number(endTime.value);dirty()};
  repeat.onclick=()=>openMenu(repeat,[{label2:"Repeat"},...[
   ["none","None"],["daily","Daily"],["weekly","Weekly"],["monthly","Monthly"],["yearly","Yearly"]
- ].map(([k,label])=>({label,right:(f.repeat||"none")===k?"check":null,fn:()=>{f.repeat=k==="none"?null:k;dirty();sync()}}))]);
+ ].map(([k,label])=>({label,right:(f.repeat||"none")===k?"check":null,fn:()=>{f.repeat=k==="none"?null:k;f.rrule=null;dirty();sync()}})),{label:"Custom…",icon:"sliders",fn:()=>customRepeat(f,dirty,sync)}]);
  calendar.onclick=()=>openMenu(calendar,[{label2:"Calendar"},...state.calendars.filter(c=>!c.subscribed).map(c=>({label:c.name,right:f.cal===c.id?"check":null,fn:()=>{f.cal=c.id;dirty();sync()}}))]);
  const close=()=>{closeDatePicker();closeMenu();bd.remove()};
  const tryClose=()=>{
@@ -730,10 +760,20 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
    end=dt(f.eDate.getFullYear(),f.eDate.getMonth(),f.eDate.getDate(),Math.floor(f.eMin/60),f.eMin%60);
    if(end<=start)end=new Date(start.getTime()+30*60000);
   }
-  const e=src?{...src,title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat}:{
-   id:id(),title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,declined:false
+  const e=src?{...src,title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,rrule:f.rrule}:{
+   id:id(),title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,rrule:f.rrule,declined:false
   };
   const button=$("[data-save]",dlg);button.disabled=true;
+  if(src&&occ&&scope==="only"){
+   const ok=await saveOccurrenceException(src,occ,"edited",{title:e.title,location:e.loc,starts_at:e.start.toISOString(),ends_at:e.end.toISOString(),description:e.description||""});
+   if(ok){close();renderAll(false);toast("This occurrence updated")}else button.disabled=false;
+   return;
+  }
+  if(src&&occ&&scope==="following"){
+   const ok=await splitFollowing(src,occ,e);
+   if(ok){close();renderAll(false);toast("This and following updated")}else button.disabled=false;
+   return;
+  }
   if(await saveEvent(e,src?"update":"create")){
    if(src)Object.assign(src,e);else state.events.push(e);
    close();renderAll(false);toast(src?"Event updated":"Event created");
