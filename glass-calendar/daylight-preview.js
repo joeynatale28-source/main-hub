@@ -1,4 +1,4 @@
-import {localApi,localReset} from './secure-app/src/local-store.js';
+import {localApi,localReset,bootAuth,signOut} from './daylight-backend.js';
 "use strict";
 /* Daylight: working implementation of the user's supplied one-page UI.
  * A browser-only application. All CRUD is through localApi; no logins, syncing or MCP. */
@@ -114,7 +114,7 @@ async function loadLocal(){
 }
 async function updateSetting(changes){
  state.settings={...state.settings,...changes};
- try{await localApi("data_update",{entity:"settings",data:changes})}catch(e){toast("Local settings could not be saved");console.error(e)}
+ try{await localApi("data_update",{entity:"settings",data:changes})}catch(e){toast("Settings could not be saved");console.error(e)}
 }
 async function updateName(){try{await localApi("user_update",{first_name:state.firstName,last_name:state.lastName})}catch(e){toast("Name could not be saved")}}
 async function saveCalendar(c,method){
@@ -123,12 +123,12 @@ async function saveCalendar(c,method){
   const saved=await localApi("data_"+method,{entity:"calendars",id:method==="create"?null:c.id,data});
   if(method==="create")c.id=saved.item.id;
   return true;
- }catch(e){toast("Calendar could not be saved locally");console.error(e);return false}
+ }catch(e){toast("Calendar could not be saved");console.error(e);return false}
 }
 async function removeCalendar(c){try{await localApi("data_delete",{entity:"calendars",id:c.id});return true}catch(e){toast("Calendar could not be removed");return false}}
 async function saveEvent(e,method){
  try{const r=await localApi("data_"+method,{entity:"events",id:method==="create"?null:e.id,data:eventToData(e)});if(method==="create")e.id=r.item.id;return true}
- catch(error){toast("Event could not be saved locally");console.error(error);return false}
+ catch(error){toast("Event could not be saved");console.error(error);return false}
 }
 async function removeEvent(e){try{await localApi("data_delete",{entity:"events",id:e.id});return true}catch(error){toast("Event could not be deleted");return false}}
 function occurrences(ev,rs,re){
@@ -827,7 +827,7 @@ function paneData(pane,close){
   }catch(err){toast(err.message||"Invalid backup file")}
  };
  $("#resetData",g).onclick=()=>openConfirm({title:"Reset local workspace?",body:"All calendars, events and preferences stored in this browser will be replaced with sample data. Export a backup first if needed.",confirmLabel:"Reset",danger:true,fn:async()=>{
-  localReset();close();state.cursor=sod(TODAY());state.selected=sod(TODAY());await loadLocal();toast("Local workspace reset");
+  localReset();close();state.cursor=sod(TODAY());state.selected=sod(TODAY());await loadLocal();toast("Workspace reset");
  }});
 }
 function paneAbout(pane){
@@ -886,4 +886,4 @@ document.addEventListener("pointerdown",e=>{
 },true);
 matchMedia("(prefers-color-scheme:light)").addEventListener?.("change",()=>{if(state.themeMode==="system"){applyTheme();renderAll(false)}});
 setInterval(checkLocalReminders,30000);
-loadLocal().catch(error=>{console.error("Daylight local startup",error);$("#main").innerHTML='<div class="empty-state">'+icon("alert",30)+'<p>Local browser storage is unavailable. Enable site storage and reload.</p></div>'});
+bootAuth(loadLocal).catch(error=>{console.error("Daylight auth startup",error);$("#main").innerHTML='<div class="empty-state">'+icon("alert",30)+'<p>Local browser storage is unavailable. Enable site storage and reload.</p></div>'});
