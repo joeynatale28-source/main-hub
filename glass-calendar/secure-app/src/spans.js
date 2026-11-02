@@ -1,5 +1,5 @@
 // Month/week all-day span layout. Events are grouped by occurrence and assigned stable lanes.
-export function spanning(event){return Boolean(event.all_day||event._segments>1||new Date(event.ends_at)-new Date(event.starts_at)>86400000)}
+export function spanning(event){return Number(event._segments)>1}
 export function occurrenceIdentity(e){return String(e.id)+'|'+String(e._occurrence||e.starts_at)}
 export function makeSpans(occurrences,days,weekSize=7){
  const sortedDays=days.map(d=>typeof d==='string'?d:localISO(d));
