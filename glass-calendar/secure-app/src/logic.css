@@ -1,0 +1,26 @@
+/* Prompt 1: behavior-only span and pointer interactions. Desktop grid layout retained. */
+.monthcells{position:relative;isolation:isolate}
+.monthcell{min-width:0}
+.month-span,.all-day-span{position:relative;z-index:5;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:grab;display:flex;align-items:center;text-align:left;border:0;border-left:3px solid var(--event-color);background:color-mix(in srgb,var(--event-color) 18%,var(--surface));color:color-mix(in srgb,var(--event-color) 80%,var(--text));font-size:11px;font-weight:600}
+.month-span{align-self:start;margin-top:calc(38px + var(--span-lane)*23px);margin-left:1px;margin-right:1px;height:21px;max-height:21px;padding:0 7px}
+.month-span.span-start,.all-day-span.span-start{border-top-left-radius:6px;border-bottom-left-radius:6px}
+.month-span.span-continue,.all-day-span.span-continue{border-top-left-radius:0;border-bottom-left-radius:0;border-left:0}
+.month-span.span-end,.all-day-span.span-end{border-top-right-radius:6px;border-bottom-right-radius:6px}
+.month-span.span-continues,.all-day-span.span-continues{border-top-right-radius:0;border-bottom-right-radius:0}
+.month-more{background:transparent;border:0;font-size:10px;color:var(--sub);cursor:pointer}
+.all-day-strip{position:relative;min-height:calc(38px + var(--all-day-lanes,1)*24px)}
+.all-day-span{align-self:start;height:21px;margin:calc(35px + var(--span-lane)*24px) 1px 1px;padding:0 8px}
+.agenda-item .agenda-title{min-width:0}
+.agenda-item small{margin-left:auto;padding-left:16px}
+.weekevent{touch-action:none;cursor:grab}
+.resize-handle{position:absolute;left:0;width:100%;height:7px;cursor:ns-resize}
+.resize-handle.top{top:0}.resize-handle.bottom{bottom:0}
+body.daylight-dragging{user-select:none!important;overflow:hidden!important}
+.daylight-dragging *{cursor:grabbing!important}
+.daylight-drag-ghost{position:fixed;pointer-events:none;z-index:2147483500;min-width:130px;max-width:300px;padding:9px 12px;border-radius:8px;background:color-mix(in srgb,var(--event-color) 22%,var(--card));border-left:3px solid var(--event-color);color:var(--text);box-shadow:0 8px 26px #0005}
+.daylight-drag-ghost small{display:block;margin-top:4px}
+.daylight-drag-target{outline:2px solid var(--primary);outline-offset:-2px}
+.occurrence-options{display:grid;gap:8px;margin:16px 0}
+.occurrence-options button{text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:9px;min-height:40px;padding:10px 12px}
+.occurrence-options button:hover{background:var(--raised)}
+.forgot-link{background:transparent;border:0;color:var(--sub);text-decoration:underline;margin-top:10px;font-size:12px;cursor:pointer}
