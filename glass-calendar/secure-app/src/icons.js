@@ -39,6 +39,7 @@ const paths={
  'arrow-left':'<path d="m12 19-7-7 7-7M5 12h14"/>',
  'panel-left-close':'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m8-11-3 3 3 3"/>',
  'panel-left-open':'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m5-11 3 3-3 3"/>',
+ 'life-buoy':'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.3 4.3m5.6 5.6 4.3 4.3M19.1 4.9l-4.3 4.3m-5.6 5.6-4.3 4.3"/>',
  'calendar-days':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
  'file-text':'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
  'calendar-plus':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-6 6h4m-2-2v4"/>'
@@ -65,9 +66,9 @@ function decorateOne(scope){
  pick('#searchButton','search');pick('#themeButton',()=>document.documentElement.dataset.theme==='dark'?'sun':'moon');
  pick('#settingsButton,#settings .glyph','settings');pick('#miniPrev,#prev','chevron-left');pick('#miniNext,#next','chevron-right');
  pick('#searchClose,#editorClose','x',16);
- pick('#profileMenu','more-horizontal');pick('#collapseRail',()=>document.querySelector('#root')?.classList.contains('collapsed')?'chevron-right':'chevron-left',16);if(document.querySelector('#root')?.classList.contains('collapsed'))pick('#newEvent','plus',18);pick('[data-menu]','more-vertical',16);
+ pick('#profileMenu','more-vertical');pick('#collapseRail',()=>document.querySelector('#root')?.classList.contains('collapsed')?'chevron-right':'chevron-left',16);if(document.querySelector('#root')?.classList.contains('collapsed'))pick('#newEvent','plus',18);pick('[data-menu]','more-vertical',16);
  pick('[data-nav="calendar"] .glyph','calendar');pick('[data-nav="integrations"] .glyph','plug');pick('[data-nav="tasks"] .glyph','tasks');
- pick('#about .glyph','info');pick('#newCalendar','plus',16);
+ pick('#about .glyph','life-buoy');pick('#newCalendar','plus',16);
  pick('.settings-nav [data-sec="general"] .glyph','settings');pick('.settings-nav [data-sec="calendar"] .glyph','calendar');
  pick('.settings-nav [data-sec="appearance"] .glyph','palette');pick('.settings-nav [data-sec="data"] .glyph','database');
  pick('.settings-nav [data-sec="notifications"] .glyph','bell');pick('.settings-nav [data-sec="ai"] .glyph','sparkles');
