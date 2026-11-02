@@ -1,5 +1,6 @@
 import {icon,upgradeIcons,startIcons} from './icons.js';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.10';
+import {makeSpans,spanning,occurrenceIdentity,spanRange} from './spans.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
 const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
@@ -237,17 +238,23 @@ function renderCalendar(){
  upgradeIcons();
 }
 function renderMonth(){
- const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7)),count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
+ const count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ const dates=Array.from({length:count},(_,i)=>iso(add(start,i)));
  const items=occurrences(add(start,-1),add(start,count+1));
+ const multi=makeSpans(items.filter(spanning),dates),single=items.filter(e=>!spanning(e));
  let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
  for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t),events=items.filter(e=>eventOn(e,key));
+  const t=add(start,i),key=iso(t),events=single.filter(e=>eventOn(e,key));
   html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">';
   if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
+  const covering=multi.filter(s=>s.from<=i&&s.to>=i&&s.lane>=3).length,visibleCount=events.length;
   html+='<button class="datenum '+(key===iso(now())?'today':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button>'+
-   events.slice(0,3).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+'</div>';
+   events.slice(0,Math.max(0,3-multi.filter(x=>x.from<=i&&x.to>=i&&x.lane<3).length)).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+
+   (covering+Math.max(0,visibleCount-3)>0?'<button class="month-more" data-drill="'+key+'">+'+(covering+Math.max(0,visibleCount-3))+' more</button>':'')+'</div>';
  }
- $('#grid').innerHTML=html+'</div>';bindEventButtons();
+ html+=multi.filter(s=>s.lane<3).map(s=>'<button class="month-span '+(s.start?'span-start':'span-continue')+' '+(s.end?'span-end':'span-continues')+'" '+eventAttr(s.event)+' style="'+eventStyle(s.event)+'grid-row:'+(s.week+1)+';grid-column:'+((s.from%7)+1)+' / span '+(s.to-s.from+1)+';--span-lane:'+s.lane+'"><span>'+h(s.event.title)+'</span></button>').join('')+'</div>';
+ $('#grid').innerHTML=html;bindEventButtons();
 }
 function renderWeek(){
  const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
