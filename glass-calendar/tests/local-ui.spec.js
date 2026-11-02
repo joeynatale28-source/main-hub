@@ -29,6 +29,10 @@ for(const theme of ['dark','light']){
    await page.setViewportSize(size);
    await launch(page,theme);
    const shot=async name=>page.screenshot({path:`test-results/daylight-local-${theme}-${size.width}-${name}.png`});
+   if(size.height===768){
+    await expect(page.locator('#calList .cal-row').first()).toBeInViewport();
+    await expect(page.locator('.side-support')).toBeInViewport();
+   }
    const frame=await page.locator('.shell').boundingBox();
    expect(frame.width).toBeCloseTo(size.width,0);
    await expect(page.locator('.weekwrapper')).toBeVisible();
