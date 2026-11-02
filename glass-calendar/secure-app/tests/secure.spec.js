@@ -404,3 +404,43 @@ test('timed cross-midnight and native multi-day expansion includes each civil da
  const expanded=expandEvents([ev],new Date(2026,10,1),new Date(2026,10,6));
  expect(expanded.map(eventDate)).toEqual(['2026-11-02','2026-11-03']);
 });
+
+test('Nov 7–10 renders continuous Month segments and one Agenda item with full range',async({page})=>{
+ const model=await setup(page);
+ const item={id:'multi-1',calendar_id:calendar.id,title:'Long trip',starts_at:'2026-11-07T00:00:00.000Z',ends_at:'2026-11-11T00:00:00.000Z',all_day:true,repeat_rule:{frequency:'never'}};
+ model.get().events.push(item);model.get().settings.default_view='month';
+ await page.reload();await page.locator('#today').click();
+ const bars=page.locator('.month-span-bar').filter({hasText:'Long trip'});
+ await expect(bars).toHaveCount(2);
+ const lens=await bars.evaluateAll(xs=>xs.map(x=>Number(x.style.getPropertyValue('--span-length'))));
+ expect(lens.reduce((a,b)=>a+b,0)).toBe(4);
+ await bars.first().click();
+ await expect(page.locator('dialog[open]').last()).toContainText('November 7');
+ await expect(page.locator('dialog[open]').last()).toContainText('November 10');
+});
+test('Only this event recurring delete saves EXDATE without deleting the series',async({page})=>{
+ const model=await setup(page);
+ const d=new Date();d.setHours(12,0,0,0);
+ const start=d.toISOString(),end=new Date(d.getTime()+3600000).toISOString();
+ model.get().events.push({id:'weekly-1',calendar_id:calendar.id,title:'Practice repeat',starts_at:start,ends_at:end,all_day:false,repeat_rule:{frequency:'weekly',interval:1,ends:'never'},exdates:[]});
+ await page.reload();
+ await page.locator('.weekevent').filter({hasText:'Practice repeat'}).first().click();
+ await page.locator('#deleteEvent').click();
+ const dlg=page.locator('dialog[open]').last();
+ await expect(dlg).toContainText('Only this event');
+ await expect(dlg).toContainText('This and following events');
+ await expect(dlg).toContainText('All events');
+ await dlg.locator('[data-scope="only"]').click();
+ await expect.poll(()=>model.get().events[0].exdates?.length).toBe(1);
+ expect(model.get().events.length).toBe(1);
+ await page.reload();
+ await expect(page.locator('.weekevent').filter({hasText:'Practice repeat'})).toHaveCount(0);
+});
+test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up',async({page})=>{
+ await setup(page);
+ await page.keyboard.press('Control+,');
+ await expect(page.locator('#settingsModal')).toBeVisible();
+ await page.locator('#settingsModal .dialog-close').click();
+ await page.keyboard.press('Meta+,');
+ await expect(page.locator('#settingsModal')).toBeVisible();
+});
