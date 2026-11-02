@@ -244,7 +244,7 @@ test('native weekly recurrence appears on multiple weeks and popover describes i
  await page.locator('#quickSave').click();
  await expect.poll(()=>model.get().events.length).toBe(1);
  for(let i=0;i<3;i++){
-  await expect(page.locator('.all-day-strip .all-day-span').filter({hasText:'Weekly swimming'})).toBeVisible();
+  await expect(page.locator('.all-day-strip .all-day-span').filter({hasText:'Weekly swimming'}).first()).toBeVisible();
   await page.locator('#next').click();
  }
  await page.locator('.all-day-span').filter({hasText:'Weekly swimming'}).first().click();
