@@ -32,6 +32,7 @@ export function expandEvents(events,from,to){
   const until=r.ends==='on'&&r.until?noon(r.until).getTime()+43200000:Infinity;
   for(let i=0;i<(native?Math.min(1500,count):1)&&out.length<3000;i++){
    const st=native?nextDate(start,freq,i*interval):start;
+   if(native&&Array.isArray(r.exdates)&&r.exdates.includes(daykey(st)))continue;
    if(st.getTime()>upper+86400000||st.getTime()>until)break;
    const en=new Date(st.getTime()+span);
    if(en.getTime()<lower-86400000)continue;
