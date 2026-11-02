@@ -853,11 +853,11 @@ async function exportUI(){
   const response=await Promise.all([fetch(cssUrl),fetch(jsUrl),fetch(storeUrl)]);
   if(response.some(r=>!r.ok))throw Error();
   const [css,script,store]=await Promise.all(response.map(r=>r.text()));
-  const module=store.replace(/\\bexport\\s+(?=(?:async\\s+)?function|const|let)/g,"")+"\n"+script.replace(/^import\s+\{localApi,localReset\}[^;]*;\s*/,"");
+  const module=store.replaceAll("export async function ","async function ").replaceAll("export function ","function ").replaceAll("export const ","const ")+"\n"+script.replace(/^import\s+\{localApi,localReset\}[^;]*;\s*/,"");
   const page='<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>daylight — Local UI</title>'+
-   '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>'+css.replace(/<\\/style/gi,"<\\\\/style")+'</style></head>'+
+   '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>'+css+'</style></head>'+
    '<body><div id="app"><aside id="sidebar" aria-label="Sidebar"></aside><main id="main"><div id="greeting"></div><header id="headerBand"></header><div id="viewWrap"></div></main></div><div id="overlayRoot"></div><div id="toastRoot" aria-live="polite"></div>'+
-   '<script type="module">'+module.replace(/<\\/script/gi,"<\\\\/script")+'<\\/script></body></html>';
+   '<script type="module">'+module+'</scr'+'ipt></body></html>';
   downloadBlob(page,"daylight-calendar-ui.html","text/html;charset=utf-8");toast("UI code exported");
  }catch(err){console.error(err);toast("Could not export UI code")}
 }
