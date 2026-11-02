@@ -1,0 +1,143 @@
+/* daylight. Local-only design workspace. Restored pre-Calendex structure,
+   polished across every surface using SquareUi-inspired flat tokens. */
+:root{--azure:#2E7DFF;--ui-timing:180ms;--ui-fast:120ms}
+html[data-theme=dark]{
+ --bg:#131518;--surface:#131518;--surface2:#1a1d21;--card:#1a1d21;
+ --raised:#292d34;--hover:#22262c;--line:#282b31;--text:#f2f3f5;
+ --sub:#9aa0a8;--faint:#7a818a;--primary:#2e7dff;--primary-ink:#fff;
+ --backdrop:rgba(0,0,0,.48);--ui-card-base:#1a1d21;--ui-tint-base:#22252a;color-scheme:dark
+}
+html[data-theme=light]{
+ --bg:#f7f8fa;--surface:#fff;--surface2:#f7f8fa;--card:#fff;
+ --raised:#e8ebef;--hover:#eef1f5;--line:#dfe3e9;--text:#171c25;
+ --sub:#636c79;--faint:#8992a0;--primary:#2e7dff;--primary-ink:#fff;
+ --backdrop:rgba(21,29,39,.28);--ui-card-base:#fff;--ui-tint-base:#f2f4f7;color-scheme:light
+}
+html,body{height:100%;overflow:hidden!important;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--text);font-variant-numeric:tabular-nums}
+body{background:var(--bg)!important}
+#root,#root>.shell{height:100dvh!important;min-height:0!important;overflow:hidden!important}
+#root .shell{grid-template-columns:clamp(240px,21vw,405px) minmax(0,1fr)!important;transition:grid-template-columns 200ms ease-out!important;background:var(--surface)!important}
+#root .sidebar,#root .content{background:var(--surface)!important}
+#root .sidebar{min-height:0!important;min-width:0!important;box-shadow:none!important;border-right:1px solid var(--line)!important}
+#root .side-header{border-bottom:1px solid var(--line);padding:16px 18px!important;min-height:74px!important;height:74px!important}
+#root .brand .logo{background:var(--raised)!important;border:1px solid var(--line)!important;border-radius:10px!important;width:40px!important;height:40px!important}
+#root .brand strong{font-size:16px!important;letter-spacing:-.03em;font-weight:750}
+#root .brand small{font-size:12px!important;color:var(--sub)!important}
+#root .side-middle{display:flex!important;flex-direction:column!important;min-height:0;overflow-y:auto!important;padding:16px!important}
+#root .side-middle .micro{font-size:11px!important;letter-spacing:.1em!important;font-weight:650!important;color:var(--sub)!important;margin:16px 9px 8px}
+#root .side-middle>.nav{font-size:14px!important;min-height:40px!important;height:40px!important;color:var(--sub)!important;border-radius:9px!important;margin:1px 0}
+#root .side-middle>.nav.selected{border:0!important;background:var(--raised)!important;color:var(--text)!important}
+#root .side-middle>.nav.selected:before{display:none!important}
+#root .side-middle>.nav:hover{background:var(--hover)!important;color:var(--text)!important}
+#root .side-middle #mini{min-height:270px!important;height:270px!important;flex:none!important;overflow:hidden}
+#root .mini-head{height:34px!important;min-height:34px!important;margin-bottom:8px!important}
+#root .mini-head strong{font-size:15px!important;font-weight:650}
+#root .mini-head button{border:1px solid var(--line)!important;border-radius:8px!important;width:28px!important;height:28px!important}
+#root .mini-grid{height:224px!important;grid-template-rows:repeat(7,30px)!important;grid-auto-rows:30px!important}
+#root .mini-date{font-size:13px!important;color:var(--text)!important}
+#root .mini-date.outside{opacity:.38!important}
+#root .mini-date.selected-week:not(.today):not(.selected){background:var(--hover)!important}
+#root .mini-date.today{color:#fff!important}
+#root .mini-date.today:before{background:var(--azure)!important}
+#root .mini-date.selected:not(.today){box-shadow:inset 0 0 0 2px var(--sub)!important}
+#root .mini-date.selected.today{box-shadow:inset 0 0 0 2px var(--sub),inset 0 0 0 4px var(--surface)!important}
+#root .mini-dots i{background:var(--azure)!important}
+#root .cal-row{height:40px!important;min-height:40px!important;border-radius:9px!important;gap:9px!important;margin:1px 0!important}
+#root .cal-row:hover{background:var(--hover)}
+#root .cal-row .cal-name{font-size:14px!important;font-weight:500!important}
+#root .cal-row [data-menu]{opacity:0!important}
+#root .cal-row:hover [data-menu],#root .cal-row:focus-within [data-menu]{opacity:1!important}
+#root .cal-row .switch{order:3}
+#root .cal-row .cal-dot{order:0}
+#root .cal-row .cal-name{order:1}
+#root .cal-row [data-menu]{order:4}
+#root .profile{margin-top:auto;border-top:1px solid var(--line)!important;background:var(--surface)!important;box-shadow:none!important;min-height:78px!important;height:78px!important;padding:12px 18px!important;gap:10px!important}
+#root .profile .avatar{border-radius:100%!important;border:1px solid var(--line)!important;background:var(--raised)!important;color:var(--text)!important;width:42px!important;height:42px!important;min-width:42px!important}
+#root .profile strong{font-weight:700;font-size:14px!important}
+#root .profile small{color:var(--sub)!important;font-size:12px!important}
+#root .profile #profileMenu{color:var(--sub)!important}
+#root.collapsed .shell{grid-template-columns:64px minmax(0,1fr)!important}
+#root.collapsed .sidebar{width:64px!important}
+#root.collapsed .side-middle{padding:8px!important}
+#root.collapsed .side-middle .nav{font-size:0!important;width:44px!important;max-width:44px!important;min-width:44px!important}
+#root.collapsed .side-middle .nav .glyph{width:22px!important;display:grid;place-items:center}
+#root.collapsed .side-middle .micro{font-size:0!important;margin:10px 0!important;height:1px!important;border-top:1px solid var(--line)!important;overflow:hidden}
+#root.collapsed #mini,#root.collapsed #calList,#root.collapsed .mini-add{display:none!important}
+#root.collapsed .profile{display:flex;justify-content:center;padding:10px!important}
+#root.collapsed .profile>span:nth-child(2),#root.collapsed .profile #profileMenu{display:none!important}
+#root .content{min-width:0!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;padding:0!important;gap:0!important}
+#root .view-header{flex:none!important;min-height:112px!important;height:112px!important;margin:0!important;padding:14px 24px 18px!important;border-bottom:1px solid var(--line)!important;background:var(--surface)!important;display:flex;align-items:flex-end!important;justify-content:space-between;gap:24px!important}
+#root .heading-copy{position:relative;display:flex!important;flex-direction:column;gap:4px!important;padding-top:21px;justify-content:flex-end}
+#root .view-header .greeting{position:absolute;top:0;left:0;color:var(--sub)!important;font-size:12px!important;line-height:18px!important;white-space:nowrap}
+#root .heading-copy h1{font-size:21px!important;font-weight:750!important;line-height:25px;letter-spacing:-.02em;color:var(--text)!important}
+#root .heading-copy .view-range{font-size:13px!important;color:var(--sub)!important;line-height:18px}
+#root .view-header .tools{display:flex!important;align-items:center!important;gap:7px!important;flex:none!important;white-space:nowrap}
+#root .view-header .tools>.icon,#root .view-header .tools>.secondary{height:34px!important;min-height:34px!important;border:1px solid var(--line)!important;border-radius:9px!important;background:transparent!important;color:var(--sub)!important}
+#root .view-header .tools>.icon{min-width:34px!important;width:34px!important}
+#root .view-header .tools>.icon:hover,#root .view-header .tools>.secondary:hover{background:var(--hover)!important;color:var(--text)!important}
+#root .view-header #today{font-size:12px!important;font-weight:600}
+#root .view-header .local-header-add{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;margin-left:8px!important;height:38px!important;min-height:38px!important;border-radius:9px!important;background:var(--azure)!important;color:#fff!important;border:1px solid var(--azure)!important;padding:0 13px!important;font-size:13px!important;font-weight:650!important;box-shadow:none!important}
+#root .view-header .local-header-add:hover{background:#1869ed!important}
+#root .view-header .local-header-add:active{transform:scale(.98)}
+#root .calendar-grid{min-height:0!important;flex:1 1 auto!important;border:0!important;border-radius:0!important;background:var(--surface)!important;box-shadow:none!important;overflow:auto!important}
+#root .calendar-grid .weekdays{position:sticky;top:0;z-index:3;height:42px!important;min-height:42px!important;background:var(--surface)!important;border-bottom:1px solid var(--line)!important;color:var(--sub)!important}
+#root .calendar-grid .weekdays>span{font-size:12px!important;font-weight:650!important;letter-spacing:.08em;border-right:1px solid var(--line)!important}
+#root .monthcells{height:auto!important;min-height:0!important;grid-template-rows:repeat(var(--weeks),132px)!important;align-content:start!important;background:var(--surface)!important}
+#root .monthcell{height:132px!important;min-height:132px!important;background:var(--surface)!important;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;padding:9px!important}
+#root .monthcell.outside{background:var(--surface2)!important}
+#root .monthcell.outside .datenum{opacity:.35}
+#root .monthcell .datenum{width:26px!important;height:26px!important;min-width:26px!important;font-size:13px!important;font-weight:600}
+#root .monthcell .datenum.today{background:var(--azure)!important;color:#fff!important;border-radius:100%!important}
+#root .monthcell .datenum.selected:not(.today){box-shadow:inset 0 0 0 2px var(--sub)!important;border-radius:100%!important}
+#root .monthcell .cellplus{border:1px solid var(--line)!important;border-radius:7px!important;background:var(--hover)!important}
+#root .month-span-bar,#root .all-day-span{background:color-mix(in srgb,var(--event-color) 20%,var(--ui-tint-base))!important;color:var(--text)!important;border:0!important;border-radius:9px!important;box-shadow:none!important;font-size:12px!important;font-weight:650!important}
+#root .month-span-bar{height:25px!important;min-height:25px!important;margin-top:38px!important;transform:translateY(calc(var(--span-lane)*27px))!important;line-height:20px!important;padding:2px 8px!important}
+#root .month-span-bar.continue-left{border-radius:0 9px 9px 0!important}
+#root .month-span-bar.continue-right{border-radius:9px 0 0 9px!important}
+#root .month-span-bar.continue-left.continue-right{border-radius:0!important}
+#root .month-more{color:var(--sub)!important;background:transparent!important;border:0!important;font-size:12px!important;box-shadow:none!important}
+#root .weekwrapper{height:100%!important;overflow:auto!important;scrollbar-width:thin}
+#root .weekhead,#root .all-day-strip{background:var(--surface)!important;z-index:6!important}
+#root .weekhead{position:sticky;top:0!important;height:65px!important;border-bottom:1px solid var(--line)!important}
+#root .all-day-strip{position:sticky;top:65px!important;border-bottom:1px solid var(--line)!important}
+#root .weekhead>div{border-right:1px solid var(--line)!important}
+#root .weekhead button[data-drill]{font-size:16px!important;font-weight:700;color:var(--text)!important}
+#root .weekhead>div:has(.today){box-shadow:inset 0 -2px var(--azure)!important}
+#root .weekhead button.today{color:#fff!important;background:var(--azure)!important;border-radius:100%!important}
+#root .weekbody{height:1152px!important;min-height:1152px!important;background:var(--surface)!important}
+#root .daytrack{background:repeating-linear-gradient(to bottom,transparent 0 47px,var(--line) 47px 48px)!important;border-right:1px solid var(--line)!important}
+#root .hours span{font-size:12px!important;color:var(--sub)!important;line-height:16px}
+#root .weekevent{background:color-mix(in srgb,var(--event-color) 20%,var(--ui-tint-base))!important;border:0!important;border-radius:10px!important;box-shadow:none!important;color:var(--text)!important;padding:6px 8px!important}
+#root .weekevent strong{font-size:13px!important;font-weight:650!important;line-height:16px}
+#root .weekevent small{font-size:12px!important;color:var(--sub)!important}
+#root .now-line{height:1px!important;background:repeating-linear-gradient(to right,var(--sub) 0 5px,transparent 5px 10px)!important;opacity:.9}
+#root .now-line:before{background:var(--azure)!important;display:block!important;content:"";height:2px;left:0;top:0;width:72px;border-radius:0}
+#root .now-gutter-dot{background:var(--azure)!important}
+#root .agenda{padding:16px!important;background:var(--surface)!important;min-height:0!important;overflow:auto}
+#root .agenda-date{background:var(--surface)!important;font-size:13px!important;color:var(--sub)!important;border-bottom:1px solid var(--line)!important}
+#root .agenda-item{background:color-mix(in srgb,var(--event-color) 16%,var(--ui-tint-base))!important;border:0!important;border-radius:12px!important;box-shadow:none!important;padding:13px!important}
+#root .list-page{width:100%!important;max-width:none!important;min-height:0!important;height:100%!important;padding:24px!important;overflow:auto!important;background:var(--surface)!important}
+#root .list-page .view-header{height:auto!important;min-height:70px!important;padding:0 0 18px!important}
+#root .integration-card,#root .task-row{border:1px solid var(--line)!important;background:var(--card)!important;border-radius:12px!important;box-shadow:none!important}
+#root .task-filters button,.pill-select,.secondary{border-radius:9px!important}
+#root #settingsModal{width:min(880px,94vw)!important;height:min(640px,92vh)!important;min-height:min(640px,92vh)!important;max-height:min(640px,92vh)!important;border:1px solid var(--line)!important;border-radius:16px!important;background:var(--card)!important;box-shadow:0 12px 38px rgba(0,0,0,.16)!important;color:var(--text)!important}
+#root #settingsModal .settings-grid{height:100%!important;min-height:0}
+#root #settingsModal .settings-nav{background:var(--surface2)!important;border-right:1px solid var(--line)!important}
+#root #settingsModal .settings-pane{background:var(--card)!important;overflow-y:auto!important;scrollbar-width:thin}
+#root #settingsModal .settings-nav button.selected{background:var(--raised)!important;border-radius:9px!important;box-shadow:none!important}
+#root #settingsModal .settings-nav button.selected:before{display:none!important}
+.local-status{display:inline-flex;align-items:center;gap:8px;color:var(--sub);font-size:12px;white-space:nowrap}
+.primary{background:var(--azure)!important;color:#fff!important;border:1px solid var(--azure)!important;box-shadow:none!important}
+.primary:hover{background:#1869ed!important}
+.primary:active{transform:scale(.98)}
+button,input,textarea,select{transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out,transform 120ms ease-out!important}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--azure)!important;outline-offset:2px!important;box-shadow:none!important}
+.dialog,.floating-menu,.date-grid-popup{background:var(--card)!important;color:var(--text)!important;border:1px solid var(--line)!important;box-shadow:0 12px 34px rgba(0,0,0,.12)!important;border-radius:12px!important}
+.dialog{border-radius:16px!important}
+.dialog::backdrop{background:var(--backdrop)!important;backdrop-filter:blur(2px)!important}
+#toast{background:var(--card)!important;border:1px solid var(--line)!important;border-radius:12px!important;box-shadow:none!important}
+#searchBar{background:var(--card)!important;border:1px solid var(--line)!important;box-shadow:0 12px 34px rgba(0,0,0,.12)!important}
+html[data-reduce-motion=true] *,html[data-reduce-motion=true] *::before,html[data-reduce-motion=true] *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media(max-width:1430px){#root .view-header{padding:14px 16px 16px!important;gap:12px!important}#root .view-header .tools{gap:4px!important}#root .view-header .local-header-add{padding:0 10px!important;margin-left:4px!important}}
+@media(max-width:1050px){#root .shell{grid-template-columns:240px minmax(0,1fr)!important}#root .view-header .tools>.icon{width:30px!important;min-width:30px!important}#root .view-header .local-header-add{font-size:12px!important}}
