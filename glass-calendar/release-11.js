@@ -15,7 +15,15 @@ panel.querySelector('.settings-intro')?.remove();
 panel.querySelector('.view-page-top')?.remove();
 $('settingsSearch')?.remove();
 const nav=panel.querySelector('.settings-sections'),stack=panel.querySelector('.settings-stack');
-const sectionDefs=[['settingsGeneral','General','⚙'],['settingsCalendar','Calendar','▦'],['settingsAppearance','Appearance','◈'],['settingsData','Calendar data','▤'],['settingsNotifications','Notifications','♧'],['settingsAbout','About','ⓘ']];
+const svg=paths=>'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
+const sectionDefs=[
+ ['settingsGeneral','General',svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>')],
+ ['settingsCalendar','Calendar',svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/>')],
+ ['settingsAppearance','Appearance',svg('<path d="M12 2a10 10 0 1 0 0 20c1.6 0 2.5-.9 2.5-2 0-1-.7-1.8-.7-2.4 0-1 .8-1.7 2-1.7H19a3 3 0 0 0 3-3.2A10 10 0 0 0 12 2Z"/><circle cx="7" cy="12" r="1"/><circle cx="9" cy="7" r="1"/><circle cx="15" cy="7" r="1"/><circle cx="18" cy="11" r="1"/>')],
+ ['settingsData','Calendar data',svg('<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>')],
+ ['settingsNotifications','Notifications',svg('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>')],
+ ['settingsAbout','About',svg('<circle cx="12" cy="12" r="10"/><path d="M12 11v6m0-10v.5"/>')]
+];
 nav.innerHTML=sectionDefs.map(([id,name,icon])=>'<button type="button" class="settings-anchor" data-target="'+id+'"><span class="settings-nav-icon" aria-hidden="true">'+icon+'</span>'+name+'</button>').join('');
 let activeSection='settingsGeneral',opener=null,discardConfirmed=false;
 function section(id){
@@ -31,7 +39,7 @@ function closeSettings(force=false){
  if(!force&&getDirty()&&!confirm('Discard the unfinished subscription?'))return;
  dlg.close();opener?.focus?.({preventScroll:true});opener=null;
 }
-function openSettings(event,which){panel.hidden=false;
+function openSettings(event,which){panel.hidden=false;const menu=$('profileMenu');if(menu)menu.hidden=true;$('profileMenuBtn')?.setAttribute('aria-expanded','false');
  if(dlg.open){if(which)section(which);return}
  opener=event?.target?.closest?.('button')||document.activeElement;
  $('settingsName').value=localStorage.getItem('daylight-name')||'';
@@ -80,7 +88,7 @@ function redraw(){calendarContainer.querySelectorAll('.calendar-filter').forEach
  row.title=calendar.name;
  });}
 const watch=new MutationObserver(()=>{redraw()});watch.observe(calendarContainer,{childList:true,subtree:false});redraw();
-function setVisible(id,on){bridge.toggleCalendar(id,on);menuClose(false)}
+function setVisible(id,on){bridge.toggleCalendar(id,on);menuClose(false);requestAnimationFrame(()=>[...calendarContainer.querySelectorAll('.calendar-filter')].find(x=>x.querySelector('[data-calendar]')?.dataset.calendar===id)?.querySelector('.calendar-actions-button')?.focus())}
 function inlineRename(id){
  const row=[...calendarContainer.querySelectorAll('.calendar-filter')].find(x=>x.querySelector('[data-calendar]')?.dataset.calendar===id);if(!row)return;
  const label=row.querySelector('.cal-name'),control=row.querySelector('.calendar-actions-button'),old=label.textContent;
