@@ -253,7 +253,7 @@ function renderMonth(){
    events.slice(0,Math.max(0,3-multi.filter(x=>x.from<=i&&x.to>=i&&x.lane<3).length)).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+
    (covering+Math.max(0,visibleCount-3)>0?'<button class="month-more" data-drill="'+key+'">+'+(covering+Math.max(0,visibleCount-3))+' more</button>':'')+'</div>';
  }
- html+=multi.filter(s=>s.lane<3).map(s=>'<button class="month-span '+(s.start?'span-start':'span-continue')+' '+(s.end?'span-end':'span-continues')+'" '+eventAttr(s.event)+' style="'+eventStyle(s.event)+'grid-row:'+(s.week+1)+';grid-column:'+((s.from%7)+1)+' / span '+(s.to-s.from+1)+';--span-lane:'+s.lane+'"><span>'+h(s.event.title)+'</span></button>').join('')+'</div>';
+ html+=multi.filter(s=>s.lane<3).map(s=>'<button class="month-span '+(s.start?'span-start':'span-continue')+' '+(s.end?'span-end':'span-continues')+'" '+eventAttr(s.event,'grid-row:'+(s.week+1)+';grid-column:'+((s.from%7)+1)+' / span '+(s.to-s.from+1)+';--span-lane:'+s.lane+';')+'><span>'+h(s.event.title)+'</span></button>').join('')+'</div>';
  $('#grid').innerHTML=html;bindEventButtons();
 }
 function renderWeek(){
