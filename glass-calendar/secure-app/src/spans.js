@@ -6,15 +6,15 @@ export function makeSpans(occurrences,days,weekSize=7){
  const groups=new Map();
  for(const e of occurrences){
   const id=occurrenceIdentity(e);
-  if(!groups.has(id))groups.set(id,{event:e,dates:new Set()});
-  groups.get(id).dates.add(e._civilDate||localISO(new Date(e.starts_at)));
+  if(!groups.has(id))groups.set(id,{event:e,dates:new Map()});
+  groups.get(id).dates.set(e._civilDate||localISO(new Date(e.starts_at)),e);
  }
  const output=[];
  for(const {event,dates} of groups.values()){
   const indices=sortedDays.map((d,i)=>dates.has(d)?i:-1).filter(i=>i!==-1);
   if(!indices.length)continue;
   let from=indices[0],to=indices[0];
-  const emit=()=>output.push({event,from,to,week:Math.floor(from/weekSize),start:from===indices[0],end:to===indices[indices.length-1]});
+  const emit=()=>{const first=dates.get(sortedDays[from]),last=dates.get(sortedDays[to]);output.push({event,from,to,week:Math.floor(from/weekSize),start:first?first._segment===0:from===indices[0],end:last?last._segment===last._segments-1:to===indices[indices.length-1]})};
   for(let i=1;i<indices.length;i++){
    const next=indices[i];
    if(next!==to+1||Math.floor(next/weekSize)!==Math.floor(to/weekSize)){emit();from=next}
