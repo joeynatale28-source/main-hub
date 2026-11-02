@@ -1,3 +1,4 @@
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.10/+esm';
 import {icon,upgradeIcons,startIcons} from './icons.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
@@ -5,27 +6,52 @@ const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
 const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
+const supabase=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
 const date=s=>new Date(s+'T12:00:00'),add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const label=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
+const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
 const toast=(text)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}el.textContent=text;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200);upgradeIcons()};
-async function api(action,data={},include=true){
- const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key},body:JSON.stringify({...data,action,...(include?{token:state.token}:{})})});
- let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable')}
- if(!r.ok)throw Error(body.error||'Request failed');return body;
+async function api(action,data={}){
+ const {data:session}=await supabase.auth.getSession();
+ const access=session.session?.access_token;
+ if(!access)throw Error('Session expired. Log in again.');
+ const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key,Authorization:'Bearer '+access},body:JSON.stringify({...data,action})});
+ let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable.')}
+ if(!r.ok)throw Error(body.error||'Request failed.');return body;
 }
 async function load(){
- try{const result=await api('auth_session');state.user=result.user;const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});applyTheme();render()}catch(error){console.error('DAYLIGHT STARTUP ERROR',error?.stack||error);localStorage.removeItem('dl-release-session');state.token='';login()}
+ try{
+  const {data:auth,error:authError}=await supabase.auth.getUser();
+  if(authError||!auth?.user){login();return}
+  const result=await api('auth_session');
+  state.user=result.user;
+  const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
+  Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
+  applyTheme();render();
+ }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);login()}
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor')}
-function login(){root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Username<input id="username" required autocomplete="username" placeholder="Username"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">◉</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><small>Accounts are created by Joey — there’s no sign-up.</small></form></main>';
+function login(){
+ root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">'+icon('eye')+'</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" id="forgotPassword" class="link-action">Forgot password?</button><small>Accounts are created by the owner. Public registration is unavailable.</small></form></main>';
  $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
- $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match.";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
+ $('#login').onsubmit=async e=>{
+  e.preventDefault();const btn=$('#loginBtn'),err=$('#authError');btn.disabled=true;btn.textContent='Logging in…';err.hidden=true;
+  const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});
+  if(error){err.textContent=error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
+  await load();
+ };
+ $('#forgotPassword').onclick=async()=>{
+  const email=$('#email').value.trim(),err=$('#authError');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.hidden=false;err.textContent='Enter your email address first.';$('#email').focus();return}
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  err.hidden=false;err.textContent=error?'Password reset could not be requested. Please try again.':'If the email exists, a password reset link has been sent.';
+ };
+ upgradeIcons();
 }
-async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
+async function logout(){await supabase.auth.signOut();Object.assign(state,{user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{}});login()}
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
 function reflect(){
@@ -362,7 +388,7 @@ function customSelect(name,current,items){const text=items.find(x=>String(x[0])=
 function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
  const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
- if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account','@'+u.username,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
+ if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account',u.email||'','<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
  if(which==='calendar')return '<h2>Calendar</h2><p>Plan how your calendar is displayed.</p>'+row('Default Calendar View','View when Daylight opens',customSelect('default_view',s.default_view,selectOptions.default_view))+switchRows+row('Work hours','Beginning and end of the workday','<span class="worktime"><button class="pill-select" data-time="work_hours_start">'+h(readableTime(s.work_hours_start||'09:00'))+'</button> – <button class="pill-select" data-time="work_hours_end">'+h(readableTime(s.work_hours_end||'17:00'))+'</button></span>');
  if(which==='appearance')return '<h2>Appearance</h2><p>Make Daylight feel like yours.</p>'+themeCards()+switchRows;
  if(which==='data')return '<h2>Data & sync</h2><p>Manage calendar subscriptions and information.</p>'+row('Connected calendars','Manage the calendars in your workspace','<button class="secondary" id="goIntegrations">Manage connected calendars ›</button>')+row('US Holidays','Show federal holidays',switchHtml('holidays',state.calendars.find(x=>x.client_id==='us-holidays')?.is_visible!==false))+'<h3>Subscriptions</h3><div id="settingsSubs">'+(state.subscriptions.length?state.subscriptions.map(x=>'<div class="sub-item"><strong>'+h(x.name)+'</strong><small>'+h(x.url)+'</small><small>Last fetched: '+h(x.last_fetched_at?prettyStamp(x.last_fetched_at):'Never')+'</small><button class="secondary" data-refresh="'+x.id+'">Refresh</button><button class="danger outline" data-remove="'+x.id+'">Remove</button></div>').join(''):'<p class="quiet">No subscriptions yet.</p>')+'</div>'+row('Add subscription','Read-only .ics calendar link','<button class="secondary" id="addSub">Add subscription</button>')+row('Last sync',state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)?prettyStamp(state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)):'Never','<button class="secondary" id="refreshAll">Refresh all</button>');
@@ -520,4 +546,4 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
 };
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else if(state.token)load();else login();
+else load();
