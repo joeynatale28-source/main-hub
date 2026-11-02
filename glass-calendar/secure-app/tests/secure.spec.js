@@ -446,3 +446,47 @@ test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up
  await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',metaKey:true,bubbles:true,cancelable:true})));
  await expect(page.locator('#settingsModal')).toBeVisible();
 });
+
+test('UI overhaul uses SVG brand and captions, date picker includes month/year dropdowns',async({page})=>{
+ await setup(page);
+ await expect(page.locator('#newEvent')).toBeVisible();
+ await expect(page.locator('.brand .logo svg')).toHaveCount(1);
+ await expect(page.locator('#profileMenu svg')).toHaveCount(1);
+ await expect(page.locator('#miniPrev svg')).toHaveCount(1);
+ await expect(page.locator('#miniNext svg')).toHaveCount(1);
+ await expect(page.locator('#newCalendar svg')).toHaveCount(1);
+ await page.locator('#newEvent').click();
+ await page.locator('#startDateBtn').click();
+ await expect(page.locator('#calendarDatePicker [data-calendar-month]')).toBeVisible();
+ await expect(page.locator('#calendarDatePicker [data-calendar-year]')).toBeVisible();
+ await expect(page.locator('#calendarDatePicker [data-date-choice]')).toHaveCount(42);
+ await page.locator('#calendarDatePicker [data-calendar-month]').selectOption('0');
+ await expect(page.locator('#calendarDatePicker')).toBeVisible();
+});
+test('UI overhaul unifies About, Data and Tasks Empty patterns',async({page})=>{
+ await setup(page);await expect(page.locator('#newEvent')).toBeVisible();
+ await page.locator('[data-nav="tasks"]').click();
+ await expect(page.locator('.ui-empty')).toContainText('No tasks yet');
+ await expect(page.locator('.ui-empty svg')).toBeVisible();
+ await page.locator('#settings').click();await page.locator('[data-sec="data"]').click();
+ await expect(page.locator('#settingsSubs .ui-empty')).toContainText('No subscriptions yet');
+ await page.locator('[data-sec="about"]').click();
+ await expect(page.locator('#settingsPane .about-head')).toBeVisible();
+ await expect(page.locator('#settingsPane .about-history')).toContainText('Version 2.2');
+ await expect(page.locator('#settingsPane .about-legal')).toContainText('Privacy Policy');
+});
+test('UI overhaul calendar bars are 28px and page motion respects Reduce motion',async({page})=>{
+ const model=await setup(page);await expect(page.locator('#newEvent')).toBeVisible();
+ model.get().settings.default_view='month';
+ model.get().events.push({id:'uibar',calendar_id:calendar.id,title:'Long week',starts_at:'2026-11-07T00:00:00.000Z',ends_at:'2026-11-11T00:00:00.000Z',all_day:true,repeat_rule:{frequency:'never'}});
+ await page.reload();await expect(page.locator('.monthcells')).toBeVisible();
+ const bars=page.locator('.month-span-bar').filter({hasText:'Long week'});await expect(bars).toHaveCount(2);
+ const height=await bars.first().evaluate(el=>parseFloat(getComputedStyle(el).height));expect(height).toBe(28);
+ await page.locator('#next').click();
+ await expect(page.locator('#grid')).toHaveClass(/ui-page-next/);
+ model.get().settings.reduce_motion=true;await page.reload();
+ await expect(page.locator('html')).toHaveAttribute('data-reduce-motion','true');
+ await page.locator('#next').click();
+ const duration=await page.locator('#grid').evaluate(el=>getComputedStyle(el).animationDuration);
+ expect(duration).toBe('0s');
+});
