@@ -1,0 +1,151 @@
+/* Daylight v2.0 precision pass: shared icon sizes, fixed dialog geometry and honest controls. */
+:root{--dl-control:36px;--dl-small:28px;--dl-input:40px}
+.dl-icon-slot,.dl-inline-icon,.dl-caret,.toast-icon,.integration-icon{display:inline-grid;place-items:center;line-height:0;flex:none;vertical-align:middle}
+.dl-icon-slot{width:18px;height:18px}
+.dl-icon-slot.is-compact{width:16px;height:16px}
+.dl-icon{display:block;stroke-width:1.5px;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.glyph,.row-icon{display:grid!important;place-items:center!important;line-height:0!important;flex:none}
+.glyph{width:22px!important;min-width:22px!important;height:22px}
+.row-icon{width:22px;min-width:22px;height:34px;padding-top:0!important}
+.icon{display:inline-grid!important;place-items:center!important;line-height:0!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;padding:0!important}
+.icon.compact,.icon.tiny,.mini-head .icon,.mini-add,.dialog .dialog-close{width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important}
+.icon .dl-icon-slot{width:18px;height:18px}
+.icon.compact .dl-icon-slot,.icon.tiny .dl-icon-slot,.mini-head .icon .dl-icon-slot{width:16px;height:16px}
+.primary{min-height:40px!important;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 15px!important}
+.secondary,.danger{height:36px!important;min-height:36px!important;padding:0 14px!important;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.login input,.dialog input:not([type=color]):not([type=hidden]),.dialog textarea{min-height:40px}
+.login .mark,.brand .logo,.about-mark{display:grid;place-items:center;line-height:0}
+.login .mark .dl-icon-slot,.brand .logo .dl-icon-slot,.about-mark .dl-icon-slot{width:24px;height:24px}
+.login .mark .dl-icon,.brand .logo .dl-icon,.about-mark .dl-icon{width:24px;height:24px}
+#eye{display:grid;place-items:center}
+#eye .dl-icon-slot{width:18px;height:18px}
+.side-header{display:flex;align-items:center;gap:8px;padding:12px!important}
+.side-header .brand{flex:1;min-width:0}
+.collapse-toggle{flex:none;color:var(--sub)}
+.mini-head{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-height:30px}
+.mini-head>span{display:flex!important;flex-direction:row!important;align-items:center!important;gap:3px!important;width:auto!important;height:28px!important}
+.mini-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;grid-template-rows:repeat(7,30px)!important;grid-auto-flow:row!important;grid-auto-rows:30px!important;gap:1px!important;align-content:start!important}
+.mini-date{height:30px!important;min-height:30px!important;width:100%;padding:0!important;min-width:0!important;align-self:center;justify-self:center}
+.cal-row{display:flex!important;align-items:center!important;gap:7px!important;min-height:40px!important;height:40px!important;min-width:0}
+.cal-row .switch,.setting-row .switch,.accent-preview .switch,.quick-row .switch{width:44px!important;min-width:44px!important;max-width:44px!important;height:24px!important;min-height:24px!important;padding:2px!important;transform:none!important;transform-origin:center!important;margin:0!important;flex:none!important;border-radius:99px!important}
+.cal-row .switch:active{transform:none!important}
+.switch span{width:18px!important;height:18px!important;min-width:18px!important;max-width:18px!important;border-radius:50%!important;transform:translateX(0)!important}
+.switch.on span{transform:translateX(20px)!important}
+.cal-row.dim .cal-name,.cal-row.dim .cal-dot{opacity:.45!important}
+.cal-row.dim .switch{background:var(--raised)!important;border-color:var(--line)!important}
+.cal-row .cal-dot{flex:0 0 8px!important}
+.cal-row .cal-name{font-size:12px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-row>.icon{opacity:0;width:28px!important;height:28px!important;min-width:28px!important}
+.cal-row:hover>.icon,.cal-row:focus-within>.icon{opacity:1}
+@media(hover:none){.cal-row>.icon{opacity:1}}
+.calendar-rename{width:100%;flex:1;min-width:0;height:32px;border:1px solid var(--accent);border-radius:7px;background:var(--surface2);color:var(--text);padding:0 5px;font-size:12px}
+.calendar-rename+.icon{margin-left:-5px}
+.calendar-rename~.icon{opacity:1!important}
+.cal-row [hidden]{display:none!important}
+#root.collapsed .shell{grid-template-columns:68px minmax(0,1fr)!important}
+#root.collapsed .sidebar{width:68px}
+#root.collapsed .side-header{padding:10px 7px!important;gap:2px!important;justify-content:center}
+#root.collapsed .brand{width:36px!important;flex:0 0 36px!important}
+#root.collapsed .brand span:nth-child(2){display:none!important}
+#root.collapsed .brand .logo{width:34px;height:34px}
+#root.collapsed .collapse-toggle{width:28px!important;min-width:28px!important;min-height:28px!important;height:28px!important}
+#root.collapsed #mini{display:none!important}
+#root.collapsed .side-middle{padding:6px 8px!important;overflow-x:hidden}
+#root.collapsed .side-middle .micro{height:1px;min-height:1px;font-size:0!important;overflow:hidden;border-top:1px solid var(--line);margin:15px 3px!important;padding:0}
+#root.collapsed .side-middle .micro button{display:none!important}
+#root.collapsed .side-middle>.primary{width:40px!important;height:40px!important;margin:5px auto 18px!important;padding:0!important;font-size:0!important;overflow:hidden}
+#root.collapsed .nav{width:40px!important;height:40px!important;margin:3px auto!important;padding:0!important;font-size:0!important;display:grid!important;place-items:center!important;line-height:0!important}
+#root.collapsed .nav .glyph{font-size:18px!important}
+#root.collapsed .cal-row{width:40px!important;margin:0 auto!important;display:grid!important;place-items:center!important;height:36px!important;min-height:36px!important;position:relative}
+#root.collapsed .cal-row .cal-name,#root.collapsed .cal-row .switch,#root.collapsed .cal-row [data-menu]{display:none!important}
+#root.collapsed .cal-row .cal-dot{width:12px!important;height:12px!important;grid-area:1/1;cursor:pointer}
+#root.collapsed .profile{padding:8px!important;justify-content:center}
+#root.collapsed .profile>span:nth-child(2),#root.collapsed .profile #profileMenu{display:none!important}
+.view-header .tools{display:flex;align-items:center;flex-wrap:nowrap;gap:6px}
+.view-header .tools>.secondary{min-height:36px!important}
+#searchBar{position:relative;padding:10px!important}
+#searchBar #searchQuery{height:40px!important;width:100%!important;display:block!important;padding:0 39px 0 37px!important;border-radius:9px!important}
+.search-input-icon{position:absolute;top:22px;left:22px;display:grid;place-items:center;pointer-events:none;color:var(--sub)}
+#searchBar #searchClose{position:absolute;top:12px;right:13px;width:36px!important;height:36px!important}
+.monthcell .datenum.today{background:var(--accent)!important;color:white!important;min-width:25px;height:25px;border-radius:50%!important;display:inline-grid;place-items:center}
+.monthcell .cellplus{width:24px!important;height:24px!important;display:grid!important;place-items:center!important;top:5px!important;right:5px!important;left:auto!important;bottom:auto!important;padding:0!important}
+.dialog{width:min(420px,94vw)!important;max-height:92vh!important;overflow:hidden!important;position:fixed}
+.dialog .dialog-body{padding:25px!important;overflow-y:auto;max-height:92vh}
+.dialog .dialog-close{position:absolute;top:12px!important;right:12px!important;width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;z-index:9;color:var(--sub);background:var(--surface)!important;border-radius:8px}
+.dialog .dialog-close .dl-icon-slot{width:16px;height:16px}
+.dialog h2{padding-right:26px}
+.dialog .footer-actions{display:flex;justify-content:flex-end;gap:9px;align-items:center}
+.dialog .footer-actions>.primary,.dialog .footer-actions>.secondary,.dialog .footer-actions>.danger{height:36px!important;min-height:36px!important;padding:0 14px!important}
+.warning-circle{height:38px;width:38px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger);margin-bottom:12px}
+.dialog.wide#settingsModal{width:min(880px,94vw)!important;height:min(640px,92vh)!important;max-height:min(640px,92vh)!important;min-height:min(640px,92vh)!important;border-radius:18px!important}
+#settingsModal .dialog-body{padding:0!important;min-height:0!important;height:100%!important;max-height:100%!important;overflow:hidden!important}
+#settingsModal .settings-grid{height:100%!important;max-height:100%!important;min-height:0!important;grid-template-columns:218px minmax(0,1fr)!important}
+#settingsModal .settings-nav{height:100%;min-height:0;overflow-y:auto;scrollbar-width:thin}
+#settingsModal .settings-pane{height:100%;max-height:100%;min-height:0;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-width:thin;scrollbar-color:var(--raised) transparent}
+#settingsModal .settings-pane>h2{position:sticky;top:-32px;background:var(--surface);z-index:3;padding-bottom:10px;margin:0}
+#settingsModal .settings-nav button{font-size:12px;min-height:39px!important;line-height:1.2;display:flex!important;gap:10px!important}
+#settingsModal .settings-nav .glyph{height:22px!important;min-width:22px!important}
+#settingsModal .setting-row{min-height:65px;gap:15px}
+#settingsModal .settings-nav button.selected,#settingsModal .theme-card.picked{border-color:var(--accent)!important}
+#settingsModal .theme-card{position:relative;padding:8px 8px 13px;min-width:0}
+#settingsModal .theme-card.picked{outline:2px solid var(--accent)!important;box-shadow:0 0 0 1px var(--surface),0 0 0 4px color-mix(in srgb,var(--accent) 14%,transparent)}
+#settingsModal .theme-mini{border-radius:7px;border:1px solid #7775;position:relative}
+#settingsModal .theme-mini u{position:absolute;left:48%;top:63%;width:34%;height:9px;border-radius:3px;background:var(--accent);text-decoration:none}
+#settingsModal .theme-mini.light u{background:#277fcb}
+#settingsModal .theme-mini.dark u{background:#6864db}
+#settingsModal .theme-mini.system u{background:#6380c4}
+#settingsModal .theme-check{position:absolute;right:5px;bottom:6px;display:grid;place-items:center;width:19px;height:19px;background:var(--accent);color:white;border-radius:50%}
+#settingsModal .theme-check .dl-icon-slot{width:13px;height:13px}
+#settingsModal .swatch{position:relative;flex:0 0 32px}
+#settingsModal .swatch:focus-visible,#settingsModal .swatch[data-picked=true]{outline:2px solid var(--accent);outline-offset:3px}
+.pill-select{height:36px;min-height:36px;padding:0 11px!important;display:inline-flex;align-items:center;justify-content:space-between;gap:7px;max-width:240px;text-align:left}
+.pill-select .select-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill-select>.dl-icon-slot,.pill-select>.dl-caret{width:16px;height:16px;flex:none}
+.worktime{display:flex;align-items:center;gap:5px}
+.worktime .pill-select{font-size:12px;padding:0 9px!important;max-width:110px;white-space:nowrap}
+.floating-menu{position:fixed!important;z-index:2147482000!important;min-width:220px!important;max-width:min(440px,calc(100vw - 12px));max-height:min(370px,75vh)!important;display:flex;flex-direction:column;overflow:hidden!important;padding:6px!important;border-radius:12px}
+.floating-menu .menu-options{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;min-height:0;flex:1}
+.floating-menu .menu-options button{width:100%;min-height:36px;display:flex;align-items:center;gap:10px;text-align:left;padding:7px 12px;font-size:12px}
+.floating-menu .menu-options button[hidden]{display:none!important}
+.floating-menu .menu-options button .dl-icon-slot{width:16px;height:16px}
+.floating-menu .menu-search{height:43px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:5px 8px;flex:none}
+.floating-menu .menu-search input{width:100%;height:32px!important;min-height:32px!important;border:0!important;outline:0!important;background:transparent!important;color:var(--text);font-size:12px}
+.dialog.quick-dialog{width:min(520px,94vw)!important;max-height:92vh!important;overflow:hidden!important}
+.quick-dialog .dialog-body{padding:0!important;max-height:92vh!important;overflow:hidden!important}
+.quick-dialog #quickForm{display:flex!important;flex-direction:column!important;min-height:0!important;max-height:92vh!important;overflow:hidden!important}
+.quick-dialog .quick-top{margin:16px 20px 0!important;padding:0!important;min-height:30px;align-items:center;flex:none}
+.quick-dialog .grip{width:18px;height:18px}
+.quick-dialog .quick-title{margin:0 20px!important;width:calc(100% - 40px)!important;flex:none}
+.quick-dialog .toggle-segments{flex:none!important;margin:16px 20px!important;align-self:flex-start}
+.quick-dialog .toggle-segments button{display:inline-flex;align-items:center;gap:6px}
+.quick-dialog .toggle-segments button .dl-icon-slot{width:16px;height:16px}
+.quick-dialog .quick-content{overflow-y:auto!important;overscroll-behavior:contain;min-height:0;flex:1;gap:6px!important;padding:0 20px 12px!important;scrollbar-width:thin}
+.quick-dialog .quick-footer{flex:none;position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 20px!important;margin:0!important;display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:6}
+.quick-dialog .quick-footer .primary{min-height:40px!important;height:40px!important;background:var(--accent)!important;color:white!important;font-weight:600}
+.quick-dialog .quick-footer .secondary{background:transparent;border:0}
+.quick-dialog #editorClose{width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important}
+.quick-dialog .quick-row>.row-icon{width:22px!important}
+.quick-dialog .quick-row .field-button{min-height:36px}
+.quick-dialog #addressOptions{max-height:180px}
+.quick-dialog .quick-footer-right{display:flex;align-items:center;gap:9px}
+.quick-dialog .quick-footer-right>.danger-text{height:36px}
+#toast{display:flex;align-items:center;gap:9px;min-height:38px}
+#toast .toast-icon{color:var(--accent)}
+#toast .toast-icon .dl-icon-slot{width:16px;height:16px}
+.integration-card h3{display:flex;align-items:center;gap:10px}
+.integration-icon{width:24px;height:24px;color:var(--sub)}
+.integration-icon .dl-icon-slot{width:20px;height:20px}
+.integration-icon .dl-icon{width:20px;height:20px}
+.integration-card .secondary{gap:7px}
+.integration-card .secondary .dl-icon-slot{width:14px;height:14px}
+.agenda,.task-list{min-height:0}
+.whole-empty{display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;min-height:115px!important;max-height:160px!important;padding:20px!important;width:100%;margin:auto}
+.whole-empty .empty-icon{width:40px;height:40px;display:grid;place-items:center;color:var(--faint)}
+.whole-empty .empty-icon .dl-icon-slot,.whole-empty .empty-icon .dl-icon{width:40px;height:40px}
+.whole-empty p{margin:0;color:var(--sub)}
+.agenda{display:flex;flex-direction:column}
+.task-list{display:flex;flex-direction:column;min-height:calc(100vh - 175px)}
+.profile strong{font-size:13px!important;font-weight:600}
+.profile small{font-size:11px!important}
+@media(max-width:850px){.side-header{padding:10px 4px!important;gap:0}.side-header .brand span:nth-child(2){display:none}.side-header .collapse-toggle{width:26px!important;min-width:26px!important}.cal-row .switch{display:none}.cal-row{justify-content:center}.cal-row .cal-name{display:none}.cal-row .cal-dot{width:12px;height:12px}.cal-row .icon{display:none!important}#settingsModal .settings-grid{grid-template-columns:160px minmax(0,1fr)!important}}
+@media(max-width:540px){.view-header .tools{gap:2px}#settingsModal .settings-grid{grid-template-columns:112px minmax(0,1fr)!important}.settings-pane{padding:23px 12px!important}.dialog.wide#settingsModal{width:96vw!important} .worktime{flex-wrap:wrap}}
