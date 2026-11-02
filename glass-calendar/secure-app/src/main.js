@@ -1,6 +1,6 @@
-import './style.css';
 const root=document.querySelector('#root');
-const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_ANON_KEY;
+const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
+const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
 const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
