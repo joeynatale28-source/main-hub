@@ -27,7 +27,9 @@ async function api(action,data={}){
 }
 async function load(){
  try{
+  if(passwordRecoveryActive){showPasswordRecovery();return}
   const {data:auth,error:authError}=await supabase.auth.getUser();
+  if(passwordRecoveryActive){showPasswordRecovery();return}
   if(authError||!auth?.user){login();return}
   const result=await api('auth_session');
   state.user=result.user;
@@ -43,16 +45,40 @@ function login(){
  $('#login').onsubmit=async e=>{
   e.preventDefault();const btn=$('#loginBtn'),err=$('#authError');btn.disabled=true;btn.textContent='Logging in…';err.hidden=true;
   const {error}=await supabase.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});
-  if(error){err.textContent=error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
+  if(error){err.textContent=error.code==='invalid_credentials'?'Email or password not recognized. Re-enter your credentials or choose Forgot password.':error.message.endsWith('.')?error.message:error.message+'.';err.hidden=false;btn.disabled=false;btn.textContent='Log in';return}
   await load();
  };
  $('#forgotPassword').onclick=async()=>{
   const email=$('#email').value.trim(),err=$('#authError');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.hidden=false;err.textContent='Enter your email address first.';$('#email').focus();return}
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
-  err.hidden=false;err.textContent=error?'Password reset could not be requested. Please try again.':'If the email exists, a password reset link has been sent.';
+  const button=$('#forgotPassword');button.disabled=true;button.textContent='Sending reset link…';const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});button.disabled=false;button.textContent='Forgot password?';
+  err.hidden=false;err.textContent=error?(error.message.endsWith('.')?error.message:error.message+'.'):'If the email exists, a password reset link has been sent. Open it to set a new password.';
  };
  upgradeIcons();
+}
+let passwordRecoveryActive=false;
+function showPasswordRecovery(){
+ root.innerHTML='<main class="center"><form class="login" id="recoveryForm"><div class="mark">'+icon('brand',24)+'</div><h1>Set a new password</h1><p>Enter a new password for your Daylight account.</p><label>New password<input id="recoveryPassword" type="password" required autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></label><label>Confirm new password<input id="recoveryConfirm" type="password" required autocomplete="new-password" minlength="8" placeholder="Enter it again"></label><p id="recoveryError" class="error" hidden></p><button type="submit" class="primary block" id="recoverySave">Update password</button></form></main>';
+ const form=$('#recoveryForm'),err=$('#recoveryError'),btn=$('#recoverySave');
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  const pass=$('#recoveryPassword').value,confirm=$('#recoveryConfirm').value;
+  if(pass!==confirm){err.textContent='Passwords do not match.';err.hidden=false;return}
+  btn.disabled=true;btn.textContent='Updating…';err.hidden=true;
+  try{
+   const {error}=await supabase.auth.updateUser({password:pass});
+   if(error)throw error;
+   await supabase.auth.signOut();
+   passwordRecoveryActive=false;
+   history.replaceState({},'',location.pathname);
+   login();
+   const msg=$('#authError');msg.hidden=false;msg.textContent='Password updated. Log in with your new password.';
+  }catch(error){
+   err.textContent=error?.message?.endsWith('.')?error.message:(error?.message||'Could not update password')+'.';
+   err.hidden=false;btn.disabled=false;btn.textContent='Update password';
+  }
+ };
+ upgradeIcons();$('#recoveryPassword').focus();
 }
 async function logout(){await supabase.auth.signOut();Object.assign(state,{user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{}});login()}
 async function list(entity){return (await api('data_list',{entity})).items}
@@ -712,4 +738,12 @@ setInterval(checkReminders,30000);
 window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.code==='Comma'||e.key===','||e.key==='<')){e.preventDefault();e.stopPropagation();if(state.user)settings()}},{capture:true});
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">'+icon('brand',24)+'</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else load();
+else {
+ supabase.auth.onAuthStateChange(event=>{
+  if(event==='PASSWORD_RECOVERY'){
+   passwordRecoveryActive=true;
+   showPasswordRecovery();
+  }
+ });
+ load();
+}
