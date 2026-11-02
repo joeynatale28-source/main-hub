@@ -510,7 +510,7 @@ async function changeOccurrence(e,action,data={}){
   }
  }else if(scope==='only'){
   await change('events',origin.id,{exdates:[...new Set([...(origin.exdates||[]),when])]},'update');
-  if(action==='update')await change('events',null,{...Object.fromEntries(['calendar_id','title','description','location_name','location_address','all_day','reminder_offset_minutes','status'].map(k=>[k,origin[k]])),starts_at:e.starts_at,ends_at:e.ends_at,repeat_rule:{frequency:'never'},recurrence_parent_id:origin.id,...data},'create');
+  if(action==='update')await change('events',null,{...Object.fromEntries(['calendar_id','title','description','location_name','location_address','all_day','reminder_offset_minutes','status'].map(k=>[k,origin[k]])),starts_at:e.starts_at,ends_at:e.ends_at,recurrence_parent_id:origin.id,...data,repeat_rule:{frequency:'never'}},'create');
  }else{
   const yesterday=daykey(new Date(new Date(e._occurrence||e.starts_at).getTime()-86400000));
   await change('events',origin.id,{repeat_rule:{...r,ends:'on',until:yesterday}},'update');
