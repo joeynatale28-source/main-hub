@@ -62,24 +62,54 @@ export function greeting(first,at=new Date(),holidays=[]){
  if(holiday)return holiday[0]+', '+first+'! '+holiday[1];
  const hr=at.getHours();return (hr>=5&&hr<12?'Good morning':hr>=12&&hr<17?'Good afternoon':'Good evening')+', '+first+'! 👋';
 }
+/** Shadcn-style Popover + Calendar composition.
+ * The host app is vanilla JS, so the calendar is an accessible DOM implementation
+ * of the same picker structure, not a React DayPicker component. Calendar dates
+ * are civil YYYY-MM-DD values throughout; no UTC midnight conversion.
+ */
 export function makeDateGrid(trigger,value,onPick,icon,weekStart=0){
  document.querySelector('#calendarDatePicker')?.remove();
- const holder=document.createElement('div');holder.id='calendarDatePicker';holder.className='date-grid-popup';holder.setAttribute('role','dialog');holder.setAttribute('aria-label','Choose date');
+ const holder=document.createElement('div');holder.id='calendarDatePicker';
+ holder.className='date-grid-popup';holder.setAttribute('role','dialog');
+ holder.setAttribute('aria-label','Choose date');holder.setAttribute('aria-modal','false');
+ holder.style.position='fixed';
  (trigger.closest('dialog[open]')||document.body).append(holder);
- let month=noon(value||daykey(new Date()));
+ let month=noon(value||daykey(new Date())),focused=value||daykey(new Date());
+ const months=Array.from({length:12},(_,i)=>new Date(2024,i,1).toLocaleString('en-US',{month:'long'}));
  const render=()=>{
-  const first=new Date(month.getFullYear(),month.getMonth(),1,12),offset=(first.getDay()-weekStart+7)%7,start=addDays(first,-offset),today=daykey(new Date());
-  holder.innerHTML='<header class="date-grid-heading"><button type="button" data-prev aria-label="Previous month">'+icon('chevron-left',16)+'</button><strong>'+first.toLocaleString('en-US',{month:'long',year:'numeric'})+'</strong><button type="button" data-next aria-label="Next month">'+icon('chevron-right',16)+'</button></header><div class="date-grid-days">'+Array.from({length:7},(_,i)=>'<span>'+['S','M','T','W','T','F','S'][(i+weekStart)%7]+'</span>').join('')+Array.from({length:42},(_,i)=>{const d=addDays(start,i),v=daykey(d);return '<button type="button" data-date-choice="'+v+'" class="'+(d.getMonth()!==first.getMonth()?'outside ':'')+(v===today?'today ':'')+(v===value?'selected':'')+'">'+d.getDate()+'</button>'}).join('')+'</div>';
+  const first=new Date(month.getFullYear(),month.getMonth(),1,12);
+  const offset=(first.getDay()-weekStart+7)%7,start=addDays(first,-offset),today=daykey(new Date());
+  const monthOptions=months.map((m,i)=>'<option value="'+i+'" '+(i===first.getMonth()?'selected':'')+'>'+m+'</option>').join('');
+  const years=Array.from({length:81},(_,i)=>first.getFullYear()-40+i).map(y=>'<option value="'+y+'" '+(y===first.getFullYear()?'selected':'')+'>'+y+'</option>').join('');
+  holder.innerHTML='<header class="date-grid-heading"><button type="button" data-prev aria-label="Previous month">'+icon('chevron-left',16)+'</button><select aria-label="Month" data-calendar-month>'+monthOptions+'</select><select aria-label="Year" data-calendar-year>'+years+'</select><button type="button" data-next aria-label="Next month">'+icon('chevron-right',16)+'</button></header><div class="date-grid-days" role="grid" aria-label="'+first.toLocaleString('en-US',{month:'long',year:'numeric'})+'">'+Array.from({length:7},(_,i)=>'<span class="dayname" aria-hidden="true">'+['S','M','T','W','T','F','S'][(i+weekStart)%7]+'</span>').join('')+Array.from({length:42},(_,i)=>{const d=addDays(start,i),v=daykey(d);return '<button type="button" role="gridcell" aria-selected="'+(v===value)+'" data-date-choice="'+v+'" class="'+(d.getMonth()!==first.getMonth()?'outside ':'')+(v===today?'today ':'')+(v===value?'selected':'')+'" tabindex="'+(v===focused?'0':'-1')+'" aria-label="'+d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'">'+d.getDate()+'</button>'}).join('')+'</div>';
   holder.querySelector('[data-prev]').onclick=()=>{month=new Date(first.getFullYear(),first.getMonth()-1,1,12);render()};
   holder.querySelector('[data-next]').onclick=()=>{month=new Date(first.getFullYear(),first.getMonth()+1,1,12);render()};
-  holder.querySelectorAll('[data-date-choice]').forEach(b=>b.onclick=()=>{const v=b.dataset.dateChoice;holder.remove();onPick(v)});
+  holder.querySelector('[data-calendar-month]').onchange=e=>{month=new Date(first.getFullYear(),Number(e.target.value),1,12);render()};
+  holder.querySelector('[data-calendar-year]').onchange=e=>{month=new Date(Number(e.target.value),first.getMonth(),1,12);render()};
+  holder.querySelectorAll('[data-date-choice]').forEach(b=>b.onclick=()=>{const picked=b.dataset.dateChoice;holder.remove();onPick(picked)});
  };
  render();
- const rect=trigger.getBoundingClientRect();holder.style.left=Math.max(8,Math.min(innerWidth-300,rect.left))+'px';holder.style.top=(rect.bottom+320>innerHeight?Math.max(8,rect.top-320):rect.bottom+6)+'px';
- holder.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();holder.remove();trigger.focus()}});
- setTimeout(()=>{const dismiss=e=>{if(!holder.isConnected){document.removeEventListener('pointerdown',dismiss,true);return}if(!holder.contains(e.target)&&e.target!==trigger){holder.remove();document.removeEventListener('pointerdown',dismiss,true)}};document.addEventListener('pointerdown',dismiss,true)},0);
+ const position=()=>{
+  const rect=trigger.getBoundingClientRect(),box=holder.getBoundingClientRect();
+  const width=box.width||300,height=box.height||355;
+  holder.style.left=Math.max(8,Math.min(innerWidth-width-8,rect.left))+'px';
+  holder.style.top=(rect.bottom+height+8>innerHeight?Math.max(8,rect.top-height-8):rect.bottom+8)+'px';
+ };
+ position();
+ holder.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();holder.remove();trigger.focus();return}
+  if(!e.target.matches('[data-date-choice]'))return;
+  const moves={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7};
+  if(e.key==='Home'){e.preventDefault();focused=daykey(addDays(noon(focused),-((noon(focused).getDay()-weekStart+7)%7)))}
+  else if(e.key==='End'){e.preventDefault();focused=daykey(addDays(noon(focused),6-((noon(focused).getDay()-weekStart+7)%7)))}
+  else if(Object.hasOwn(moves,e.key)){e.preventDefault();focused=daykey(addDays(noon(e.target.dataset.dateChoice),moves[e.key]))}
+  else return;
+  const d=noon(focused);
+  if(d.getMonth()!==month.getMonth()||d.getFullYear()!==month.getFullYear())month=new Date(d.getFullYear(),d.getMonth(),1,12);
+  render();position();holder.querySelector('[data-date-choice="'+focused+'"]')?.focus();
+ });
+ setTimeout(()=>{const dismiss=e=>{if(!holder.isConnected){document.removeEventListener('pointerdown',dismiss,true);return}if(!holder.contains(e.target)&&!trigger.contains(e.target)){holder.remove();document.removeEventListener('pointerdown',dismiss,true)}};document.addEventListener('pointerdown',dismiss,true)},0);
 }
-
 /** Consolidate day-by-day display segments into one event/occurrence range. */
 export const uniqueInstances=segments=>{
  const map=new Map();
