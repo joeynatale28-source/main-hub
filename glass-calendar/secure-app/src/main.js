@@ -65,7 +65,7 @@ function recovery(){
 }
 async function logout(){await client()?.auth.signOut();state.token='';state.user=null;login()}
 async function list(entity){return (await api('data_list',{entity})).items}
-async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
+async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render();if(document.querySelector('#settingsModal')?.open)renderSettings()}
 function reflect(){
  const hasSettings=document.querySelector('#settingsModal')?.open;
  if(hasSettings){
@@ -562,14 +562,34 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();toast('Subscription removed')}}));
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();if(document.querySelector('#settingsModal')?.open)renderSettings();toast('Subscription removed')}}));
 }
 function legal(id){const text={
  privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
  terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
  changelog:''
  };const title=id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog',body=id==='changelog'?'<div class="changelog"><h3>Version 2.1</h3><ul><li>Month-grid date picking and native repeat rendering</li><li>Calendar colors and contextual greetings</li><li>Tasks filters, event details, and updated Settings</li></ul><h3>Version 2.0</h3><ul><li>Improved calendar visibility, inline renaming, and fixed Settings sizing</li></ul><h3>Version 1.1</h3><ul><li>Login-only accounts, Supabase storage, and AI access controls</li></ul></div>':'<p>'+h(text[id])+'</p>';modal('<h2>'+h(title)+'</h2>'+body+'<div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
-function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{loading($('#subSave',dlg),true,'Adding…');const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();const r=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:u.href}});dlg.close();await refreshData();if(r.refresh_error)toast(r.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");else toast('Subscription added')}catch{loading($('#subSave',dlg),false);toast('Enter a valid HTTPS feed URL')}}}
+function subscriptionDialog(){
+ const dlg=modal('<h2>Add subscription</h2><p>Subscribe to a read-only .ics calendar feed.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics" type="url"></label><p class="subscription-inline-error" id="subError" hidden></p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');
+ const field=$('#subURL',dlg),error=$('#subError',dlg),button=$('#subSave',dlg);
+ const showError=message=>{error.textContent=message;error.hidden=false;field.setAttribute('aria-invalid','true')};
+ field.oninput=()=>{error.hidden=true;field.removeAttribute('aria-invalid')};
+ button.onclick=async()=>{
+  let url;try{url=new URL(field.value.trim().replace(/^webcals?:\/\//i,'https://'));if(url.protocol!=='https:')throw Error()}catch{return showError('Enter a valid HTTPS feed URL.')};
+  const href=url.href;
+  if(state.subscriptions.some(x=>x.url===href))return showError('That feed is already added.');
+  loading(button,true,'Fetching calendar…');
+  try{
+   const response=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value.trim(),url:href}});
+   dlg.close();await refreshData();
+   if(document.querySelector('#settingsModal')?.open)renderSettings();
+   toast(response.refresh_error?'Subscription added. Feed fetch failed.':'Subscription added');
+  }catch(e){
+   loading(button,false);
+   showError(e.message?.includes('already added')?'That feed is already added.':(e.message||'Could not add subscription.'));
+  }
+ };
+}
 function renderTasks(){
  const counts={all:state.tasks.length,todo:state.tasks.filter(t=>!t.completed).length,completed:state.tasks.filter(t=>t.completed).length};
  const choices=[['all','All'],['todo','To do'],['completed','Completed']];
