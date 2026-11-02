@@ -1,4 +1,5 @@
 import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
+import {instances,weekSegments,bounds} from '../src/spans.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
 const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',email:'example@example.com',is_admin:true};
@@ -210,7 +211,7 @@ test('Month today highlight and all-day event edit preserves a one-day date',asy
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();
  await page.locator('#brand').click();
- await expect(page.locator('.monthcells .datenum.today')).toHaveCount(1);
+ await expect(page.locator('.spanning-month .datenum.today')).toHaveCount(1);
 });
 
 const plus=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -232,7 +233,7 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
  for(const d of [start,plus(start,1),end]){
-  await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Three-day conference'})).toHaveCount(1);
+  await expect(page.locator('.span-bar').filter({hasText:'Three-day conference'})).toHaveCount(1);
  }
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
@@ -242,25 +243,26 @@ test('native weekly recurrence appears on multiple weeks and popover describes i
  await page.locator('#quickSave').click();
  await expect.poll(()=>model.get().events.length).toBe(1);
  for(let i=0;i<3;i++){
-  await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Weekly swimming'})).toBeVisible();
+  await expect(page.locator('.span-week-layer .span-bar').filter({hasText:'Weekly swimming'})).toBeVisible();
   await page.locator('#next').click();
  }
- await page.locator('.all-day-chip').filter({hasText:'Weekly swimming'}).first().click();
+ await page.locator('.span-week-layer .span-bar').filter({hasText:'Weekly swimming'}).first().click();
  await expect(page.locator('dialog[open]').last()).toContainText('Repeats weekly');
  await expect(page.locator('dialog[open]').last()).toContainText('Personal');
 });
-test('all-day subscribed events use civil DTSTART dates and week strip',async({page})=>{
+test('all-day subscribed 3-day event remains one interval on exact stated civil dates',async({page})=>{
  const model=await setup(page);
  const a=plus([new Date().getFullYear(),String(new Date().getMonth()+1).padStart(2,'0'),'01'].join('-'),7);
- const event=(id,d)=>({id,calendar_id:calendar.id,source_subscription_id:'44444444-4444-4444-8444-444444444444',title:'Feed all-day',starts_at:d+'T00:00:00.000Z',ends_at:plus(d,1)+'T00:00:00.000Z',all_day:true,repeat_rule:{}});
- model.get().events.push(event('one',a),event('two',plus(a,1)),event('three',plus(a,2)));
+ model.get().events.push({id:'one',calendar_id:calendar.id,source_subscription_id:'44444444-4444-4444-8444-444444444444',title:'Feed three-day',starts_at:a+'T00:00:00.000Z',ends_at:plus(a,3)+'T00:00:00.000Z',all_day:true,repeat_rule:{}});
  model.get().settings.default_view='month';
  await page.reload();
- for(const d of [a,plus(a,1),plus(a,2)])await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(1);
- await expect(page.locator('[data-cell="'+plus(a,-1)+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(0);
+ const bars=page.locator('.spanning-month .span-bar').filter({hasText:'Feed three-day'});
+ await expect(bars).toHaveCount(1);
+ expect((await bars.first().getAttribute('style'))).toContain('span 3');
+ await expect(page.locator('.spanning-month .span-bar').filter({hasText:'Feed three-day'})).toHaveCount(1);
  await page.locator('[data-drill="'+a+'"]').first().click();
- await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Feed all-day'})).toHaveCount(1);
- await expect(page.locator('.daytrack .all-day-chip')).toHaveCount(0);
+ await expect(page.locator('.span-week-layer .span-bar').filter({hasText:'Feed three-day'})).toHaveCount(1);
+ await expect(page.locator('.daytrack .span-bar')).toHaveCount(0);
 });
 test('token revoke removes row immediately, across reload and from mock auth',async({page})=>{
  const model=await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
@@ -292,7 +294,7 @@ test('calendar colors tint chips while primary remains monochrome',async({page})
  await page.locator('[data-select="default_view"]').click();
  await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- const item=page.locator('.eventchip').filter({hasText:'Pool workout'});
+ const item=page.locator('.span-bar').filter({hasText:'Pool workout'});
  await expect(item).toHaveCount(1);
  const eventStyle=await item.getAttribute('style');expect(eventStyle.toLowerCase()).toContain(palette.teal.toLowerCase());
  const primary=await page.locator('#newEvent').evaluate(x=>getComputedStyle(x).backgroundColor);
