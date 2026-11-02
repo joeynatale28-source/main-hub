@@ -243,7 +243,7 @@ function renderCalendar(){
  if(state.view==='month')renderMonth();else if(state.view==='agenda')renderAgenda();else renderWeek();
  upgradeIcons();
 }
-function isLong(e){return e._segments>1||new Date(e.ends_at).getTime()-new Date(e.starts_at).getTime()>86400000}
+function isLong(e){return e._segments>1||new Date(e.ends_at).getTime()-new Date(e.starts_at).getTime()>86400000||daykey(new Date(e.starts_at))!==daykey(new Date(new Date(e.ends_at).getTime()-1))}
 function spansFor(segments,days){
  const first=iso(days[0]),last=iso(days.at(-1)),instances=uniqueInstances(segments);
  return instances.map(e=>{
