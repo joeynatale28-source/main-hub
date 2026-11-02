@@ -123,5 +123,10 @@ document.querySelectorAll('#appFooter').forEach(x=>x.innerHTML=x.innerHTML.repla
 const onlineNotice=document.createElement('div');onlineNotice.id='offlineNotice';onlineNotice.setAttribute('role','status');onlineNotice.textContent="You're offline — changes will save locally";document.body.append(onlineNotice);
 const online=()=>onlineNotice.hidden=navigator.onLine;addEventListener('online',online);addEventListener('offline',online);online();
 // Resolve unused placeholder states and keep focus on topmost overlay.
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){e.stopImmediatePropagation();menuClose()}},true);
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Escape')return;
+ if(!menu.hidden){e.preventDefault();e.stopImmediatePropagation();menuClose();return}
+ const modals=[...document.querySelectorAll('dialog[open]')];
+ if(modals.length){e.stopImmediatePropagation();if(dlg.open&&!modals.some(x=>x!==dlg)){e.preventDefault();closeSettings()}}
+},true);
 })();
