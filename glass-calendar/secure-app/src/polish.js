@@ -32,11 +32,13 @@ export function expandEvents(events,from,to){
   const until=r.ends==='on'&&r.until?noon(r.until).getTime()+43200000:Infinity;
   for(let i=0;i<(native?Math.min(1500,count):1)&&out.length<3000;i++){
    const st=native?nextDate(start,freq,i*interval):start;
+   const excluded=Array.isArray(original.excluded_dates)?original.excluded_dates:[];
+   if(excluded.includes(daykey(st)))continue;
    if(st.getTime()>upper+86400000||st.getTime()>until)break;
    const en=new Date(st.getTime()+span);
    if(en.getTime()<lower-86400000)continue;
    const civil=!native&&original.source_subscription_id&&original.all_day?String(original.starts_at).slice(0,10):daykey(st);
-   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=original.source_subscription_id&&original.all_day?1:Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
+   const lastDay=original.source_subscription_id&&original.all_day?daykey(new Date(Date.UTC(new Date(original.ends_at).getUTCFullYear(),new Date(original.ends_at).getUTCMonth(),new Date(original.ends_at).getUTCDate()-1,12))):daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
    for(let j=0;j<Math.min(366,days)&&out.length<3000;j++){
     const key=daykey(addDays(noon(civil),j));
     if(noon(key).getTime()<lower-86400000||noon(key).getTime()>upper+86400000)continue;

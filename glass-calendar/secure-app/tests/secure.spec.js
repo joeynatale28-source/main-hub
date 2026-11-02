@@ -1,7 +1,7 @@
 import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
-const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',username:'example',is_admin:true};
+const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',email:'example@example.com',is_admin:true};
 const calendar={id:'22222222-2222-4222-8222-222222222222',name:'Personal',client_id:'personal',shade:'gray-1',sort_order:0,is_visible:true};
 function makeSettings(){return{theme:'dark',default_view:'week',start_of_week:'sunday',accent:'graphite',custom_accent_hex:null,show_weekends:true,compact_mode:false,reduce_motion:false,mcp_allow_delete:false,default_reminder_minutes:15}}
 async function setup(page,{loggedIn=true,failLogin=false}={}){
@@ -9,10 +9,10 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
  await page.route('https://mock.supabase.co/functions/v1/daylight-release',async route=>{
   const req=route.request().postDataJSON(),action=req.action;
   const success=(obj)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(obj)});
-  if(action==='auth_login')return failLogin?route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:"That username and password don't match"})}):success({token:'temporary-test-token',user:account});
+  
   if(action==='auth_session')return success({user});
   if(action==='user_update'){user={...user,first_name:req.first_name,last_name:req.last_name};return success({user})}
-  if(action==='auth_logout')return success({ok:true});
+  
   if(action==='mcp_list')return success({items:tokens});
   if(action==='mcp_generate'){const item={id:'tok'+(tokens.length+1),name:req.name,created_at:new Date().toISOString()};tokens.push(item);return success({item,token:'test-token-shown-once'})}
   if(action==='mcp_revoke'){tokens=tokens.filter(t=>t.id!==req.id);return success({ok:true})}
@@ -31,18 +31,21 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
   if(action==='sub_refresh')return success({count:0,item:subscriptions.find(x=>x.id===req.id)});
   return success({ok:true});
  });
- if(loggedIn)await page.addInitScript(()=>localStorage.setItem('dl-release-session','temporary-test-token'));
+ if(loggedIn)await page.addInitScript(({user})=>localStorage.setItem('sb-mock-auth-token',JSON.stringify({access_token:'test-token',refresh_token:'test-refresh',token_type:'bearer',expires_in:360000,expires_at:4102444800,user})),{user});
  await page.goto('/');
  return{get:()=>({settings,calendars,events,tasks,subscriptions,tokens,user})};
 }
-test('no session shows only login and no signup',async({page})=>{
- await setup(page,{loggedIn:false,failLogin:true});
+test('Supabase Auth email login has no signup and errors use sentences',async({page})=>{
+ await setup(page,{loggedIn:false});
  await expect(page.locator('#login')).toBeVisible();
- await expect(page.getByText("Accounts are created by Joey")).toBeVisible();
- await expect(page.locator('#newEvent')).toHaveCount(0);
- await page.locator('#username').fill('nonexistent');await page.locator('#password').fill('anything');
+ await expect(page.locator('#email')).toBeVisible();
+ await expect(page.locator('#username')).toHaveCount(0);
+ await expect(page.getByText(/sign up|sign-up|create account/i)).toHaveCount(0);
+ await page.locator('#email').fill('unknown@example.com');await page.locator('#password').fill('wrong');
+ await page.route('https://mock.supabase.co/auth/v1/token?grant_type=password',route=>route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'invalid_grant',error_description:'Invalid login credentials'})}));
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toHaveText("That username and password don't match.");
+ await expect(page.locator('#authError')).toContainText(/\.$/);
+ await expect(page.locator('#forgotPassword')).toBeVisible();
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
@@ -78,7 +81,7 @@ test('Settings popup changes default view and keeps navigation',async({page})=>{
  await page.locator('[data-select="default_view"]').click();
  await page.locator('#floatingMenu').getByText('Month').click();
  await expect(page.locator('#settingsModal')).toBeVisible();
- expect(model.get().settings.default_view).toBe('month');
+ await expect.poll(()=>model.get().settings.default_view).toBe('month');
 });
 test('AI access token is shown once and deletes require confirmation',async({page})=>{
  await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
@@ -218,9 +221,11 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- for(const d of [start,plus(start,1),end]){
-  await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Three-day conference'})).toHaveCount(1);
- }
+ const span=page.locator('.month-span').filter({hasText:'Three-day conference'});
+ await expect(span).toHaveCount(1);
+ expect(await span.getAttribute('style')).toContain('span 3');
+ for(const d of [start,plus(start,1),end])await expect(page.locator('[data-cell="'+d+'"]')).toHaveCount(1);
+ await expect(page.locator('.eventchip').filter({hasText:'Three-day conference'})).toHaveCount(0);
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
  const model=await setup(page);await page.locator('#newEvent').click();

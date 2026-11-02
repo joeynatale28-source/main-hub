@@ -1,31 +1,61 @@
 import {icon,upgradeIcons,startIcons} from './icons.js';
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.10';
+import {makeSpans,spanning,occurrenceIdentity,spanRange} from './spans.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
 const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
 const configured=Boolean(url&&key&&/^https:\/\//.test(url)&&!url.includes('YOUR_PROJECT'));
 const endpoint=url?.replace(/\/$/,'')+'/functions/v1/daylight-release';
+const sb=configured?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
 const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
 const date=s=>new Date(s+'T12:00:00'),add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const label=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
+const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
 const toast=(text)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}el.textContent=text;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200);upgradeIcons()};
-async function api(action,data={},include=true){
- const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key},body:JSON.stringify({...data,action,...(include?{token:state.token}:{})})});
- let body;try{body=await r.json()}catch{throw Error('Service temporarily unavailable')}
- if(!r.ok)throw Error(body.error||'Request failed');return body;
+async function api(action,data={}){
+ const {data:sessionData}=await sb.auth.getSession();const token=sessionData?.session?.access_token;
+ if(!token)throw Error('Session expired. Log in again.');
+ const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key,authorization:'Bearer '+token},body:JSON.stringify({...data,action})});
+ let result;try{result=await response.json()}catch{throw Error('Service temporarily unavailable.')}
+ if(!response.ok)throw Error(result.error||'Request failed.');return result;
 }
 async function load(){
- try{const result=await api('auth_session');state.user=result.user;const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});applyTheme();render()}catch(error){console.error('DAYLIGHT STARTUP ERROR',error?.stack||error);localStorage.removeItem('dl-release-session');state.token='';login()}
+ try{
+  const {data:sessionData}=await sb.auth.getSession();if(!sessionData.session){state.user=null;login();return}
+  const result=await api('auth_session');state.user=result.user;
+  const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
+  Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
+  applyTheme();render();
+ }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);state.user=null;login()}
 }
 function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));const button=$('#themeButton');if(button)button.innerHTML=icon(t==='dark'?'moon':t==='light'?'sun':'monitor')}
-function login(){root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Username<input id="username" required autocomplete="username" placeholder="Username"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">◉</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><small>Accounts are created by Joey — there’s no sign-up.</small></form></main>';
- $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
- $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match.";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
+function login(){
+ root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">'+icon('brand')+'</div><h1>daylight.</h1><p>Log in to your account</p><label>Email<input id="email" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye" aria-label="Show password">'+icon('eye')+'</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><button type="button" class="forgot-link" id="forgotPassword">Forgot password?</button></form></main>';
+ $('#eye').onclick=()=>{const p=$('#password');p.type=p.type==='password'?'text':'password';$('#eye').innerHTML=icon(p.type==='password'?'eye':'eye-off')};
+ $('#login').onsubmit=async e=>{e.preventDefault();const b=$('#loginBtn');loading(b,true,'Logging in…');const email=$('#email').value,password=$('#password').value;
+  try{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await load()}
+  catch(error){const el=$('#authError');el.hidden=false;el.textContent=(error?.message||'Could not log in.').replace(/\.*$/,'.');loading(b,false)}
+ };
+ $('#forgotPassword').onclick=async()=>{const email=$('#email').value.trim();if(!email){$('#email').focus();$('#authError').hidden=false;$('#authError').textContent='Enter your email address first.';return}
+  const b=$('#forgotPassword');loading(b,true,'Sending…');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});loading(b,false);
+  $('#authError').hidden=false;$('#authError').textContent=error?'Unable to send a reset email.':'If this email belongs to an account, password reset instructions have been sent.';
+ };
+ upgradeIcons();
 }
-async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
+async function logout(){await sb.auth.signOut();state.user=null;state.events=[];state.calendars=[];login()}
+function showRecovery(){
+ const dialog=modal('<h2>Set a new password</h2><p>Choose a new password for your Daylight account.</p><label>New password<input type="password" id="recoveryPassword" autocomplete="new-password" minlength="8" required></label><p id="recoveryError" class="error" hidden></p><div class="footer-actions"><button class="primary" id="recoverySave">Update password</button></div>');
+ $('#recoverySave',dialog).onclick=async()=>{const password=$('#recoveryPassword',dialog).value;
+  if(password.length<8){$('#recoveryError',dialog).hidden=false;$('#recoveryError',dialog).textContent='Use a password with at least 8 characters.';return}
+  loading($('#recoverySave',dialog),true,'Updating…');const {error}=await sb.auth.updateUser({password});
+  if(error){loading($('#recoverySave',dialog),false);$('#recoveryError',dialog).hidden=false;$('#recoveryError',dialog).textContent=(error.message||'Could not update your password.')+'.';return}
+  dialog.close();toast('Password updated');await load();
+ };
+}
+
 async function list(entity){return (await api('data_list',{entity})).items}
 async function refreshData(){const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(list));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{}});render()}
 function reflect(){
@@ -69,10 +99,10 @@ function safeChange(entity,id,data,action){
   return null;
  });
 }
-function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(!state.settings.show_declined_events?e.status!=='declined':true))}
+function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(state.settings.show_declined_events||!['declined','cancelled','canceled'].includes(String(e.status||'').toLowerCase())))}
 function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
-const eventStyle=e=>'--event-color:'+eventColor(e)+';';
+const eventStyle=e=>'--event-color:'+eventColor(e)+';'+(['declined','cancelled','canceled'].includes(String(e.status||'').toLowerCase())?'opacity:.5;filter:grayscale(1);':'');
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
@@ -93,7 +123,7 @@ function bindRailTooltips(){
   node.style.top=Math.max(8,Math.min(innerHeight-node.offsetHeight-8,r.top+r.height/2-node.offsetHeight/2))+'px';
  }
 }
-function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
+function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>'+h(state.user.email||'')+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
  $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
  $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
  $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
@@ -218,36 +248,123 @@ function renderCalendar(){
  upgradeIcons();
 }
 function renderMonth(){
- const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7)),count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
+ const count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ const dates=Array.from({length:count},(_,i)=>iso(add(start,i)));
  const items=occurrences(add(start,-1),add(start,count+1));
+ const multi=makeSpans(items.filter(spanning),dates),single=items.filter(e=>!spanning(e));
  let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
  for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t),events=items.filter(e=>eventOn(e,key));
+  const t=add(start,i),key=iso(t),events=single.filter(e=>eventOn(e,key));
   html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">';
   if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
+  const covering=multi.filter(s=>s.from<=i&&s.to>=i&&s.lane>=3).length,visibleCount=events.length;
   html+='<button class="datenum '+(key===iso(now())?'today':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button>'+
-   events.slice(0,3).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+'</div>';
+   events.slice(0,Math.max(0,3-multi.filter(x=>x.from<=i&&x.to>=i&&x.lane<3).length)).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+
+   (covering+Math.max(0,visibleCount-3)>0?'<button class="month-more" data-drill="'+key+'">+'+(covering+Math.max(0,visibleCount-3))+' more</button>':'')+'</div>';
  }
- $('#grid').innerHTML=html+'</div>';bindEventButtons();
+ html+=multi.filter(s=>s.lane<3).map(s=>'<button class="month-span '+(s.start?'span-start':'span-continue')+' '+(s.end?'span-end':'span-continues')+'" '+eventAttr(s.event,'grid-row:'+(s.week+1)+';grid-column:'+((s.from%7)+1)+' / span '+(s.to-s.from+1)+';--span-lane:'+s.lane+';')+'><span>'+h(s.event.title)+'</span></button>').join('')+'</div>';
+ $('#grid').innerHTML=html;bindEventButtons();enableEventDrag();
 }
 function renderWeek(){
- const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
+ const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7));
+ const days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),dates=days.map(iso);
+ const events=occurrences(add(start,-1),add(start,days.length+1));
+ const multi=makeSpans(events.filter(spanning),dates,days.length),singles=events.filter(e=>!spanning(e));
+ const lanes=Math.max(1,...multi.map(s=>s.lane+1));
  let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
- html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span>'+days.map(day=>'<div class="all-day-day">'+events.filter(x=>x.all_day&&eventOn(x,iso(day))).map(x=>'<button class="all-day-chip" '+eventAttr(x)+'>'+h(x.title)+'</button>').join('')+'</div>').join('')+'</div>';
+ html+='<div class="all-day-strip" style="--cols:'+days.length+';--all-day-lanes:'+lanes+'"><span>all day</span>'+
+ days.map(day=>'<div class="all-day-day">'+singles.filter(x=>x.all_day&&eventOn(x,iso(day))).map(x=>'<button class="all-day-chip" '+eventAttr(x)+'>'+h(x.title)+'</button>').join('')+'</div>').join('')+
+ multi.map(seg=>'<button class="all-day-span '+(seg.start?'span-start':'span-continue')+' '+(seg.end?'span-end':'span-continues')+'" '+eventAttr(seg.event,'grid-column:'+(seg.from+2)+' / span '+(seg.to-seg.from+1)+';grid-row:1;--span-lane:'+seg.lane+';')+'>'+h(seg.event.title)+'</button>').join('')+'</div>';
  html+='<div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
-  for(const e of events.filter(x=>!x.all_day&&eventOn(x,key))){
-   const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,e._segment?60:(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+'><strong>'+h(e.title)+'</strong></button>';
+  for(const e of singles.filter(x=>!x.all_day&&eventOn(x,key))){
+   const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+'><strong>'+h(e.title)+'</strong><span class="resize-handle top" data-resize="top"></span><span class="resize-handle bottom" data-resize="bottom"></span></button>';
   }html+='</div>';
  }
- $('#grid').innerHTML=html+'</div></div>';bindEventButtons();
+ $('#grid').innerHTML=html+'</div></div>';bindEventButtons();enableEventDrag();
  $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor((e.clientY-el.getBoundingClientRect().top)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
 }
 function renderAgenda(){
- const today=iso(now()),items=occurrences(add(now(),-1),add(now(),370)).filter(x=>eventDate(x)>=today),days=[...new Set(items.map(x=>eventDate(x)))];
- $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>eventOn(x,d)).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
+ const today=iso(now()),all=occurrences(add(now(),-1),add(now(),370)).filter(x=>eventDate(x)>=today);
+ const used=new Set(),items=all.filter(e=>{const id=occurrenceIdentity(e);if(used.has(id))return false;used.add(id);return true});
+ const days=[...new Set(items.map(x=>eventDate(x)))];
+ $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+
+ items.filter(x=>eventOn(x,d)).map(x=>{const range=spanRange(x),multi=spanning(x);return '<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(multi?h(prettyShort(range.first+'T12:00:00')+' – '+prettyShort(range.last+'T12:00:00')):x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>'}).join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
+}
+let dragSession=null,skipNextClick=false;
+function enableEventDrag(){
+ if(state.view==='agenda')return;
+ $$('.weekevent,.month-span,.monthcell .eventchip,.all-day-span').forEach(button=>{
+  button.addEventListener('pointerdown',e=>{
+   if(e.button!==0)return;
+   const ev=getOccurrence(button.dataset.detail,button.dataset.occ);
+   if(!ev||ev.source_subscription_id)return;
+   const edge=e.target.closest('[data-resize]')?.dataset.resize||'move';
+   initiateDrag(e,{button,event:ev,edge,kind:state.view==='month'?'month':'week'});
+  });
+  button.addEventListener('click',e=>{if(skipNextClick){e.preventDefault();e.stopImmediatePropagation();skipNextClick=false}},true);
+ });
+ if(state.view==='month')$$('.monthcell').forEach(cell=>{
+  cell.addEventListener('pointerdown',e=>{
+   if(e.button!==0||e.target.closest('button'))return;
+   initiateDrag(e,{button:cell,event:null,edge:'create',kind:'month'});
+  });
+ });
+}
+function initiateDrag(e,info){
+ const startX=e.clientX,startY=e.clientY,previous=info.event,original=previous?previous._origin||previous:null;
+ const begin=previous?new Date(previous.starts_at):null,finish=previous?new Date(previous.ends_at):null;
+ const ms=begin&&finish?finish-begin:3600000;
+ const originDate=info.kind==='month'?(e.target.closest('[data-cell]')?.dataset.cell||info.event?._civilDate||iso(begin)):null;
+ let active=false,ghost=null,targetDate=originDate,minuteDelta=0,newBegin=null,newFinish=null;
+ const cancel=()=>{document.removeEventListener('pointermove',move,true);document.removeEventListener('pointerup',up,true);document.removeEventListener('keydown',onKey,true);ghost?.remove();document.body.classList.remove('daylight-dragging');$$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));dragSession=null};
+ const onKey=event=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancel()}};
+ const move=event=>{
+  const dx=event.clientX-startX,dy=event.clientY-startY;
+  if(!active&&Math.hypot(dx,dy)<6)return;
+  if(!active){
+   active=true;dragSession={cancel};document.body.classList.add('daylight-dragging');
+   ghost=document.createElement('div');ghost.className='daylight-drag-ghost';ghost.style.setProperty('--event-color',previous?eventColor(previous):'var(--primary)');document.body.append(ghost);
+  }
+  event.preventDefault();ghost.style.left=Math.max(8,Math.min(innerWidth-ghost.offsetWidth-8,event.clientX+14))+'px';ghost.style.top=Math.max(8,Math.min(innerHeight-ghost.offsetHeight-8,event.clientY+12))+'px';
+  const hovered=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-cell],[data-slot]');
+  $$('.daylight-drag-target').forEach(n=>n.classList.remove('daylight-drag-target'));
+  if(hovered){hovered.classList.add('daylight-drag-target');targetDate=hovered.dataset.cell||hovered.dataset.slot}
+  if(info.kind==='month'){
+   if(!targetDate)targetDate=originDate;
+   const offset=Math.round((date(targetDate)-date(originDate))/86400000);
+   newBegin=previous?new Date(begin.getTime()+offset*86400000):date(originDate);
+   newFinish=previous?new Date(finish.getTime()+offset*86400000):new Date(date(targetDate).getTime()+86400000);
+   if(!previous&&targetDate<originDate){newBegin=date(targetDate);newFinish=new Date(date(originDate).getTime()+86400000)}
+   ghost.innerHTML='<strong>'+h(previous?.title||'New event')+'</strong><small>'+h(prettyShort(newBegin))+' – '+h(prettyShort(new Date(newFinish-1)))+'</small>';
+  }else{
+   const track=hovered?.closest('.daytrack')||document.elementFromPoint(event.clientX,event.clientY)?.closest('.daytrack');
+   const base=track?.getBoundingClientRect();
+   const snapY=base?Math.round((event.clientY-base.top)/15)*15:Math.round(dy/15)*15;
+   const moveMinutes=info.edge==='move'&&base?Math.max(0,Math.min(1425,snapY))-(begin.getHours()*60+begin.getMinutes()):Math.round(dy/15)*15;
+   minuteDelta=moveMinutes;
+   if(info.edge==='top'){newBegin=new Date(begin.getTime()+minuteDelta*60000);newFinish=finish}
+   else if(info.edge==='bottom'){newBegin=begin;newFinish=new Date(finish.getTime()+minuteDelta*60000)}
+   else{const days=track?Math.round((date(track.dataset.slot)-date(iso(begin)))/86400000):0;newBegin=new Date(begin.getTime()+days*86400000+minuteDelta*60000);newFinish=new Date(newBegin.getTime()+ms)}
+   if(newFinish-newBegin<15*60000){newFinish=new Date(newBegin.getTime()+15*60000)}
+   ghost.innerHTML='<strong>'+h(previous?.title||'Event')+'</strong><small>'+h(prettyClock(newBegin))+' – '+h(prettyClock(newFinish))+'</small>';
+  }
+ };
+ const up=async(event)=>{
+  const didMove=active,beginning=newBegin,ending=newFinish,selected=previous;
+  cancel();if(!didMove||!beginning||!ending)return;
+  skipNextClick=true;setTimeout(()=>skipNextClick=false,350);
+  if(info.edge==='create'){openEditor(null,iso(beginning));const form=$('#quickForm');if(form){$('#startDate',form).value=iso(beginning);$('#endDate',form).value=iso(new Date(ending.getTime()-1));const startButton=$('[data-pick="start"]',form),endButton=$('[data-pick="end"]',form);if(startButton)startButton.textContent=label(beginning);if(endButton)endButton.textContent=label(new Date(ending.getTime()-1))}return}
+  const data={starts_at:beginning.toISOString(),ends_at:ending.toISOString()};
+  try{
+   if(isNativeRepeat(original))occurrenceChoice(selected,'update',async scope=>{try{await mutateOccurrence(selected,scope,'update',data)}catch(err){toast(err.message||'Could not update event.')}});
+   else{await safeChange('events',original.id,data,'update');toast('Event updated')}
+  }catch(err){toast(err.message||'Could not update event.')}
+ };
+ document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',up,true);document.addEventListener('keydown',onKey,true);
 }
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
@@ -255,6 +372,7 @@ function bindEventButtons(){
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
  $$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
 }
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();if(state.user&&!$('#settingsModal'))settings();return} },true);
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
  if(document.querySelector('#calendarDatePicker')){document.querySelector('#calendarDatePicker').remove();e.preventDefault();e.stopImmediatePropagation();return}
@@ -345,7 +463,7 @@ async function saveSetting(field,value){
  return task;
 }
 const switches={
- calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar']],
+ calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Include declined and cancelled events, greyed out']],
  appearance:[['show_weekends','Show weekends','Include Saturday and Sunday'],['compact_mode','Compact mode','Use tighter spacing'],['reduce_motion','Reduce motion','Minimize movement and animations']],
  notifications:[['task_reminders','Task reminders','Notifications for due tasks'],['event_reminders','Event reminders','Notifications for upcoming events'],['notification_sound','Notification sound','Play a sound when a reminder appears']]
 };
@@ -362,7 +480,7 @@ function customSelect(name,current,items){const text=items.find(x=>String(x[0])=
 function themeCards(){return '<div class="theme-cards">'+['dark','light','system'].map(theme=>'<button class="theme-card '+(state.settings.theme===theme?'picked':'')+'" data-theme="'+theme+'"><span class="theme-mini '+theme+'"><i></i><b></b><em></em><strong></strong><u></u></span><span>'+h(theme==='dark'?'Midnight':theme==='light'?'Daylight':'System')+'</span>'+(state.settings.theme===theme?'<span class="theme-check">'+icon('check',16)+'</span>':'')+'</button>').join('')+'</div>'}
 function settingsContent(which){
  const s=state.settings,u=state.user,all=switches[which],switchRows=all?all.map(([id,title,help])=>row(title,help,switchHtml(id,s[id]))).join(''):'';
- if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account','@'+u.username,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
+ if(which==='general')return '<h2>General</h2><p>Account and personal preferences.</p>'+row('Account',u.email,'<button class="secondary" id="logoutBtn">Log out</button>')+row('First name','Used on your account','<input class="small-input" id="firstName" value="'+h(u.first_name)+'">')+row('Last name','Used on your account','<input class="small-input" id="lastName" value="'+h(u.last_name)+'">')+row('Time zone','Defaults to your device',customSelect('time_zone',s.time_zone||'auto',selectOptions.time_zone))+row('Start of week','First calendar weekday',customSelect('start_of_week',s.start_of_week,selectOptions.start_of_week));
  if(which==='calendar')return '<h2>Calendar</h2><p>Plan how your calendar is displayed.</p>'+row('Default Calendar View','View when Daylight opens',customSelect('default_view',s.default_view,selectOptions.default_view))+switchRows+row('Work hours','Beginning and end of the workday','<span class="worktime"><button class="pill-select" data-time="work_hours_start">'+h(readableTime(s.work_hours_start||'09:00'))+'</button> – <button class="pill-select" data-time="work_hours_end">'+h(readableTime(s.work_hours_end||'17:00'))+'</button></span>');
  if(which==='appearance')return '<h2>Appearance</h2><p>Make Daylight feel like yours.</p>'+themeCards()+switchRows;
  if(which==='data')return '<h2>Data & sync</h2><p>Manage calendar subscriptions and information.</p>'+row('Connected calendars','Manage the calendars in your workspace','<button class="secondary" id="goIntegrations">Manage connected calendars ›</button>')+row('US Holidays','Show federal holidays',switchHtml('holidays',state.calendars.find(x=>x.client_id==='us-holidays')?.is_visible!==false))+'<h3>Subscriptions</h3><div id="settingsSubs">'+(state.subscriptions.length?state.subscriptions.map(x=>'<div class="sub-item"><strong>'+h(x.name)+'</strong><small>'+h(x.url)+'</small><small>Last fetched: '+h(x.last_fetched_at?prettyStamp(x.last_fetched_at):'Never')+'</small><button class="secondary" data-refresh="'+x.id+'">Refresh</button><button class="danger outline" data-remove="'+x.id+'">Remove</button></div>').join(''):'<p class="quiet">No subscriptions yet.</p>')+'</div>'+row('Add subscription','Read-only .ics calendar link','<button class="secondary" id="addSub">Add subscription</button>')+row('Last sync',state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)?prettyStamp(state.subscriptions.map(x=>x.last_fetched_at).filter(Boolean).sort().at(-1)):'Never','<button class="secondary" id="refreshAll">Refresh all</button>');
@@ -396,33 +514,72 @@ function renderSettings(){
  $('#addSub',pane)?.addEventListener('click',()=>subscriptionDialog());
  $('#refreshAll',pane)?.addEventListener('click',async()=>{let fails=0;for(const x of state.subscriptions){try{await api('sub_refresh',{id:x.id})}catch{fails++}}await refreshData();toast(fails?fails+' feeds could not be refreshed':'Subscriptions refreshed');renderSettings()});
  $$('[data-refresh]',pane).forEach(b=>b.onclick=async()=>{try{await api('sub_refresh',{id:b.dataset.refresh});await refreshData();toast('Subscription refreshed');renderSettings()}catch(e){toast(e.message)}});
- $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{toast('Removing subscription…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();toast('Subscription removed')}}));
+ $$('[data-remove]',pane).forEach(b=>b.onclick=()=>confirmAction('Remove subscription?','The subscribed calendar will be removed.',async()=>{loading(b,true,'Removing…');const saved=await safeChange('subscriptions',b.dataset.remove,null,'delete');if(saved){await refreshData();renderSettings();toast('Subscription removed')}else loading(b,false)}));
 }
 function legal(id){const text={
- privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is verified server-side and only a salted password hash is stored. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Browser storage holds a session token so you remain signed in. Public calendar subscriptions may expose their contents to the URL provider.',
+ privacy:'Daylight stores your account information, events, tasks, calendars, settings and subscriptions in its Supabase database. Your password is handled by Supabase Auth; Daylight never stores your password. MCP tokens are stored only as hashes. Account data is accessible through authenticated server APIs. Never share your login or AI tokens. Supabase Auth manages your browser session securely. Public calendar subscriptions may expose their contents to the URL provider.',
  terms:'Daylight is a personal calendar application. You are responsible for entries you create and links you subscribe to. Do not share access tokens. Calendar data may be incomplete or unavailable while offline or if a provider blocks access. Export important information for backup. This service is provided as-is, without a promise of continuous availability.',
  changelog:''
  };const title=id==='privacy'?'Privacy Policy':id==='terms'?'Terms of Service':'Changelog',body=id==='changelog'?'<div class="changelog"><h3>Version 2.1</h3><ul><li>Month-grid date picking and native repeat rendering</li><li>Calendar colors and contextual greetings</li><li>Tasks filters, event details, and updated Settings</li></ul><h3>Version 2.0</h3><ul><li>Improved calendar visibility, inline renaming, and fixed Settings sizing</li></ul><h3>Version 1.1</h3><ul><li>Login-only accounts, Supabase storage, and AI access controls</li></ul></div>':'<p>'+h(text[id])+'</p>';modal('<h2>'+h(title)+'</h2>'+body+'<div class="footer-actions"><button class="primary" data-close>Done</button></div>')}
-function subscriptionDialog(){const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');$('#subSave',dlg).onclick=async()=>{const input=$('#subURL',dlg).value;try{loading($('#subSave',dlg),true,'Adding…');const u=new URL(input.replace(/^webcal:/,'https:'));if(u.protocol!=='https:')throw Error();const r=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:u.href}});dlg.close();await refreshData();if(r.refresh_error)toast(r.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");else toast('Subscription added')}catch{loading($('#subSave',dlg),false);toast('Enter a valid HTTPS feed URL')}}}
+function subscriptionDialog(){
+ const dlg=modal('<h2>Add subscription</h2><p>Use a public .ics URL. Feed refresh requires server-side fetching.</p><label>Name<input id="subName" placeholder="Optional"></label><label>Feed URL<input id="subURL" placeholder="https://example.com/events.ics"></label><p id="subscriptionError" class="error" hidden></p><footer class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="subSave">Add subscription</button></footer>');
+ $('#subSave',dlg).onclick=async()=>{
+  const input=$('#subURL',dlg).value.trim(),errorNode=$('#subscriptionError',dlg);
+  errorNode.hidden=true;errorNode.textContent='';
+  let normalized;
+  try{const u=new URL(input.replace(/^webcal:/i,'https:'));if(u.protocol!=='https:')throw Error();normalized=u.href}
+  catch{errorNode.textContent='Enter a valid HTTPS feed URL.';errorNode.hidden=false;return}
+  if(state.subscriptions.some(s=>s.url===normalized)){errorNode.textContent='That feed is already added.';errorNode.hidden=false;return}
+  const button=$('#subSave',dlg);loading(button,true,'Adding…');
+  try{
+   const response=await api('data_create',{entity:'subscriptions',data:{name:$('#subName',dlg).value,url:normalized}});
+   dlg.close();await refreshData();if($('#settingsModal'))renderSettings();
+   if(response.refresh_error)toast(response.refresh_error==='NOT_CALENDAR'?"That link didn't return a calendar file. Check the URL points to a direct .ics feed.":"Couldn't reach that feed. The server may be blocking access.");
+   else toast('Subscription added');
+  }catch(error){
+   loading(button,false);
+   errorNode.textContent=error.message==='That feed is already added.'?'That feed is already added.':(error.message||'Could not add subscription.');
+   errorNode.hidden=false;
+  }
+ };
+}
 function renderTasks(){
  const counts={all:state.tasks.length,todo:state.tasks.filter(t=>!t.completed).length,completed:state.tasks.filter(t=>t.completed).length};
  const choices=[['all','All'],['todo','To do'],['completed','Completed']];
  const filtered=state.tasks.filter(t=>state.taskFilter==='all'||(state.taskFilter==='completed'?t.completed:!t.completed));
  $('#content').innerHTML='<div class="list-page tasks-view"><header class="view-header"><div><h1>Tasks</h1><p>Stay on top of what matters.</p></div><button class="primary" id="newTask">'+icon('plus')+' New task</button></header><div class="task-filters">'+choices.map(([key,label])=>'<button data-task-filter="'+key+'" class="'+(key===state.taskFilter?'selected':'')+'">'+label+' <span>'+counts[key]+'</span></button>').join('')+'</div><div class="task-list">'+(filtered.length?filtered.map(t=>'<div class="task-row"><button data-done="'+t.id+'" role="checkbox" aria-checked="'+t.completed+'" class="check '+(t.completed?'checked':'')+'">'+(t.completed?icon('check',16):'')+'</button><button data-task="'+t.id+'" class="task-title '+(t.completed?'done':'')+'"><strong>'+h(t.title)+'</strong><small>'+h(t.due_date?prettyShort(t.due_date+'T12:00:00'):'No due date')+'</small></button></div>').join(''):'<div class="whole-empty"><span class="empty-icon">'+icon('tasks',40)+'</span><p>'+(state.taskFilter==='all'?'No tasks yet':state.taskFilter==='todo'?'No tasks to do':'No completed tasks yet')+'</p></div>')+'</div></div>';
  $('#newTask').onclick=()=>openEditor(null,null,null,'task');
- $$('[data-task-filter]').forEach(b=>b.onclick=()=>{state.taskFilter=b.dataset.taskFilter;renderTasks();upgradeIcons()});
- $$('[data-done]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.done);safeChange('tasks',t.id,{completed:!t.completed},'update')});
- $$('[data-task]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.task);openEditor(t,null,null,'task')});
+ $('[data-task-filter]').forEach(b=>b.onclick=()=>{state.taskFilter=b.dataset.taskFilter;renderTasks();upgradeIcons()});
+ $('[data-done]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.done);safeChange('tasks',t.id,{completed:!t.completed},'update')});
+ $('[data-task]').forEach(b=>b.onclick=()=>{const t=state.tasks.find(t=>t.id===b.dataset.task);openEditor(t,null,null,'task')});
 }
 function renderIntegrations(){
  $('#content').innerHTML='<div class="list-page"><header class="view-header"><div><h1>Integrations</h1><p>Connect your schedules in one place.</p></div><button class="primary" id="connect">Add subscription</button></header><div class="integration-grid">'+[['Google Calendar','Use a published iCalendar URL. Private account sync is not connected.'],['Outlook','Export or publish an iCalendar feed from Outlook.'],['Apple Calendar','Share a read-only calendar URL from iCloud.'],['CalDAV','Authenticated two-way CalDAV is not available.']].map(x=>'<div class="integration-card"><h3>'+h(x[0])+'</h3><p>'+h(x[1])+'</p><button class="secondary" data-help="'+h(x[0])+'">Learn more ↗</button></div>').join('')+'</div></div>';
- $('#connect').onclick=subscriptionDialog;$$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
+ $('#connect').onclick=subscriptionDialog;$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
+
+const isNativeRepeat=e=>!e?.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(String(e?.repeat_rule?.frequency||'').toLowerCase());
+function occurrenceChoice(event,action,callback){
+ const dlg=modal('<h2>'+(action==='delete'?'Delete recurring event':'Change recurring event')+'</h2><p>Which occurrences should this change affect?</p><div class="occurrence-options"><button type="button" data-occurrence="only">Only this event</button><button type="button" data-occurrence="following">This and following events</button><button type="button" data-occurrence="all">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
+ $('[data-occurrence]',dlg).forEach(b=>b.onclick=()=>{const which=b.dataset.occurrence;dlg.close();callback(which)});
+}
+async function mutateOccurrence(event,scope,mode,changes=null){
+ const base=event._origin||event;
+ const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,occurrence_date:event._civilDate||iso(new Date(event._occurrence||event.starts_at)),...(changes?{changes}:{})});
+ await refreshData();toast(mode==='delete'?'Event deleted':'Event updated');return result;
+}
+function deleteEventSafely(e,closeDetail){
+ const event=e._origin||e;
+ if(event.source_subscription_id)return toast('Subscribed events are read-only');
+ if(isNativeRepeat(event)){occurrenceChoice(e,'delete',async scope=>{try{await mutateOccurrence(e,scope,'delete');closeDetail?.()}catch(ex){toast(ex.message||'Could not delete event.')}});return}
+ confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',event.id,null,'delete');closeDetail?.();toast('Event deleted')});
+}
+
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
- const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),when=e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at);const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
- $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e._origin||e)});
- $('#deleteEvent',dlg)?.addEventListener('click',()=>confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',e.id,null,'delete');dlg.close()}));
+ const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),range=spanRange(e),multi=spanning(e),when=multi?label(date(range.first))+' – '+label(date(range.last))+', '+date(range.last).getFullYear():(e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at));const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
+ $('#editEvent',dlg)?.addEventListener('click',()=>{dlg.close();openEditor(e)});
+ $('#deleteEvent',dlg)?.addEventListener('click',()=>deleteEventSafely(e,()=>dlg.close()));
  upgradeIcons();
 }
 
@@ -506,7 +663,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
  field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
  field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
  upgradeIcons();
- $('#quickDelete',form)?.addEventListener('click',()=>confirmAction('Delete '+state.mode+'?','This cannot be undone.',async()=>{await safeChange(state.mode==='task'?'tasks':'events',existing.id,null,'delete');dlg.close()}));
+ $('#quickDelete',form)?.addEventListener('click',()=>{if(state.mode==='event')return deleteEventSafely(existing,()=>dlg.close());confirmAction('Delete task?','This task will be permanently deleted.',async()=>{await safeChange('tasks',existing.id,null,'delete');dlg.close();toast('Task deleted')})});
  form.onsubmit=async e=>{
   e.preventDefault();if(!title.value.trim()){title.classList.add('shake','invalid');$('#titleError',form).hidden=false;title.focus();setTimeout(()=>title.classList.remove('shake'),300);return}
   const startD=$('#startDate',form).value,endD=$('#endDate',form).value;
@@ -514,10 +671,30 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   const endAt=new Date(endD+'T'+(state.timed&&!state.allDay?$('#endTime',form).value:'00:00')+':00');
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
-  const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
-  try{loading($('#quickSave',form),true,'Saving…');await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
+  const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||existing?.location_address||field.value.trim(),starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
+  try{loading($('#quickSave',form),true,'Saving…');if(existing&&state.mode==='event'&&isNativeRepeat(existing._origin||existing)){loading($('#quickSave',form),false);occurrenceChoice(existing,'update',async scope=>{try{await mutateOccurrence(existing,scope,'update',data);dlg.close()}catch(ex){toast(ex.message||'Could not save event.')}});return}await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
+const remindersSeen=new Set();
+function checkReminders(){
+ if(!state.user||typeof Notification==='undefined'||Notification.permission!=='granted')return;
+ const current=Date.now(),windowMs=35000;
+ const show=(key,title,body)=>{if(remindersSeen.has(key))return;remindersSeen.add(key);try{new Notification(title,{body,tag:'daylight-'+key})}catch(error){console.warn('Notification unavailable',error)}};
+ if(state.settings.event_reminders){
+  for(const item of occurrences(add(now(),-1),add(now(),2))){
+   if(item._segment>0)continue;
+   const reminder=Number(item.reminder_offset_minutes??state.settings.default_reminder_minutes??15);
+   const when=Date.parse(item.starts_at)-reminder*60000;
+   if(when<=current&&current-when<=windowMs)show(item.id+'-'+item._occurrence,item.title,'Event starts '+prettyClock(item.starts_at));
+  }
+ }
+ if(state.settings.task_reminders){for(const task of state.tasks){
+  if(task.completed||!task.due_date)continue;
+  const when=new Date(task.due_date+'T09:00:00').getTime();
+  if(when<=current&&current-when<=windowMs)show('task-'+task.id,'Task due: '+task.title,'Due '+prettyShort(task.due_date+'T12:00:00'));
+ }}
+}
+if(typeof window!=='undefined')setInterval(checkReminders,30000);
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
-else if(state.token)load();else login();
+else {sb.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY')queueMicrotask(()=>showRecovery())});sb.auth.getSession().then(({data})=>data.session?load():login());}
