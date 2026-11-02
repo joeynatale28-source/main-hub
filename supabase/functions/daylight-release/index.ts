@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.10';
-import bcrypt from 'npm:bcryptjs@2.4.3';
 import { parseCalendar } from './ical.ts';
 const url=Deno.env.get('SUPABASE_URL')!,secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -11,18 +10,18 @@ const fresh=()=>Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.
 const plain=(x:unknown)=>String(x??'').trim();
 const allowed:Record<string,{table:string,fields:string[]}>={
  calendars:{table:'dl_calendars',fields:['name','shade','sort_order','is_visible']},
- events:{table:'dl_events',fields:['calendar_id','title','description','location_name','location_address','starts_at','ends_at','all_day','repeat_rule','reminder_offset_minutes']},
+ events:{table:'dl_events',fields:['calendar_id','title','description','location_name','location_address','starts_at','ends_at','all_day','repeat_rule','reminder_offset_minutes','status','exdates','recurrence_parent_id']},
  tasks:{table:'dl_tasks',fields:['title','notes','due_date','completed']},
  subscriptions:{table:'dl_subscriptions',fields:['calendar_id','name','url','last_fetched_at']},
  settings:{table:'dl_user_settings',fields:['theme','accent','custom_accent_hex','default_view','start_of_week','reduce_motion','show_weekends','compact_mode','show_week_numbers','show_declined_events','work_hours_start','work_hours_end','task_reminders','event_reminders','notification_sound','default_reminder_minutes','mcp_allow_delete','time_zone','extra']}
 };
-async function session(token:string){
- if(!/^[a-f0-9]{64}$/.test(token))return null;
- const hash=await sha(token);
- const {data:s,error:e}=await db.from('sessions').select('id,user_id,expires_at').eq('token_hash',hash).gt('expires_at',new Date().toISOString()).maybeSingle();
- if(e||!s)return null;
- const {data:u}=await db.from('users').select('id,first_name,last_name,username,is_admin').eq('id',s.user_id).maybeSingle();
- return u?{user:u,session:s}:null;
+async function session(req:Request){
+ const jwt=(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
+ if(!jwt)return null;
+ const {data,error}=await db.auth.getUser(jwt);
+ if(error||!data.user)return null;
+ const u=data.user;
+ return {user:{id:u.id,email:u.email||'',first_name:String(u.user_metadata?.first_name||u.email?.split('@')[0]||''),last_name:String(u.user_metadata?.last_name||''),is_admin:false}};
 }
 async function bootstrap(uid:string){
  const {error:se}=await db.from('dl_user_settings').upsert({user_id:uid},{onConflict:'user_id',ignoreDuplicates:true});
@@ -98,44 +97,30 @@ async function handle(req:Request){
  if(req.method!=='POST')return fail('Method not allowed',405);
  let body:Record<string,unknown>;try{body=await req.json();if(!body||Array.isArray(body)||typeof body!=='object')throw Error()}catch{return fail('Invalid request')}
  const action=plain(body.action);
- if(action==='auth_login'){
-  const generic="That username and password don't match";
-  const userName=plain(body.username).toLowerCase(),password=String(body.password??'');
-  if(!userName||!password)return fail(generic,401);
-  const {data:u}=await db.from('users').select('id,first_name,last_name,username,is_admin,password_hash,password_salt').eq('username',userName).maybeSingle();
-  const candidate=u?.password_hash||'$2a$12$qPjyg7ojIrlQWMz9hA68A.e2N1owCGVgpryoiL5cElYc/09nOgECy';
-  const verified=await bcrypt.compare(password+(u?.password_salt||''),candidate).catch(()=>false);
-  if(!u||!verified)return fail(generic,401);
-  const token=fresh(),{error}=await db.from('sessions').insert({user_id:u.id,token_hash:await sha(token),expires_at:new Date(Date.now()+30*86400000).toISOString()});
-  if(error)throw error;
-  await bootstrap(u.id);
-  return json({token,user:{id:u.id,first_name:u.first_name,last_name:u.last_name,username:u.username,is_admin:u.is_admin}});
- }
- const token=plain(body.token)||plain(req.headers.get('x-daylight-session'));
- const pair=await session(token);
+ const pair=await session(req);
  if(!pair)return fail('Session expired. Log in again.',401);
  const uid=pair.user.id;
- if(action==='auth_logout'){const hash=await sha(token);await db.from('sessions').delete().eq('user_id',uid).eq('token_hash',hash);return json({ok:true})}
  if(action==='auth_session')return json({user:pair.user});
  if(action==='user_update'){
   const first=plain(body.first_name).slice(0,60),last=plain(body.last_name).slice(0,60);
-  if(!first||!last)return fail('First and last names are required');
-  const {error}=await db.from('users').update({first_name:first,last_name:last}).eq('id',uid);
-  if(error)throw error;return json({ok:true,user:{...pair.user,first_name:first,last_name:last}});
+  if(!first||!last)return fail('First and last names are required.',400);
+  const {error}=await db.auth.admin.updateUserById(uid,{user_metadata:{first_name:first,last_name:last}});
+  if(error)throw error;
+  return json({ok:true,user:{...pair.user,first_name:first,last_name:last}});
  }
  if(action==='mcp_list'){
-  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at,revoked').eq('user_id',uid).eq('revoked',false).order('created_at',{ascending:false});
-  if(error)throw error;return json({items:data});
+  const {data,error}=await db.from('dl_mcp_tokens').select('id,name,created_at,last_used_at').eq('user_id',uid).order('created_at',{ascending:false});
+  if(error)throw error;return json({items:data||[]});
  }
  if(action==='mcp_generate'){
-  const name=plain(body.name).slice(0,100);if(!name)return fail('Token name is required');
+  const name=plain(body.name).slice(0,100);if(!name)return fail('Token name is required.',400);
   const raw=fresh(),{data,error}=await db.from('dl_mcp_tokens').insert({user_id:uid,name,token_hash:await sha(raw)}).select('id,name,created_at').single();
   if(error)throw error;return json({item:data,token:raw});
  }
  if(action==='mcp_revoke'){
-  if(!/^[0-9a-f-]{36}$/i.test(plain(body.id)))return fail('Invalid token');
+  if(!/^[0-9a-f-]{36}$/i.test(plain(body.id)))return fail('Invalid token.',400);
   const {data,error}=await db.from('dl_mcp_tokens').delete().eq('user_id',uid).eq('id',body.id).select('id').maybeSingle();
-  if(error)throw error;return data?json({ok:true}):fail('Token not found',404);
+  if(error)throw error;return data?json({ok:true}):fail('Token not found.',404);
  }
  if(action==='sub_refresh'){
   const id=plain(body.id);if(!/^[0-9a-f-]{36}$/i.test(id))return fail('Invalid subscription');
@@ -162,11 +147,13 @@ async function handle(req:Request){
   if(action==='data_create'){
    if(entity==='subscriptions'){
     const url=feedUrl(plain(changes.url));
+    const existing=await db.from('dl_subscriptions').select('id').eq('user_id',uid).eq('url',url).maybeSingle();
+    if(existing.data)return fail('That feed is already added.',409);
     const named=plain(changes.name),name=named||new URL(url).hostname;
     const client_id='ics-'+crypto.randomUUID();
     const {data:calendar,error:ce}=await db.from('dl_calendars').insert({user_id:uid,name,shade:'gray-4',client_id,sort_order:100,is_visible:true}).select('*').single();if(ce)throw ce;
     const {data:subscription,error:se}=await db.from('dl_subscriptions').insert({user_id:uid,calendar_id:calendar.id,name,url,name_custom:!!named}).select('*').single();
-    if(se){await db.from('dl_calendars').delete().eq('id',calendar.id).eq('user_id',uid);throw se}
+    if(se){await db.from('dl_calendars').delete().eq('id',calendar.id).eq('user_id',uid);if(se.code==='23505')return fail('That feed is already added.',409);throw se}
     const refreshed=await refreshSub(uid,subscription.id);
     return json({item:'item' in refreshed?refreshed.item:subscription,refresh_error:'error' in refreshed?refreshed.error:null});
    }

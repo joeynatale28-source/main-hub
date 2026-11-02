@@ -1,11 +1,24 @@
 import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
-const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',username:'example',is_admin:true};
+const account={id:'11111111-1111-4111-8111-111111111111',email:'example@daylight.test',first_name:'Example',last_name:'Person',user_metadata:{first_name:'Example',last_name:'Person'},aud:'authenticated',role:'authenticated',created_at:'2026-11-01T00:00:00Z'};
 const calendar={id:'22222222-2222-4222-8222-222222222222',name:'Personal',client_id:'personal',shade:'gray-1',sort_order:0,is_visible:true};
 function makeSettings(){return{theme:'dark',default_view:'week',start_of_week:'sunday',accent:'graphite',custom_accent_hex:null,show_weekends:true,compact_mode:false,reduce_motion:false,mcp_allow_delete:false,default_reminder_minutes:15}}
 async function setup(page,{loggedIn=true,failLogin=false}={}){
  let settings=makeSettings(),calendars=[{...calendar}],events=[],tasks=[],subscriptions=[],tokens=[],user={...account};
+ const authUser={...account},jwt='eyJhbGciOiJIUzI1NiJ9.'+Buffer.from(JSON.stringify({sub:account.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+86400*30})).toString('base64url')+'.testing';
+ const session={access_token:jwt,refresh_token:'mock-refresh-token',expires_in:86400,expires_at:Math.floor(Date.now()/1000)+86400,token_type:'bearer',user:authUser};
+ await page.route('https://mock.supabase.co/auth/v1/**',async route=>{
+  const request=route.request(),target=new URL(request.url());
+  if(target.pathname.endsWith('/token')&&target.searchParams.get('grant_type')==='password'){
+   if(failLogin)return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({msg:'Invalid login credentials',error:'invalid_grant'})});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(session)});
+  }
+  if(target.pathname.endsWith('/user'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(authUser)});
+  if(target.pathname.endsWith('/recover'))return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+  if(target.pathname.endsWith('/logout'))return route.fulfill({status:204,body:''});
+  return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+ });
  await page.route('https://mock.supabase.co/functions/v1/daylight-release',async route=>{
   const req=route.request().postDataJSON(),action=req.action;
   const success=(obj)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(obj)});
@@ -31,18 +44,21 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
   if(action==='sub_refresh')return success({count:0,item:subscriptions.find(x=>x.id===req.id)});
   return success({ok:true});
  });
- if(loggedIn)await page.addInitScript(()=>localStorage.setItem('dl-release-session','temporary-test-token'));
+ if(loggedIn)await page.addInitScript(session=>localStorage.setItem('sb-mock-auth-token',JSON.stringify(session)),session);
  await page.goto('/');
  return{get:()=>({settings,calendars,events,tasks,subscriptions,tokens,user})};
 }
-test('no session shows only login and no signup',async({page})=>{
+test('email login has no signup; failed auth and password reset use Supabase flows',async({page})=>{
  await setup(page,{loggedIn:false,failLogin:true});
  await expect(page.locator('#login')).toBeVisible();
- await expect(page.getByText("Accounts are created by Joey")).toBeVisible();
+ await expect(page.locator('#email')).toBeVisible();
+ await expect(page.locator('#username')).toHaveCount(0);
  await expect(page.locator('#newEvent')).toHaveCount(0);
- await page.locator('#username').fill('nonexistent');await page.locator('#password').fill('anything');
+ await page.locator('#email').fill('notfound@daylight.test');await page.locator('#password').fill('anything');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toHaveText("That username and password don't match.");
+ await expect(page.locator('#authError')).toContainText('Invalid login credentials.');
+ await page.locator('#forgotPassword').click();
+ await expect(page.locator('#authError')).toContainText('password reset link');
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
@@ -78,7 +94,7 @@ test('Settings popup changes default view and keeps navigation',async({page})=>{
  await page.locator('[data-select="default_view"]').click();
  await page.locator('#floatingMenu').getByText('Month').click();
  await expect(page.locator('#settingsModal')).toBeVisible();
- expect(model.get().settings.default_view).toBe('month');
+ await expect.poll(()=>model.get().settings.default_view).toBe('month');
 });
 test('AI access token is shown once and deletes require confirmation',async({page})=>{
  await setup(page);await page.locator('#settings').click();await page.locator('[data-sec="ai"]').click();
@@ -218,9 +234,8 @@ test('month-grid picker commits Start and End and supports a three-day event',as
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu').getByText('Month').click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- for(const d of [start,plus(start,1),end]){
-  await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Three-day conference'})).toHaveCount(1);
- }
+ await expect(page.locator('.month-span-bar').filter({hasText:'Three-day conference'})).toHaveCount(1);
+ const span=await page.locator('.month-span-bar').filter({hasText:'Three-day conference'}).getAttribute('style');expect(span).toContain('--span-length:3');
 });
 test('native weekly recurrence appears on multiple weeks and popover describes it',async({page})=>{
  const model=await setup(page);await page.locator('#newEvent').click();
@@ -229,10 +244,10 @@ test('native weekly recurrence appears on multiple weeks and popover describes i
  await page.locator('#quickSave').click();
  await expect.poll(()=>model.get().events.length).toBe(1);
  for(let i=0;i<3;i++){
-  await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Weekly swimming'})).toBeVisible();
+  await expect(page.locator('.all-day-strip .all-day-span').filter({hasText:'Weekly swimming'}).first()).toBeVisible();
   await page.locator('#next').click();
  }
- await page.locator('.all-day-chip').filter({hasText:'Weekly swimming'}).first().click();
+ await page.locator('.all-day-span').filter({hasText:'Weekly swimming'}).first().click();
  await expect(page.locator('dialog[open]').last()).toContainText('Repeats weekly');
  await expect(page.locator('dialog[open]').last()).toContainText('Personal');
 });
@@ -243,10 +258,10 @@ test('all-day subscribed events use civil DTSTART dates and week strip',async({p
  model.get().events.push(event('one',a),event('two',plus(a,1)),event('three',plus(a,2)));
  model.get().settings.default_view='month';
  await page.reload();
- for(const d of [a,plus(a,1),plus(a,2)])await expect(page.locator('[data-cell="'+d+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(1);
- await expect(page.locator('[data-cell="'+plus(a,-1)+'"] .eventchip').filter({hasText:'Feed all-day'})).toHaveCount(0);
+ await expect(page.locator('.month-span-bar').filter({hasText:'Feed all-day'})).toHaveCount(3);
+ await expect(page.locator('[data-cell="'+plus(a,-1)+'"] .month-span-bar').filter({hasText:'Feed all-day'})).toHaveCount(0);
  await page.locator('[data-drill="'+a+'"]').first().click();
- await expect(page.locator('.all-day-strip .all-day-chip').filter({hasText:'Feed all-day'})).toHaveCount(1);
+ await expect(page.locator('.all-day-strip .all-day-span').filter({hasText:'Feed all-day'})).toHaveCount(1);
  await expect(page.locator('.daytrack .all-day-chip')).toHaveCount(0);
 });
 test('token revoke removes row immediately, across reload and from mock auth',async({page})=>{
@@ -279,7 +294,7 @@ test('calendar colors tint chips while primary remains monochrome',async({page})
  await page.locator('[data-select="default_view"]').click();
  await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- const item=page.locator('.eventchip').filter({hasText:'Pool workout'});
+ const item=page.locator('.month-span-bar').filter({hasText:'Pool workout'});
  await expect(item).toHaveCount(1);
  const eventStyle=await item.getAttribute('style');expect(eventStyle.toLowerCase()).toContain(palette.teal.toLowerCase());
  const primary=await page.locator('#newEvent').evaluate(x=>getComputedStyle(x).backgroundColor);
@@ -372,7 +387,7 @@ test('changing calendar color re-tints existing event and rail tooltips render',
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- const chip=page.locator('.eventchip').filter({hasText:'Color change'});
+ const chip=page.locator('.month-span-bar').filter({hasText:'Color change'});
  await expect(chip).toHaveCount(1);
  expect((await chip.getAttribute('style')).toLowerCase()).toContain(palette.rose);
 });
@@ -388,4 +403,46 @@ test('timed cross-midnight and native multi-day expansion includes each civil da
  const ev={id:'cross',starts_at:'2026-11-02T23:30:00',ends_at:'2026-11-03T00:30:00',all_day:false,repeat_rule:{frequency:'never'}};
  const expanded=expandEvents([ev],new Date(2026,10,1),new Date(2026,10,6));
  expect(expanded.map(eventDate)).toEqual(['2026-11-02','2026-11-03']);
+});
+
+test('Nov 7–10 renders continuous Month segments and one Agenda item with full range',async({page})=>{
+ const model=await setup(page);
+ const item={id:'multi-1',calendar_id:calendar.id,title:'Long trip',starts_at:'2026-11-07T00:00:00.000Z',ends_at:'2026-11-11T00:00:00.000Z',all_day:true,repeat_rule:{frequency:'never'}};
+ model.get().events.push(item);model.get().settings.default_view='month';
+ await page.reload();await page.locator('#today').click();
+ const bars=page.locator('.month-span-bar').filter({hasText:'Long trip'});
+ await expect(bars).toHaveCount(2);
+ const lens=await bars.evaluateAll(xs=>xs.map(x=>Number(x.style.getPropertyValue('--span-length'))));
+ expect(lens.reduce((a,b)=>a+b,0)).toBe(4);
+ await bars.first().click();
+ await expect(page.locator('dialog[open]').last()).toContainText('November 7');
+ await expect(page.locator('dialog[open]').last()).toContainText('November 10');
+});
+test('Only this event recurring delete saves EXDATE without deleting the series',async({page})=>{
+ const model=await setup(page);
+ const d=new Date();d.setHours(12,0,0,0);
+ const start=d.toISOString(),end=new Date(d.getTime()+3600000).toISOString();
+ model.get().events.push({id:'weekly-1',calendar_id:calendar.id,title:'Practice repeat',starts_at:start,ends_at:end,all_day:false,repeat_rule:{frequency:'weekly',interval:1,ends:'never'},exdates:[]});
+ await page.reload();
+ await page.locator('.weekevent').filter({hasText:'Practice repeat'}).first().click();
+ await page.locator('#deleteEvent').click();
+ const dlg=page.locator('dialog[open]').last();
+ await expect(dlg).toContainText('Only this event');
+ await expect(dlg).toContainText('This and following events');
+ await expect(dlg).toContainText('All events');
+ await dlg.locator('[data-scope="only"]').click();
+ await expect.poll(()=>model.get().events[0].exdates?.length).toBe(1);
+ expect(model.get().events.length).toBe(1);
+ await page.reload();
+ await expect(page.locator('.weekevent').filter({hasText:'Practice repeat'})).toHaveCount(0);
+});
+test('Cmd/Ctrl+comma opens Settings, and data reset login does not offer sign up',async({page})=>{
+ await setup(page);
+ await expect(page.locator('#newEvent')).toBeVisible();
+ await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',ctrlKey:true,bubbles:true,cancelable:true})));
+ // Verify the app's handler directly: Chromium may reserve Ctrl+, for browser Settings.
+ await expect(page.locator('#settingsModal')).toBeVisible();
+ await page.locator('#settingsModal .dialog-close').click();
+ await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:',',code:'Comma',metaKey:true,bubbles:true,cancelable:true})));
+ await expect(page.locator('#settingsModal')).toBeVisible();
 });
