@@ -3,5 +3,8 @@
 window.__DAYLIGHT_CONFIG = Object.freeze({
   VITE_SUPABASE_URL: "https://qrqemjgpzoqhtmsowmqv.supabase.co",
   VITE_PUBLIC_SITE_URL: "https://joeynatale28-source.github.io/main-hub/glass-calendar/",
+  // Public API endpoints: Supabase JS manages /auth/v1; the app calls the Edge Function with the signed-in JWT.
+  VITE_SUPABASE_AUTH_URL: "https://qrqemjgpzoqhtmsowmqv.supabase.co/auth/v1",
+  VITE_DAYLIGHT_API_URL: "https://qrqemjgpzoqhtmsowmqv.supabase.co/functions/v1/daylight-release",
   VITE_SUPABASE_ANON_KEY: "sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj"
 });
