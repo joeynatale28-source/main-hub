@@ -92,3 +92,26 @@ button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 @media(max-width:850px){.view-header{gap:8px}.greeting{font-size:13px}.view-header .tools{flex-wrap:nowrap}.task-filters{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.action-spinner{animation:none!important}}
 html[data-reduce-motion=true] .action-spinner{animation:none!important}
+
+/* On the collapsed rail, every real control has a readable hover/focus name chip. */
+#root.collapsed .sidebar [data-tooltip]{position:relative}
+#root.collapsed .sidebar [data-tooltip]:is(:hover,:focus-visible)::after{
+ content:attr(data-tooltip);position:absolute;z-index:2147483600;top:50%;left:calc(100% + 11px);
+ transform:translateY(-50%);background:var(--card);color:var(--text);
+ padding:8px 11px;border-radius:8px;border:1px solid var(--line);
+ box-shadow:0 7px 24px #0004;white-space:nowrap;pointer-events:none;
+ font:500 12px/1.2 Inter,-apple-system,sans-serif;letter-spacing:0;
+}
+#root.collapsed .sidebar{overflow:visible!important}
+#root.collapsed .side-middle{overflow-y:auto!important;overflow-x:visible!important}
+#root.collapsed .sidebar .nav{overflow:visible!important}
+#root.collapsed .cal-row{overflow:visible!important}
+#settingsPane:has(.about-summary){display:flex;flex-direction:column;gap:12px}
+#settingsPane .about-summary{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:180px;margin:12px 0 22px;border-bottom:1px solid var(--line)}
+#settingsPane .about-summary .about-mark{font-size:27px;padding:0}
+#settingsPane .about-summary strong{font-size:17px;letter-spacing:-.04em}
+#settingsPane .about-summary small{font-size:11px}
+#settingsPane:has(.about-summary)>.setting-row{min-height:64px}
+#settingsPane:has(.about-summary)>.setting-row:last-child{margin-bottom:20px}
+.changelog h3{margin-top:16px;margin-bottom:7px}
+.changelog ul{padding-left:18px;color:var(--sub);line-height:1.7;font-size:12px}
