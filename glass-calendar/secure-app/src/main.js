@@ -83,7 +83,7 @@ function render(){if(!state.user)return;root.classList.toggle('collapsed',state.
  $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
  $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
  $('#collapseRail').onclick=()=>{state.collapsed=!state.collapsed;localStorage.setItem('daylight-rail-collapsed',state.collapsed?'1':'0');render()};
- $('#newCalendar').onclick=()=>promptForm('New calendar','Name',async name=>{await safeChange('calendars',null,{name,shade:'gray-2',sort_order:state.calendars.length,is_visible:true},'create')});
+ $('#newCalendar').onclick=()=>calendarForm();
  renderMini();renderCalList();state.page==='calendar'?renderCalendar():state.page==='tasks'?renderTasks():renderIntegrations();upgradeIcons();
 }
 function renderMini(){
@@ -103,11 +103,54 @@ function renderCalList(){
  $$('[data-menu]',container).forEach(x=>x.onclick=()=>{
   const c=state.calendars.find(c=>c.id===x.dataset.menu);if(!c)return;
   const subscribed=state.subscriptions.some(sub=>sub.calendar_id===c.id);
-  menu(x,[['Rename',()=>inlineRename(c)],[(c.is_visible?'Hide':'Unhide'),()=>safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')],
-   [subscribed?'Remove subscription':'Delete calendar',()=>subscribed?confirmAction('Remove subscription?','Remove this read-only calendar and its feed?',async()=>{const sub=state.subscriptions.find(x=>x.calendar_id===c.id);if(sub){await safeChange('subscriptions',sub.id,null,'delete');await refreshData()}}):confirmAction('Delete '+c.name+'?','This removes the calendar and its events.',()=>safeChange('calendars',c.id,null,'delete')),true]
+  menu(x,[['Rename',()=>inlineRename(c)],['Change color',()=>calendarForm(c)],[(c.is_visible?'Hide':'Unhide'),()=>safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')],
+   [subscribed?'Remove subscription':'Delete calendar',()=>subscribed?confirmAction('Remove subscription?','Remove this read-only calendar and its feed?',async()=>{const sub=state.subscriptions.find(x=>x.calendar_id===c.id);if(sub){await safeChange('subscriptions',sub.id,null,'delete');await refreshData()}}):confirmCalendarDelete(c),true]
   ]);
  });
  upgradeIcons();
+}
+function calendarForm(existing=null){
+ const dlg=modal('<h2>'+(existing?'Calendar color':'New calendar')+'</h2><label>Name<input id="calendarFormName" maxlength="100" value="'+h(existing?.name||'')+'" placeholder="Calendar name"></label><label>Color</label><div class="calendar-swatches">'+paletteNames.map(name=>'<button type="button" class="calendar-color-swatch" data-color="'+name+'" style="--swatch:'+palette[name]+'" aria-label="'+name+'">'+icon('check',16)+'</button>').join('')+'</div><div class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="calendarFormSave">Save</button></div>');
+ const field=$('#calendarFormName',dlg),buttons=$$('[data-color]',dlg);
+ let selected=existing?Object.keys(palette).find(k=>palette[k]===colorFor(existing))||'blue':'blue';
+ const update=()=>buttons.forEach(b=>{b.classList.toggle('selected',b.dataset.color===selected);b.setAttribute('aria-pressed',String(b.dataset.color===selected))});
+ buttons.forEach(b=>b.onclick=()=>{selected=b.dataset.color;update()});update();field.focus();
+ const save=async()=>{const name=field.value.trim();if(!name){field.classList.add('invalid','shake');field.focus();return}
+  const btn=$('#calendarFormSave',dlg);loading(btn,true,'Saving…');
+  try{await change('calendars',existing?.id||null,existing?{name,shade:selected}:{name,shade:selected,is_visible:true,sort_order:state.calendars.length},existing?'update':'create');dlg.close();toast(existing?'Calendar updated':'Calendar created')}
+  catch{loading(btn,false);toast("Couldn't save — check your connection")}
+ };
+ $('#calendarFormSave',dlg).onclick=save;field.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();save()}};
+}
+function toastUndo(text,undo){
+ toast(text);const el=$('#toast');if(!el)return;
+ const button=document.createElement('button');button.type='button';button.className='undo-button';button.textContent='Undo';el.append(button);
+ clearTimeout(toast.timer);let used=false;
+ button.onclick=()=>{if(used)return;used=true;clearTimeout(toast.timer);button.disabled=true;button.textContent='Restoring…';Promise.resolve(undo()).then(()=>toast('Calendar restored')).catch(()=>toast('Could not restore calendar'))};
+ toast.timer=setTimeout(()=>el.classList.remove('show'),5000);
+}
+function confirmCalendarDelete(cal){
+ const dlg=modal('<div class="warning-circle">'+icon('warning')+'</div><h2>Delete calendar?</h2><p>Type <strong>'+h(cal.name)+'</strong> to confirm. Its events will also be deleted.</p><input id="calendarDeleteName" autocomplete="off" placeholder="'+h(cal.name)+'"><div class="footer-actions"><button class="secondary" data-close>Cancel</button><button class="danger" id="calendarDeleteConfirm" disabled>Delete calendar</button></div>');
+ const field=$('#calendarDeleteName',dlg),btn=$('#calendarDeleteConfirm',dlg);field.oninput=()=>btn.disabled=field.value!==cal.name;field.focus();
+ btn.onclick=async()=>{
+  loading(btn,true,'Deleting…');
+  const snapshot=state.events.filter(e=>e.calendar_id===cal.id).map(e=>({...e}));
+  try{
+   await api('data_delete',{entity:'calendars',id:cal.id});
+   state.calendars=state.calendars.filter(c=>c.id!==cal.id);
+   state.events=state.events.filter(e=>e.calendar_id!==cal.id);
+   dlg.close();render();
+   toastUndo('Calendar deleted — Undo',async()=>{
+    const saved=await api('data_create',{entity:'calendars',data:{name:cal.name,shade:cal.shade,is_visible:cal.is_visible,sort_order:cal.sort_order}});
+    const newCal=saved.item;
+    for(const e of snapshot){
+     const payload={calendar_id:newCal.id,title:e.title,description:e.description,location_name:e.location_name,location_address:e.location_address,starts_at:e.starts_at,ends_at:e.ends_at,all_day:e.all_day,repeat_rule:e.repeat_rule,reminder_offset_minutes:e.reminder_offset_minutes};
+     await api('data_create',{entity:'events',data:payload});
+    }
+    await refreshData();
+   });
+  }catch{loading(btn,false);toast("Couldn't delete calendar — check your connection")}
+ };
 }
 function inlineRename(c){
  const row=state.calendars.some(x=>x.id===c.id)?[...$$('#calList .cal-row')].find(x=>x.dataset.cal===c.id):null;if(!row)return;
