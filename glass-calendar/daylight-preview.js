@@ -576,20 +576,18 @@ function openPopover(occ,anchor){
  positionFloat(pop,anchor,308);popEl=pop;
  $("[data-close]",pop).onclick=closePopover;
  if(cal.subscribed){$("[data-edit]",pop).remove();$("[data-delete]",pop).remove();return}
- $("[data-edit]",pop).onclick=()=>{closePopover();openEventForm(e,null,occ)};
+
+ $("[data-edit]",pop).onclick=()=>{
+  closePopover();
+  if(e.repeat)chooseSeriesAction("Edit recurring event",scope=>openEventForm(e,null,occ,null,scope));
+  else openEventForm(e,null,occ);
+ };
  $("[data-delete]",pop).onclick=()=>{
   closePopover();
-  const perform=()=>openConfirm({title:"Delete event?",body:'Delete “'+e.title+'”? You can undo immediately.',confirmLabel:"Delete",danger:true,fn:async()=>{
-   const snapshot={...e};
-   if(!await removeEvent(e))return;
-   state.events=state.events.filter(x=>x.id!==e.id);renderAll(false);
-   toast("Event deleted",{label:"Undo",fn:async()=>{
-    const copy={...snapshot};if(await saveEvent(copy,"create")){state.events.push(copy);renderAll(false)}
-   }});
+  if(e.repeat)chooseSeriesAction("Delete recurring event",scope=>deleteWithScope(e,occ,scope));
+  else openConfirm({title:"Delete event?",body:"Delete “"+e.title+"”?",confirmLabel:"Delete",danger:true,fn:async()=>{
+   if(await removeEvent(e)){state.events=state.events.filter(x=>x.id!==e.id);renderAll(false);toast("Event deleted")}
   }});
-  if(e.repeat)openMenu($("[data-delete]",pop),[
-   {label:"Delete entire recurring series",icon:"trash",danger:true,fn:perform}
-  ]);else perform();
  };
 }
 function openConfirm(opts){
