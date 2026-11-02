@@ -76,11 +76,10 @@ export function parseCalendar(text:string):{name:string,events:FeedEvent[]}{
    if(hasRule&&!matches(p,base,rule))continue;
    considered++;if(excluded.has(ms))continue;
    if(allDay){
-    const spans=Math.max(1,Math.min(365,Math.round(duration/864e5)));
-    for(let j=0;j<spans;j++){
-     const item=shift(p,j),start=Date.UTC(item.y,item.m-1,item.d),end=start+864e5;
-     output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms+'::'+j});
-    }
+    // Preserve DTSTART VALUE=DATE and DTEND's exclusive end in one record.
+    // Rendering expands this one record into a continuous bar without UTC shifting.
+    const start=Date.UTC(p.y,p.m-1,p.d),end=start+Math.max(1,Math.round(duration/864e5))*864e5;
+    output.push({title,description,location_name:location,location_address:location,starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString(),all_day:true,repeat_rule:{},external_uid:uid+'::'+ms});
    }else{
     const start=ms,end=ms+duration;
     let cursor=start,j=0;
