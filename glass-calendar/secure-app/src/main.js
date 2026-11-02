@@ -558,6 +558,23 @@ function renderIntegrations(){
  $('#connect').onclick=subscriptionDialog;$('[data-help]').forEach(x=>x.onclick=()=>modal('<h2>'+h(x.dataset.help)+'</h2><p>'+(x.dataset.help==='CalDAV'?'Two-way CalDAV sync is not available yet.':'Direct '+h(x.dataset.help)+' account sync is not available yet. You can use Add subscription with a published .ics feed URL if your provider supports one.')+'</p><button class="primary" data-close>Done</button>'));
 }
 
+const isNativeRepeat=e=>!e?.source_subscription_id&&['daily','weekly','monthly','yearly'].includes(String(e?.repeat_rule?.frequency||'').toLowerCase());
+function occurrenceChoice(event,action,callback){
+ const dlg=modal('<h2>'+(action==='delete'?'Delete recurring event':'Change recurring event')+'</h2><p>Which occurrences should this change affect?</p><div class="occurrence-options"><button type="button" data-occurrence="only">Only this event</button><button type="button" data-occurrence="following">This and following events</button><button type="button" data-occurrence="all">All events</button></div><div class="footer-actions"><button class="secondary" data-close>Cancel</button></div>');
+ $('[data-occurrence]',dlg).forEach(b=>b.onclick=()=>{const which=b.dataset.occurrence;dlg.close();callback(which)});
+}
+async function mutateOccurrence(event,scope,mode,changes=null){
+ const base=event._origin||event;
+ const result=await api('recurrence_mutate',{id:base.id,scope,mode,occurrence_start:event._occurrence||event.starts_at,occurrence_date:event._civilDate||iso(new Date(event._occurrence||event.starts_at)),...(changes?{changes}:{})});
+ await refreshData();toast(mode==='delete'?'Event deleted':'Event updated');return result;
+}
+function deleteEventSafely(e,closeDetail){
+ const event=e._origin||e;
+ if(event.source_subscription_id)return toast('Subscribed events are read-only');
+ if(isNativeRepeat(event)){occurrenceChoice(e,'delete',async scope=>{try{await mutateOccurrence(e,scope,'delete');closeDetail?.()}catch(ex){toast(ex.message||'Could not delete event.')}});return}
+ confirmAction('Delete event?','This event will be permanently deleted.',async()=>{await safeChange('events',event.id,null,'delete');closeDetail?.();toast('Event deleted')});
+}
+
 function details(e){
  const readOnly=state.subscriptions.some(sub=>sub.calendar_id===e.calendar_id);
  const cal=state.calendars.find(c=>c.id===e.calendar_id),day=e._civilDate?date(e._civilDate):new Date(e.starts_at),range=spanRange(e),multi=spanning(e),when=multi?label(date(range.first))+' – '+label(date(range.last))+', '+date(range.last).getFullYear():(e.all_day?label(day):label(day)+' · '+prettyClock(e.starts_at)+'–'+prettyClock(e.ends_at));const dlg=modal('<div class="micro">EVENT</div><h2>'+h(e.title)+'</h2><p>'+h(when)+'</p><p class="popover-calendar"><i style="background:'+eventColor(e)+'"></i>'+h(cal?.name||'Calendar')+'</p>'+(repeatLabel(e.repeat_rule)?'<p>'+h(repeatLabel(e.repeat_rule))+'</p>':'')+'<p>'+h(e.description||'No description')+'</p><p>'+h(e.location_name||'')+'</p><div class="footer-actions"><button class="secondary" data-close>'+icon('x',16)+' Close</button>'+(readOnly?'':'<button class="secondary" id="deleteEvent">'+icon('trash',16)+' Delete</button><button class="primary" id="editEvent">'+icon('pencil',16)+' Edit</button>')+'</div>');
