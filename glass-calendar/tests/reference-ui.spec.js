@@ -2,10 +2,12 @@ import {test,expect} from '@playwright/test';
 test.use({timezoneId:'America/New_York'});
 async function start(page,theme='dark'){
  await page.clock.setFixedTime(new Date('2026-11-02T11:12:00-05:00'));
- await page.addInitScript(()=>{localStorage.removeItem('daylight-local-ui-v1');localStorage.removeItem('daylight-preview-ui-settings')});
  const errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');
+ // Clear once, before the test scenario. Do not erase user data on later reloads.
+ await page.evaluate(()=>{localStorage.removeItem('daylight-local-ui-v1');localStorage.removeItem('daylight-preview-ui-settings')});
+ await page.reload();
  await expect(page.locator('#sidebar .brand-name')).toHaveText('daylight.');
  await expect(page.locator('.month-week')).toHaveCount(6);
  if(theme==='light'){
