@@ -15,11 +15,11 @@ export async function localApi(action,payload={}){
  if(action==='user_update'){
   const first_name=String(payload.first_name||'').trim(),last_name=String(payload.last_name||'').trim();
   const result=await supabase.auth.updateUser({data:{first_name,last_name}});check(result);currentUser=result.data.user;
-  await check(supabase.from('user_settings').update({first_name}).eq('user_id',uid));return {user:currentUser};
+  check(await supabase.from('user_settings').update({first_name}).eq('user_id',uid));return {user:currentUser};
  }
  if(!isDataEntity(entity))throw Error('Unsupported data request');
  if(action==='data_list'){
-  const result=await supabase.from(table).select('*').eq('user_id',uid).order(entity==='calendars'?'sort_order':'created_at',{ascending:true});
+  const query=supabase.from(table).select('*').eq('user_id',uid);const result=entity==='settings'?await query:await query.order(entity==='calendars'?'sort_order':'created_at',{ascending:true});
   const data=check(result);
   return {items:entity==='settings'?data.map(normalizeSettings):data};
  }
@@ -61,7 +61,7 @@ export async function bootAuth(ready){
  function fail(e){document.getElementById('authError').textContent=e?.message||String(e)}
  async function start(){
   overlay.style.display='none';
-  try{await check(supabase.rpc('daylight_ensure_workspace'));await ready()}
+  try{check(await supabase.rpc('daylight_ensure_workspace'));await ready()}
   catch(e){overlay.style.display='grid';fail(e)}
  }
  const {data:{session}}=await supabase.auth.getSession();
