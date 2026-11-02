@@ -35,6 +35,7 @@ async function load(){
   state.user=result.user;
   const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
   Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});
+  if(passwordRecoveryActive){showPasswordRecovery();return}
   applyTheme();render();
  }catch(error){console.error('DAYLIGHT STARTUP ERROR',error);login()}
 }
