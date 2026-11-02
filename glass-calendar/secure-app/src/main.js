@@ -89,10 +89,10 @@ function safeChange(entity,id,data,action){
   return null;
  });
 }
-function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(!state.settings.show_declined_events?e.status!=='declined':true))}
+function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(state.settings.show_declined_events||!['declined','cancelled','canceled'].includes(String(e.status||'').toLowerCase())))}
 function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
-const eventStyle=e=>'--event-color:'+eventColor(e)+';';
+const eventStyle=e=>'--event-color:'+eventColor(e)+';'+(['declined','cancelled','canceled'].includes(String(e.status||'').toLowerCase())?'opacity:.5;filter:grayscale(1);':'');
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
@@ -362,6 +362,7 @@ function bindEventButtons(){
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
  $$('[data-detail]').forEach(x=>x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)});
 }
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();if(state.user&&!$('#settingsModal'))settings();return} },true);
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
  if(document.querySelector('#calendarDatePicker')){document.querySelector('#calendarDatePicker').remove();e.preventDefault();e.stopImmediatePropagation();return}
@@ -452,7 +453,7 @@ async function saveSetting(field,value){
  return task;
 }
 const switches={
- calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar']],
+ calendar:[['show_week_numbers','Show week numbers','Show ISO week numbers in the calendar'],['show_declined_events','Show declined events','Include declined and cancelled events, greyed out']],
  appearance:[['show_weekends','Show weekends','Include Saturday and Sunday'],['compact_mode','Compact mode','Use tighter spacing'],['reduce_motion','Reduce motion','Minimize movement and animations']],
  notifications:[['task_reminders','Task reminders','Notifications for due tasks'],['event_reminders','Event reminders','Notifications for upcoming events'],['notification_sound','Notification sound','Play a sound when a reminder appears']]
 };
@@ -637,7 +638,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event'){
   const endAt=new Date(endD+'T'+(state.timed&&!state.allDay?$('#endTime',form).value:'00:00')+':00');
   if(!state.timed||state.allDay)endAt.setDate(endAt.getDate()+1);
   if(endAt<=startAt){toast('End must be after start');return}
-  const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||'',starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
+  const entity=state.mode==='task'?'tasks':'events',data=state.mode==='task'?{title:title.value.trim(),notes:$('#quickDescription',form).value,due_date:startD}:{calendar_id:$('#calendarValue',form).value,title:title.value.trim(),description:$('#quickDescription',form).value,location_name:field.value,location_address:selectedLocation?.address||existing?.location_address||field.value.trim(),starts_at:startAt.toISOString(),ends_at:endAt.toISOString(),all_day:state.allDay||!state.timed,repeat_rule:repeatRule,reminder_offset_minutes:$('#reminderValue',form).value?Number($('#reminderValue',form).value):null};
   try{loading($('#quickSave',form),true,'Saving…');if(existing&&state.mode==='event'&&isNativeRepeat(existing._origin||existing)){loading($('#quickSave',form),false);occurrenceChoice(existing,'update',async scope=>{try{await mutateOccurrence(existing,scope,'update',data);dlg.close()}catch(ex){toast(ex.message||'Could not save event.')}});return}await change(entity,existing?.id||null,data,existing?'update':'create');dlg.close();toast(state.mode==='task'?(existing?'Task updated':'Task saved'):(existing?'Event updated':'Event created'))}catch{loading($('#quickSave',form),false);toast("Couldn't save — check your connection")}
  };
 };
