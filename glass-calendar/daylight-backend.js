@@ -5,12 +5,12 @@ const key='sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj';
 export const supabase=createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let currentUser=null;
 const ensure=()=>{if(!currentUser)throw Error('Please sign in.');return currentUser.id};
-const isDataEntity=e=>['calendars','events','tasks','settings'].includes(e);
+const isDataEntity=e=>['calendars','events','tasks','settings','exceptions'].includes(e);
 const shadeHex={blue:'#5B8DEF',violet:'#9A7FF0',green:'#43B581',amber:'#E3A93D',rose:'#E5646E',teal:'#3FB6B2',plum:'#C65D8F',gray:'#8A8F98'};
 function check(result){if(result.error)throw result.error;return result.data}
 function normalizeSettings(s){return {...s,show_week_numbers:s.week_numbers,show_declined_events:s.show_declined}}
 export async function localApi(action,payload={}){
- const uid=ensure(),entity=payload.entity,table=entity==='settings'?'user_settings':entity;
+ const uid=ensure(),entity=payload.entity,table=entity==='settings'?'user_settings':entity==='exceptions'?'event_exceptions':entity;
  if(action==='auth_session')return {user:{id:uid,first_name:currentUser.user_metadata?.first_name||currentUser.email?.split('@')[0]||'',last_name:currentUser.user_metadata?.last_name||'',email:currentUser.email}};
  if(action==='user_update'){
   const first_name=String(payload.first_name||'').trim(),last_name=String(payload.last_name||'').trim();
@@ -30,7 +30,7 @@ export async function localApi(action,payload={}){
   if(entity==='events'){
    data.location=data.location_address||data.location_name||'';
    data.recurrence=data.repeat_rule?.frequency||'never';
-   delete data.exdates;
+   if('exdates' in data){data.extra={...(data.extra||{}),exdates:data.exdates};delete data.exdates}
   }
   const result=await supabase.from(table).insert(data).select().single();
   return {item:check(result)};
@@ -38,11 +38,11 @@ export async function localApi(action,payload={}){
  if(action==='data_update'){
   if(entity==='settings'){
    const inp=payload.data||{},data={};
-   for(const [a,b] of Object.entries({theme:'theme',default_view:'default_view',show_week_numbers:'week_numbers',show_declined_events:'show_declined',reduce_motion:'reduce_motion',first_name:'first_name'}))if(a in inp)data[b]=inp[a];
+   for(const [a,b] of Object.entries({theme:'theme',default_view:'default_view',show_week_numbers:'week_numbers',show_declined_events:'show_declined',reduce_motion:'reduce_motion',first_name:'first_name',last_view:'last_view',focus_date:'focus_date'}))if(a in inp)data[b]=inp[a];
    const result=await supabase.from(table).update(data).eq('user_id',uid).select().single();return {item:check(result)};
   }
   const data={...payload.data};if(entity==='calendars'){if(data.shade)data.color=shadeHex[data.shade];if('is_visible'in data)data.visible=data.is_visible}
-  if(entity==='events'){data.location=data.location_address||data.location_name||'';data.recurrence=data.repeat_rule?.frequency||'never';delete data.exdates}
+  if(entity==='events'){data.location=data.location_address||data.location_name||'';data.recurrence=data.repeat_rule?.frequency||'never';if('exdates' in data){data.extra={...(data.extra||{}),exdates:data.exdates};delete data.exdates}}
   const result=await supabase.from(table).update(data).eq('id',payload.id).eq('user_id',uid).select().single();
   return {item:check(result)};
  }
