@@ -105,9 +105,7 @@ async function handle(req:Request){
  if(action==='user_update'){
   const first=plain(body.first_name).slice(0,60),last=plain(body.last_name).slice(0,60);
   if(!first)return fail('First name is required.',400);
-  const bearer=(req.headers.get('authorization')||'').replace(/^Bearer /,'');
-  const userClient=createClient(url,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:'Bearer '+bearer}},auth:{persistSession:false,autoRefreshToken:false}});
-  const {error}=await userClient.auth.updateUser({data:{first_name:first,last_name:last}});
+  const {error}=await db.auth.admin.updateUserById(uid,{user_metadata:{first_name:first,last_name:last}});
   if(error)return fail('Could not update profile.',400);
   return json({user:{...pair.user,first_name:first,last_name:last}});
  }
