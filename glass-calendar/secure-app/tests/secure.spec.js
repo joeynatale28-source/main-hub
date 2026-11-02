@@ -133,7 +133,7 @@ test('appearance controls preview immediately, all switches are 44 x 24',async({
  expect(color.toLowerCase()).toBe('#3b82f6');
  await page.locator('.theme-card[data-theme="light"]').click();
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await expect(page.locator('[data-theme="light"]')).toHaveClass(/picked/);
+ await expect(page.locator('.theme-card[data-theme="light"]')).toHaveClass(/picked/);
  await expect.poll(()=>model.get().settings.theme).toBe('light');
 });
 test('calendar Hide and Unhide persist, inline Rename works, collapse persists',async({page})=>{
