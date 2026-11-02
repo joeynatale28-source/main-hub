@@ -1,0 +1,21 @@
+{
+  "name": "daylight-mcp",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "check": "tsc --noEmit",
+    "smoke": "tsx tests/smoke.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "@supabase/supabase-js": "2.49.10",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "tsx": "4.20.3",
+    "typescript": "5.9.3"
+  }
+}
