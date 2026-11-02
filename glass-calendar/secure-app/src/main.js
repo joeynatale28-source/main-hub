@@ -44,22 +44,28 @@ async function change(entity,id,data,action){
  else if(action==='create')state[entity].push(result.item);
  else if(action==='delete')state[entity]=state[entity].filter(x=>x.id!==id);
  else if(action==='update')state[entity]=state[entity].map(x=>x.id===id?result.item:x);
- reflect();return result.item;
+ try{reflect()}catch(renderError){console.error('Daylight UI refresh after saved change failed',renderError)}
+ return result.item;
 }
 function safeChange(entity,id,data,action){
  const previous=structuredClone(state[entity]||[]);
  if(action==='update'&&data&&Array.isArray(state[entity])){
   state[entity]=state[entity].map(x=>x.id===id?{...x,...data}:x);
-  reflect();
+  try{reflect()}catch(renderError){console.error('Daylight optimistic UI refresh failed',renderError)}
  }
- return api('data_'+action,{entity,...(id?{id}:{}),...(data?{data}:{})}).then(result=>{
+ const request=api('data_'+action,{entity,...(id?{id}:{}),...(data?{data}:{})});
+ return request.then(result=>{
   if(action==='create')state[entity].push(result.item);
   else if(action==='delete')state[entity]=state[entity].filter(x=>x.id!==id);
   else if(action==='update')state[entity]=state[entity].map(x=>x.id===id?result.item:x);
-  reflect();return result.item;
- }).catch(e=>{
-  state[entity]=previous;reflect();
-  toast("Couldn't save — check your connection");return null;
+  try{reflect()}catch(renderError){console.error('Daylight UI refresh after saved change failed',renderError)}
+  return result.item;
+ },error=>{
+  // Only an actual rejected network/database request triggers the error toast.
+  state[entity]=previous;
+  try{reflect()}catch(renderError){console.error('Daylight rollback UI refresh failed',renderError)}
+  toast("Couldn't save — check your connection");
+  return null;
  });
 }
 function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true))}
