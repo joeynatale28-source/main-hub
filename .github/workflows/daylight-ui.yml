@@ -62,3 +62,31 @@ jobs:
           done
           echo "GitHub Pages has not served the new homepage"
           exit 1
+
+  visual-regression:
+    name: Screenshots — Midnight and Daylight at desktop/laptop sizes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: glass-calendar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install visual-test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Render and assert both themes at 1920px and 1366px
+        run: npx playwright test tests/perfection.spec.js --reporter=line --workers=1
+      - name: Preserve screenshot captures and trace on failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daylight-ui-screenshots
+          path: |
+            glass-calendar/test-results/**/*.png
+            glass-calendar/test-results/**/*.zip
+          if-no-files-found: ignore
+          retention-days: 7
