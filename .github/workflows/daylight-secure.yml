@@ -31,6 +31,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Compile secure client
         run: npm run build
+      - name: Run secure frontend browser tests
+        run: npm test
       - name: Upload compiled app
         uses: actions/upload-artifact@v4
         with:
@@ -51,3 +53,5 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Type-check MCP
         run: npm run check
+      - name: Run parser acceptance tests
+        run: npm run test:ical
