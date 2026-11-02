@@ -1172,5 +1172,21 @@ document.addEventListener("pointerdown",e=>{
  if(closeDatePickerFn&&!e.target.closest("#datePop,.picker-btn"))closeDatePickerFn();
 },true);
 matchMedia("(prefers-color-scheme:light)").addEventListener?.("change",()=>{if(state.themeMode==="system"){applyTheme();renderAll(false)}});
+
+const sentReminders=new Set();
+function checkLocalReminders(){
+ if(!("Notification" in window)||Notification.permission!=="granted")return;
+ const now=Date.now(),start=new Date(now),end=new Date(now+16*60000);
+ for(const occurrence of occsInRange(start,end)){
+  if(occurrence.ev.allDay)continue;
+  const minutes=(occurrence.start.getTime()-now)/60000;
+  if(minutes<14||minutes>16)continue;
+  const key=occurrence.ev.id+":"+occurrence.start.toISOString();
+  if(sentReminders.has(key))continue;
+  sentReminders.add(key);
+  new Notification(occurrence.ev.title,{body:"Starts in 15 minutes"});
+ }
+}
+
 setInterval(checkLocalReminders,30000);
-bootAuth(loadLocal).catch(error=>{console.error("Daylight auth startup",error);$("#main").innerHTML='<div class="empty-state">'+icon("alert",30)+'<p>Local browser storage is unavailable. Enable site storage and reload.</p></div>'});
+bootAuth(loadLocal).catch(error=>{console.error("Daylight auth startup",error);$("#main").innerHTML='<div class="empty-state">'+icon("alert",30)+'<p>Daylight could not start. Refresh the page or check your connection.</p></div>'});
