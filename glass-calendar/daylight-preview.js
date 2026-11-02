@@ -1,4 +1,4 @@
-import {localApi,localReset,bootAuth,signOut} from './daylight-backend.js';
+import {localApi,localReset,bootAuth,signOut,feedAction} from './daylight-backend.js';
 "use strict";
 /* Daylight: working implementation of the user's supplied one-page UI.
  * A browser-only application. All CRUD is through localApi; no logins, syncing or MCP. */
@@ -103,7 +103,7 @@ async function loadLocal(){
   localApi("data_list",{entity:"events"}),localApi("data_list",{entity:"settings"})]);
  const s=st.items[0]||{},prefs=readUIPrefs();
  state.firstName=ur.user?.first_name||"Joey";state.lastName=ur.user?.last_name||"";
- state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local"}));
+ state.calendars=ca.items.map(c=>({id:c.id,name:c.name,color:PALETTE[c.shade]?c.shade:"blue",hidden:c.is_visible===false,subscribed:c.source_type!=="local",feedUrl:c.source_url||null}));
  state.events=ev.items.map(eventFromData);
  state.settings=s;state.themeMode=s.theme||"dark";
  state.view=s.default_view||"week";state.weekNumbers=!!s.show_week_numbers;
@@ -632,7 +632,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
  repeat.onclick=()=>openMenu(repeat,[{label2:"Repeat"},...[
   ["none","None"],["daily","Daily"],["weekly","Weekly"],["monthly","Monthly"],["yearly","Yearly"]
  ].map(([k,label])=>({label,right:(f.repeat||"none")===k?"check":null,fn:()=>{f.repeat=k==="none"?null:k;dirty();sync()}}))]);
- calendar.onclick=()=>openMenu(calendar,[{label2:"Calendar"},...state.calendars.map(c=>({label:c.name,right:f.cal===c.id?"check":null,fn:()=>{f.cal=c.id;dirty();sync()}}))]);
+ calendar.onclick=()=>openMenu(calendar,[{label2:"Calendar"},...state.calendars.filter(c=>!c.subscribed).map(c=>({label:c.name,right:f.cal===c.id?"check":null,fn:()=>{f.cal=c.id;dirty();sync()}}))]);
  const close=()=>{closeDatePicker();closeMenu();bd.remove()};
  const tryClose=()=>{
   if(f.dirty)openConfirm({title:"Discard changes?",body:"You have unsaved changes to this event. Discarding them cannot be undone.",confirmLabel:"Discard",danger:true,fn:close});else close();
@@ -710,7 +710,7 @@ function openSettings(section="general"){
  const rail=el('<div class="settings-rail"><div class="sr-title">Settings</div></div>');
  const sections=[
   ["general","sliders","General"],["appearance","droplet","Appearance"],["calendar","calendar","Calendar"],
-  ["notifications","bell","Notifications"],["data","download","Local data"],["about","info","About"]
+  ["notifications","bell","Notifications"],["data","download","Data & sync"],["about","info","About"]
  ];
  const pane=el('<div class="settings-pane"></div>');
  const close=()=>{bd.remove();renderAll(false)};
@@ -805,9 +805,31 @@ function exportData(){
  }catch{toast("Could not export local data")}
 }
 function paneData(pane,close){
- paneHead(pane,"Data & sync","Your calendar data is saved securely to your Supabase account.");
- const g=el('<div class="set-group"><div class="set-group-title">Account data</div><p class="inline-note">'+state.calendars.length+' calendars · '+state.events.length+' events</p><p class="inline-note">Changes save to your private account. To sign out, use the button below.</p><button class="btn-ghost" id="signout">Log out</button></div>');
+ paneHead(pane,"Data & sync","Connect read-only iCalendar subscriptions and manage account access.");
+ const feeds=state.calendars.filter(c=>c.subscribed);
+ const g=el('<div class="set-group"><div class="set-group-title">Subscribed calendars</div><div id="feedsInSettings"></div>'+
+ '<div class="field"><label for="feedName">Name (optional)</label><input id="feedName" class="text-input" placeholder="Calendar name"></div>'+
+ '<div class="field"><label for="feedUrl">Public .ics or webcal URL</label><input id="feedUrl" class="text-input" placeholder="https://example.org/calendar.ics"><div id="feedError" class="field-err"></div></div>'+
+ '<button id="addFeed" class="btn-primary" style="margin-left:0">Add subscription</button><p class="inline-note">Feeds are fetched on the server. Subscribed events cannot be edited or dragged.</p></div>'+
+ '<div class="set-group"><div class="set-group-title">Account</div><button class="btn-ghost" id="signout">Log out</button></div>');
  pane.append(g);
+ const list=$("#feedsInSettings",g);
+ if(!feeds.length)list.append(el('<div class="empty-state" style="padding:12px 0 24px"><p>No subscriptions yet.</p></div>'));
+ for(const c of feeds){
+  const row=el('<div class="feed-row"><span class="pop-dot" style="background:'+dotOf(c)+';margin:0"></span><span style="min-width:0;flex:1"><b>'+esc(c.name)+'</b><br><small style="color:var(--muted);word-break:break-all">'+esc(c.feedUrl||"Subscribed calendar")+'</small></span><button class="icon-btn" data-refresh title="Refresh subscription">'+icon("sync",16)+'</button><button class="icon-btn" data-unsub title="Unsubscribe">'+icon("trash",16)+'</button></div>');
+  $("[data-refresh]",row).onclick=async()=>{const button=$("[data-refresh]",row);button.disabled=true;try{const result=await feedAction("refresh",{calendar_id:c.id});toast("Imported "+result.events+" feed events");close();await loadLocal()}catch(e){$("#feedError",g).textContent=e.message}finally{button.disabled=false}};
+  $("[data-unsub]",row).onclick=()=>openConfirm({title:"Unsubscribe from "+c.name+"?",body:"This removes the subscription and its read-only events.",confirmLabel:"Unsubscribe",danger:true,fn:async()=>{try{await feedAction("remove",{calendar_id:c.id});close();await loadLocal();toast("Subscription removed")}catch(e){toast(e.message)}}});
+  list.append(row);
+ }
+ $("#addFeed",g).onclick=async()=>{
+  const button=$("#addFeed",g),error=$("#feedError",g);error.textContent="";
+  const url=$("#feedUrl",g).value.trim(),name=$("#feedName",g).value.trim();
+  if(!url){error.textContent="Enter a calendar URL.";return}
+  button.disabled=true;
+  try{const result=await feedAction("add",{url,name});toast("Imported "+result.events+" feed events");close();await loadLocal()}
+  catch(e){error.textContent=e.message||"Could not add this feed."}
+  finally{button.disabled=false}
+ };
  $("#signout",g).onclick=async()=>{close();await signOut();location.reload()};
 }
 function paneAbout(pane){
