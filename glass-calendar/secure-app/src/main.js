@@ -1,4 +1,5 @@
 import {icon,upgradeIcons,startIcons} from './icons.js';
+import {instances,weekSegments,bounds,rangeLabel,agendaRange,isSpanning,dayDelta,plusCivil} from './spans.js';
 import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
 const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
@@ -108,11 +109,12 @@ function safeChange(entity,id,data,action){
 }
 function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(!state.settings.show_declined_events?e.status!=='declined':true))}
 function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
+function spanItems(from=iso(add(now(),-400)),to=iso(add(now(),450))){return instances(visible(),from,to)}
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+eventColor(e)+';';
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
-const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
+const getOccurrence=(id,when)=>spanItems(iso(add(now(),-1000)),iso(add(now(),1200))).find(e=>e.id===id&&e._occurrence===when)||state.events.find(e=>e.id===id);
 function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
 function nav(page,title,ico){return '<button class="nav '+(state.page===page?'selected':'')+'" title="'+h(title)+'" data-tooltip="'+h(title)+'" aria-label="'+h(title)+'" data-nav="'+page+'"><span class="glyph">'+ico+'</span>'+title+'</button>'}
 function bindRailTooltips(){
@@ -247,45 +249,66 @@ function renderCalendar(){
  $('#searchClose').onclick=closeSearch;
  $('#searchQuery').onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();closeSearch()}};
  $('#searchQuery').oninput=e=>{
-  const q=e.target.value.trim(),results=occurrences(add(now(),-700),add(now(),1095)).filter(x=>x.title.toLowerCase().includes(q.toLowerCase())).slice(0,40);
-  $('#searchResults').innerHTML=q?(results.length?results.map(x=>'<button '+eventAttr(x)+'>'+h(x.title)+' · '+h(prettyShort(x._civilDate+'T12:00:00'))+'</button>').join(''):'<p class="empty-results">No results for &#39;'+h(q)+'&#39;</p>'):'';
+  const q=e.target.value.trim(),results=spanItems(iso(add(now(),-700)),iso(add(now(),1095))).filter(x=>x.title.toLowerCase().includes(q.toLowerCase())).slice(0,40);
+  $('#searchResults').innerHTML=q?(results.length?results.map(x=>'<button '+eventAttr(x)+'>'+h(x.title)+' · '+h(prettyShort(x._first+'T12:00:00'))+'</button>').join(''):'<p class="empty-results">No results for &#39;'+h(q)+'&#39;</p>'):'';
   bindEventButtons();
  };
  if(state.view==='month')renderMonth();else if(state.view==='agenda')renderAgenda();else renderWeek();
  upgradeIcons();
 }
+// A single multi-day span is painted above cell borders with one interactive hit surface.
 function renderMonth(){
- const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7)),count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
- const items=occurrences(add(start,-1),add(start,count+1));
- let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="monthcells '+(state.settings.show_week_numbers?'numbered':'')+'" style="--weeks:'+count/7+'">';
- for(let i=0;i<count;i++){
-  const t=add(start,i),key=iso(t),events=items.filter(e=>eventOn(e,key));
-  html+='<div class="monthcell '+(t.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">';
-  if(state.settings.show_week_numbers&&i%7===0)html+='<span class="weeknum">W'+isoWeek(t)+'</span>';
-  html+='<button class="datenum '+(key===iso(now())?'today':'')+'" data-drill="'+key+'">'+t.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button>'+
-   events.slice(0,3).map(e=>'<button class="eventchip" '+eventAttr(e)+'>'+h(e.title)+'</button>').join('')+'</div>';
+ const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
+ const count=Math.ceil(((first.getDay()-shift+7)%7+new Date(d.getFullYear(),d.getMonth()+1,0).getDate())/7)*7;
+ const items=spanItems(iso(add(start,-1)),iso(add(start,count+1)));
+ let html='<div class="weekdays">'+Array.from({length:7},(_,i)=>'<span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(i+shift)%7]+'</span>').join('')+'</div><div class="spanning-month">';
+ for(let week=0;week<count/7;week++){
+  const begin=iso(add(start,week*7)),row=weekSegments(items,begin),shown=row.filter(e=>e.lane<3);
+  html+='<div class="monthweek">';
+  for(let i=0;i<7;i++){
+   const day=add(start,week*7+i),key=iso(day),overflow=row.filter(e=>e.lane>=3&&e.startCol<=i&&e.startCol+e.span>i).length;
+   html+='<div class="monthcell '+(day.getMonth()!==d.getMonth()?'outside':'')+'" data-cell="'+key+'">'+
+    (state.settings.show_week_numbers&&i===0?'<small class="weeknum">W'+isoWeek(day)+'</small>':'')+
+    '<button class="datenum '+(key===iso(now())?'today':'')+'" data-drill="'+key+'">'+day.getDate()+'</button><button class="cellplus" data-add="'+key+'" aria-label="Add on '+key+'">'+icon('plus',16)+'</button>'+
+    (overflow?'<button class="month-more" data-more="'+key+'">+'+overflow+' more</button>':'')+'</div>';
+  }
+  html+='<div class="span-layer">'+shown.map(e=>{
+   const cls=(e.leftOpen?'open-left ':'')+(e.rightOpen?'open-right ':'');
+   return '<button class="span-bar '+cls+'" '+eventAttr(e,'grid-column:'+(e.startCol+1)+' / span '+e.span+';grid-row:'+(e.lane+1)+';')+' title="'+h(e.title)+'">'+(e._first<begin?'<span class="span-continuation">'+h(e.title)+'</span>':h(e.title))+'</button>';
+  }).join('')+'</div></div>';
  }
- $('#grid').innerHTML=html+'</div>';bindEventButtons();
+ $('#grid').innerHTML=html+'</div>';bindEventButtons();bindDragEvents();
+ $$('[data-more]').forEach(b=>b.onclick=()=>drill(b.dataset.more));
 }
 function renderWeek(){
- const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7)),days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),events=occurrences(add(start,-1),add(start,days.length+1));
- let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
- html+='<div class="all-day-strip" style="--cols:'+days.length+'"><span>all day</span>'+days.map(day=>'<div class="all-day-day">'+events.filter(x=>x.all_day&&eventOn(x,iso(day))).map(x=>'<button class="all-day-chip" '+eventAttr(x)+'>'+h(x.title)+'</button>').join('')+'</div>').join('')+'</div>';
+ const d=state.date,shift=state.settings.start_of_week==='monday'?1:0,start=state.view==='day'?d:add(d,-((d.getDay()-shift+7)%7));
+ const days=Array.from({length:state.view==='day'?1:7},(_,i)=>add(start,i)),startDay=iso(start);
+ const events=spanItems(iso(add(start,-2)),iso(add(start,days.length+1)));
+ const whole=events.filter(e=>e.all_day||isSpanning(e)),laneData=weekSegments(whole,startDay,days.length);
+ let html='<div class="weekwrapper"><div class="weekhead" style="--cols:'+days.length+'"><div>'+(state.settings.show_week_numbers?'W'+isoWeek(start):'')+'</div>'+
+ days.map(t=>'<div><small>'+t.toLocaleDateString('en-US',{weekday:'short'})+'</small><button data-drill="'+iso(t)+'">'+t.getDate()+'</button><button data-add="'+iso(t)+'" aria-label="Add event">'+icon('plus',16)+'</button></div>').join('')+'</div>';
+ html+='<div class="all-day-strip spanning-strip" style="--cols:'+days.length+';--lanes:'+Math.max(1,Math.min(6,laneData.length?1+Math.max(...laneData.map(e=>e.lane)):1))+'"><span>all day</span><div class="span-week-layer">'+laneData.filter(e=>e.lane<6).map(e=>'<button class="span-bar '+(e.leftOpen?'open-left ':'')+(e.rightOpen?'open-right ':'')+'" '+eventAttr(e,'grid-column:'+(e.startCol+1)+' / span '+e.span+';grid-row:'+(e.lane+1)+';')+'>'+h(e.title)+'</button>').join('')+'</div></div>';
  html+='<div class="weekbody" style="--cols:'+days.length+'"><div class="hours">'+Array.from({length:24},(_,i)=>'<span style="top:'+(i*60)+'px">'+(i%12||12)+' '+(i<12?'AM':'PM')+'</span>').join('')+'</div>';
  for(const t of days){
   const key=iso(t);html+='<div class="daytrack" data-slot="'+key+'">';
-  for(const e of events.filter(x=>!x.all_day&&eventOn(x,key))){
-   const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=e._segment?0:st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,e._segment?60:(ed-st)/60000));
-   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+'><strong>'+h(e.title)+'</strong></button>';
+  for(const e of events.filter(x=>!x.all_day&&!isSpanning(x)&&x._first===key)){
+   const st=new Date(e.starts_at),ed=new Date(e.ends_at),minute=st.getHours()*60+st.getMinutes(),height=Math.max(25,Math.min(1440-minute,(ed-st)/60000));
+   html+='<button class="weekevent" '+eventAttr(e,'top:'+minute+'px;height:'+height+'px;')+'><span class="resize-handle top" data-resize="start"></span><strong>'+h(e.title)+'</strong><span class="resize-handle bottom" data-resize="end"></span></button>';
   }html+='</div>';
  }
- $('#grid').innerHTML=html+'</div></div>';bindEventButtons();
- $$('[data-slot]').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;const m=Math.max(0,Math.min(1425,Math.floor((e.clientY-el.getBoundingClientRect().top)/15)*15));openEditor(null,el.dataset.slot,String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))});
+ $('#grid').innerHTML=html+'</div></div>';bindEventButtons();bindDragEvents();
+ $$('[data-slot]').forEach(el=>el.onpointerdown=e=>{
+  if(e.target.closest('button'))return;
+  const r=el.getBoundingClientRect(),at=Math.max(0,Math.min(1425,Math.floor((e.clientY-r.top)/15)*15));
+  openEditor(null,el.dataset.slot,String(Math.floor(at/60)).padStart(2,'0')+':'+String(at%60).padStart(2,'0'));
+ });
 }
 function renderAgenda(){
- const today=iso(now()),items=occurrences(add(now(),-1),add(now(),370)).filter(x=>eventDate(x)>=today),days=[...new Set(items.map(x=>eventDate(x)))];
- $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>eventOn(x,d)).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(x.all_day?'All day':h(prettyClock(x.starts_at)))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
+ const today=iso(now()),items=spanItems(today,iso(add(now(),370))).filter(e=>e._last>=today);
+ const days=[...new Set(items.map(e=>e._first))];
+ $('#grid').innerHTML='<div class="agenda">'+(days.length?days.map(d=>'<div class="agenda-group"><button class="agenda-date" data-drill="'+d+'">'+h(label(date(d)))+'</button>'+items.filter(x=>x._first===d).map(x=>'<button class="agenda-item" '+eventAttr(x)+'><span class="agenda-title"><i class="event-dot"></i><strong>'+h(x.title)+'</strong></span><small>'+(agendaRange(x)|| (x.all_day?'All day':h(prettyClock(x.starts_at))))+'</small></button>').join('')+'</div>').join(''):'<div class="whole-empty"><span class="empty-icon"></span><p>No upcoming events</p></div>')+'</div>';bindEventButtons();
 }
+
 function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
