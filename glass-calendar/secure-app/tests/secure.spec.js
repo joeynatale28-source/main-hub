@@ -387,7 +387,7 @@ test('changing calendar color re-tints existing event and rail tooltips render',
  await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
  await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
  await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
- const chip=page.locator('.eventchip').filter({hasText:'Color change'});
+ const chip=page.locator('.span-bar').filter({hasText:'Color change'});
  await expect(chip).toHaveCount(1);
  expect((await chip.getAttribute('style')).toLowerCase()).toContain(palette.rose);
 });
