@@ -124,7 +124,7 @@ function bindRailTooltips(){
 }
 function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand" title="Calendar home" data-tooltip="Calendar home"><span class="logo">'+icon('brand',22)+'</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="'+(state.collapsed?'Expand':'Collapse')+' sidebar" title="'+(state.collapsed?'Expand':'Collapse')+' sidebar" data-tooltip="'+(state.collapsed?'Expand':'Collapse')+' sidebar">'+icon(state.collapsed?'panel-left-open':'panel-left-close',16)+'</button></div><div class="side-middle"><button id="newEvent" class="primary block" title="New event" data-tooltip="New event">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar" aria-label="Add calendar">'+icon('plus',16)+'</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings" data-tooltip="Settings"><span class="glyph">'+icon('settings')+'</span>Settings</button><button class="nav" id="about" title="About" data-tooltip="About"><span class="glyph">'+icon('info')+'</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>'+h(state.user.email||'')+'</small></span><button class="icon" id="profileMenu" aria-label="Profile menu">'+icon('more-horizontal')+'</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
  $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
- $('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
+ $$('[data-nav]').forEach(x=>x.onclick=()=>{state.page=x.dataset.nav;render()});
  $('#settings').onclick=()=>settings();$('#about').onclick=()=>settings('about');$('#profileMenu').onclick=()=>menu($('#profileMenu'),[['Settings',()=>settings()],['Log out',logout]]);
  $('#collapseRail').onclick=()=>{state.collapsed=!state.collapsed;localStorage.setItem('daylight-rail-collapsed',state.collapsed?'1':'0');render()};
  $('#newCalendar').onclick=()=>calendarForm();
@@ -266,7 +266,7 @@ function renderCalendar(){
  };
  if(state.view==='month')renderMonth();else if(state.view==='agenda')renderAgenda();else renderWeek();
  if(uiGridDirection){$('#grid')?.classList.add(uiGridDirection>0?'ui-page-next':'ui-page-prev');uiGridDirection=0}else if(uiPreviousView!==state.view){$('#grid')?.classList.add('ui-view-enter')}uiPreviousView=state.view;
- $('#grid .month-span-bar,#grid .all-day-span,#grid .eventchip').slice(0,8).forEach((el,i)=>el.style.setProperty('--chip-index',i));
+ $$('#grid .month-span-bar,#grid .all-day-span,#grid .eventchip').slice(0,8).forEach((el,i)=>el.style.setProperty('--chip-index',i));
  upgradeIcons();
 }
 function isLong(e){return e._segments>1||new Date(e.ends_at).getTime()-new Date(e.starts_at).getTime()>86400000||daykey(new Date(e.starts_at))!==daykey(new Date(new Date(e.ends_at).getTime()-1))}
@@ -332,7 +332,7 @@ function bindEventButtons(){
  $$('[data-drill]').forEach(x=>x.onclick=e=>{e.stopPropagation();drill(x.dataset.drill)});
  $$('[data-add]').forEach(x=>x.onclick=e=>{e.stopPropagation();openEditor(null,x.dataset.add)});
  $$('[data-cell]').forEach(x=>x.onclick=e=>{if(!e.target.closest('button'))openEditor(null,x.dataset.cell)});
- $('[data-detail]').forEach(x=>{x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)};x.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(!ev)return;const readOnly=state.subscriptions.some(sub=>sub.calendar_id===ev.calendar_id);menu(x,[['View details',()=>details(ev)],...(!readOnly?[['Edit event',()=>openEditor(ev._origin||ev,null,null,'event',ev)],['Delete event',()=>changeOccurrence(ev,'delete'),true]]:[])]);}});
+ $$('[data-detail]').forEach(x=>{x.onclick=e=>{e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(ev)details(ev)};x.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const ev=getOccurrence(x.dataset.detail,x.dataset.occ);if(!ev)return;const readOnly=state.subscriptions.some(sub=>sub.calendar_id===ev.calendar_id);menu(x,[['View details',()=>details(ev)],...(!readOnly?[['Edit event',()=>openEditor(ev._origin||ev,null,null,'event',ev)],['Delete event',()=>changeOccurrence(ev,'delete'),true]]:[])]);}});
 }
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
