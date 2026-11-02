@@ -811,7 +811,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
   sDate:sod(base?.start||presetDate||state.selected),eDate:sod(rawEnd||presetEndDate||presetDate||state.selected),
   sMin:base&&!src?.allDay?base.start.getHours()*60+base.start.getMinutes():(presetMinutes??nextHour*60),
   eMin:base&&!src?.allDay?base.end.getHours()*60+base.end.getMinutes():Math.min(1430,(presetMinutes??nextHour*60)+60),
-  repeat:src?.repeat||null,rrule:src?.rrule||null,loc:src?.loc||"",dirty:false
+  repeat:src?.repeat||null,rrule:src?.rrule||null,loc:src?.loc||"",description:src?.description||"",dirty:false
  };
  if(f.eMin<=f.sMin)f.eMin=Math.min(1430,f.sMin+60);
  const bd=el('<div class="backdrop"></div>'),dlg=el('<div class="dialog" role="dialog" aria-modal="true"></div>');
@@ -827,7 +827,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
   '</div>'+
   '<div class="field"><label>Repeats</label><button class="picker-btn" id="efRepeat">'+icon("repeat",15)+'<span></span><span style="margin-left:auto;color:var(--muted)">'+icon("chevD",15)+'</span></button></div>'+
   '<div class="field"><label for="efLoc">Location</label><input class="text-input" id="efLoc" placeholder="Add a location" value="'+esc(f.loc)+'"></div>'+
-  '<div class="field"><label>Calendar</label><button class="picker-btn" id="efCal"><span></span><span style="margin-left:auto;color:var(--muted)">'+icon("chevD",15)+'</span></button></div>'+
+  '<div class="field"><label for="efDescription">Description</label><textarea class="text-area" id="efDescription" rows="3" placeholder="Add notes">'+esc(f.description)+'</textarea></div>'+  '<div class="field"><label>Calendar</label><button class="picker-btn" id="efCal"><span></span><span style="margin-left:auto;color:var(--muted)">'+icon("chevD",15)+'</span></button></div>'+
  '</div><div class="dialog-foot"><button class="btn-ghost" data-cancel>Cancel</button><button class="btn-primary" style="margin-left:0" data-save>'+(src?"Save changes":"Create event")+'</button></div>';
  bd.append(dlg);overlayRoot.append(bd);
  const title=$("#efTitle",dlg),loc=$("#efLoc",dlg),all=$("#efAllDay",dlg),startDate=$("#efSDate",dlg),endDate=$("#efEDate",dlg),
@@ -845,7 +845,7 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
  }
  sync();title.focus();
  title.oninput=()=>{f.title=title.value;title.classList.remove("err");$("#efTitleErr",dlg).classList.remove("show");dirty()};
- loc.oninput=()=>{f.loc=loc.value;dirty()};
+ loc.oninput=()=>{f.loc=loc.value;dirty()};$("#efDescription",dlg).oninput=()=>{f.description=$("#efDescription",dlg).value;dirty()};
  all.onchange=()=>{f.allDay=all.checked;dirty();sync()};
  startDate.onclick=()=>openDatePicker(startDate,f.sDate,date=>{f.sDate=date;if(f.eDate<date)f.eDate=date;dirty();sync()});
  endDate.onclick=()=>openDatePicker(endDate,f.eDate,date=>{f.eDate=date;if(f.sDate>date)f.sDate=date;dirty();sync()});
@@ -869,8 +869,8 @@ function openEventForm(existing=null,presetDate=null,occ=null,presetMinutes=null
    end=dt(f.eDate.getFullYear(),f.eDate.getMonth(),f.eDate.getDate(),Math.floor(f.eMin/60),f.eMin%60);
    if(end<=start)end=new Date(start.getTime()+30*60000);
   }
-  const e=src?{...src,title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,rrule:f.rrule}:{
-   id:id(),title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),repeat:f.repeat,rrule:f.rrule,declined:false
+  const e=src?{...src,title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),description:f.description,repeat:f.repeat,rrule:f.rrule}:{
+   id:id(),title:f.title,cal:f.cal,allDay:f.allDay,start,end,loc:loc.value.trim(),description:f.description,repeat:f.repeat,rrule:f.rrule,declined:false
   };
   const button=$("[data-save]",dlg);button.disabled=true;
   if(src&&occ&&scope==="only"){
