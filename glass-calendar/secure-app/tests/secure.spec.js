@@ -333,3 +333,59 @@ test('calendar delete requires exact name and exposes Undo',async({page})=>{
  await expect.poll(()=>model.get().calendars.length).toBe(1);
  await expect(page.locator('#calList')).toContainText('Personal');
 });
+
+test('search shows no-match copy and Escape closes without losing the calendar',async({page})=>{
+ await setup(page);await page.locator('#searchButton').click();
+ await page.locator('#searchQuery').fill('zzzz-no-events-987');
+ await expect(page.locator('#searchResults')).toContainText("No results for 'zzzz-no-events-987'");
+ await page.locator('#searchQuery').press('Escape');
+ await expect(page.locator('#searchBar')).toBeHidden();
+ await expect(page.locator('.weekwrapper')).toBeVisible();
+});
+test('changing start time shifts end by one hour and saves correct duration',async({page})=>{
+ const model=await setup(page);await page.locator('#newEvent').click();await page.locator('#quickTitle').fill('Time shift');
+ await page.locator('#addTime').click();
+ const oldStart=await page.locator('#startTime').inputValue();
+ const parts=oldStart.split(':').map(Number),newHour=(parts[0]+2)%24;
+ const newStart=String(newHour).padStart(2,'0')+':00';
+ await page.locator('[data-pick="startTime"]').click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:newStart}).first().click();
+ expect(await page.locator('#startTime').inputValue()).toBe(newStart);
+ const end=(await page.locator('#endTime').inputValue()).split(':').map(Number);
+ expect((end[0]-newHour+24)%24).toBe(1);
+ await page.locator('#quickSave').click();
+ await expect.poll(()=>model.get().events.length).toBe(1);
+ const ev=model.get().events[0];expect(Math.round((new Date(ev.ends_at)-new Date(ev.starts_at))/60000)).toBe(60);
+});
+test('changing calendar color re-tints existing event and rail tooltips render',async({page})=>{
+ const model=await setup(page);await page.locator('#newEvent').click();
+ await page.locator('#quickTitle').fill('Color change');await page.locator('#quickSave').click();
+ await expect.poll(()=>model.get().events.length).toBe(1);
+ await page.locator('#calList [data-menu]').first().click();
+ await page.locator('#floatingMenu [data-item]').filter({hasText:'Change color'}).click();
+ await page.locator('[data-color="rose"]').click();await page.locator('#calendarFormSave').click();
+ await expect.poll(()=>model.get().calendars[0].shade).toBe('rose');
+ await page.locator('#collapseRail').click();
+ await page.locator('[data-nav="tasks"]').hover();
+ await expect(page.locator('#railTooltip')).toContainText('Tasks');
+ await page.locator('#collapseRail').click();
+ await page.locator('#settings').click();await page.locator('[data-sec="calendar"]').click();
+ await page.locator('[data-select="default_view"]').click();await page.locator('#floatingMenu [data-item]').filter({hasText:'Month'}).click();
+ await page.locator('#settingsModal .dialog-close').click();await page.locator('#brand').click();
+ const chip=page.locator('.eventchip').filter({hasText:'Color change'});
+ await expect(chip).toHaveCount(1);
+ expect((await chip.getAttribute('style')).toLowerCase()).toContain(palette.rose);
+});
+test('editing first name updates sidebar and greeting on the same page',async({page})=>{
+ const model=await setup(page);await page.locator('#settings').click();
+ await page.locator('#firstName').fill('Taylor');await page.locator('#firstName').press('Enter');
+ await expect.poll(()=>model.get().user.first_name).toBe('Taylor');
+ await expect(page.locator('.profile')).toContainText('Taylor');
+ await page.locator('#settingsModal .dialog-close').click();
+ await expect(page.locator('.greeting')).toContainText('Taylor');
+});
+test('timed cross-midnight and native multi-day expansion includes each civil day',()=>{
+ const ev={id:'cross',starts_at:'2026-11-02T23:30:00',ends_at:'2026-11-03T00:30:00',all_day:false,repeat_rule:{frequency:'never'}};
+ const expanded=expandEvents([ev],new Date(2026,10,1),new Date(2026,10,6));
+ expect(expanded.map(eventDate)).toEqual(['2026-11-02','2026-11-03']);
+});
