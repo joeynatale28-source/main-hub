@@ -1,11 +1,24 @@
 import {greeting,expandEvents,eventDate,palette} from '../src/polish.js';
 import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{page.on('pageerror',err=>console.log('DAYLIGHT PAGE ERROR:',err.message,err.stack));page.on('console',msg=>{if(msg.type()==='error')console.log('DAYLIGHT CONSOLE ERROR:',msg.text())})});
-const account={id:'11111111-1111-4111-8111-111111111111',first_name:'Example',last_name:'Person',username:'example',is_admin:true};
+const account={id:'11111111-1111-4111-8111-111111111111',email:'example@daylight.test',first_name:'Example',last_name:'Person',user_metadata:{first_name:'Example',last_name:'Person'},aud:'authenticated',role:'authenticated',created_at:'2026-11-01T00:00:00Z'};
 const calendar={id:'22222222-2222-4222-8222-222222222222',name:'Personal',client_id:'personal',shade:'gray-1',sort_order:0,is_visible:true};
 function makeSettings(){return{theme:'dark',default_view:'week',start_of_week:'sunday',accent:'graphite',custom_accent_hex:null,show_weekends:true,compact_mode:false,reduce_motion:false,mcp_allow_delete:false,default_reminder_minutes:15}}
 async function setup(page,{loggedIn=true,failLogin=false}={}){
  let settings=makeSettings(),calendars=[{...calendar}],events=[],tasks=[],subscriptions=[],tokens=[],user={...account};
+ const authUser={...account},jwt='eyJhbGciOiJIUzI1NiJ9.'+Buffer.from(JSON.stringify({sub:account.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+86400*30})).toString('base64url')+'.testing';
+ const session={access_token:jwt,refresh_token:'mock-refresh-token',expires_in:86400,expires_at:Math.floor(Date.now()/1000)+86400,token_type:'bearer',user:authUser};
+ await page.route('https://mock.supabase.co/auth/v1/**',async route=>{
+  const request=route.request(),target=new URL(request.url());
+  if(target.pathname.endsWith('/token')&&target.searchParams.get('grant_type')==='password'){
+   if(failLogin)return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({msg:'Invalid login credentials',error:'invalid_grant'})});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(session)});
+  }
+  if(target.pathname.endsWith('/user'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(authUser)});
+  if(target.pathname.endsWith('/recover'))return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+  if(target.pathname.endsWith('/logout'))return route.fulfill({status:204,body:''});
+  return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+ });
  await page.route('https://mock.supabase.co/functions/v1/daylight-release',async route=>{
   const req=route.request().postDataJSON(),action=req.action;
   const success=(obj)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(obj)});
@@ -31,18 +44,21 @@ async function setup(page,{loggedIn=true,failLogin=false}={}){
   if(action==='sub_refresh')return success({count:0,item:subscriptions.find(x=>x.id===req.id)});
   return success({ok:true});
  });
- if(loggedIn)await page.addInitScript(()=>localStorage.setItem('dl-release-session','temporary-test-token'));
+ if(loggedIn)await page.addInitScript(session=>localStorage.setItem('sb-mock-auth-token',JSON.stringify(session)),session);
  await page.goto('/');
  return{get:()=>({settings,calendars,events,tasks,subscriptions,tokens,user})};
 }
-test('no session shows only login and no signup',async({page})=>{
+test('email login has no signup; failed auth and password reset use Supabase flows',async({page})=>{
  await setup(page,{loggedIn:false,failLogin:true});
  await expect(page.locator('#login')).toBeVisible();
- await expect(page.getByText("Accounts are created by Joey")).toBeVisible();
+ await expect(page.locator('#email')).toBeVisible();
+ await expect(page.locator('#username')).toHaveCount(0);
  await expect(page.locator('#newEvent')).toHaveCount(0);
- await page.locator('#username').fill('nonexistent');await page.locator('#password').fill('anything');
+ await page.locator('#email').fill('notfound@daylight.test');await page.locator('#password').fill('anything');
  await page.locator('#loginBtn').click();
- await expect(page.locator('#authError')).toHaveText("That username and password don't match.");
+ await expect(page.locator('#authError')).toContainText('Invalid login credentials.');
+ await page.locator('#forgotPassword').click();
+ await expect(page.locator('#authError')).toContainText('password reset link');
 });
 test('authenticated calendar loads in Week at today',async({page})=>{
  await setup(page);
