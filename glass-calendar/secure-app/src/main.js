@@ -531,12 +531,12 @@ function enableCalendarDrag(){
   if(item&&state.subscriptions.some(s=>s.calendar_id===getOccurrence(item.dataset.detail,item.dataset.occ)?.calendar_id))return;
   const original=item?getOccurrence(item.dataset.detail,item.dataset.occ):null;
   const startCell=cell?.dataset.cell;
-  drag={id:e.pointerId,x:e.clientX,y:e.clientY,item,original,startCell,edge:e.target.dataset.resize||null,started:false};grid.setPointerCapture(e.pointerId);
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,item,original,startCell,edge:e.target.dataset.resize||null,started:false};
  };
  grid.onpointermove=e=>{
   if(!drag||e.pointerId!==drag.id)return;
   if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
-  if(!drag.started){drag.started=true;document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
+  if(!drag.started){drag.started=true;grid.setPointerCapture(e.pointerId);document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
   drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round((e.clientY-drag.y)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
   e.preventDefault();
  };
@@ -682,7 +682,7 @@ function checkReminders(){
  }
 }
 setInterval(checkReminders,30000);
-document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key===','){e.preventDefault();if(state.user)settings()}});
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.key===','||e.code==='Comma')){e.preventDefault();if(state.user)settings()}});
 startIcons();
 if(!configured){root.innerHTML='<main class="center"><div class="login"><div class="mark">✳</div><h1>Backend not configured</h1><p>Build Daylight with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Accounts require the secure API; guest access is not available.</p></div></main>'}
 else load();
