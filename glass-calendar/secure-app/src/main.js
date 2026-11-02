@@ -537,7 +537,7 @@ function enableCalendarDrag(){
   if(!drag||e.pointerId!==drag.id)return;
   if(!drag.started&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
   if(!drag.started){drag.started=true;document.body.classList.add('daylight-dragging');const g=document.createElement('div');g.className='event-drag-ghost';g.textContent=drag.original?.title||'New event';g.style.background=drag.original?eventColor(drag.original):'#777';document.body.append(g);drag.ghost=g}
-  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';
+  drag.ghost.style.left=(e.clientX+12)+'px';drag.ghost.style.top=(e.clientY+8)+'px';if(drag.original&&drag.item?.classList.contains('weekevent')){const next=new Date(Date.parse(drag.original.starts_at)+Math.round((e.clientY-drag.y)/15)*15*60000);drag.ghost.textContent=drag.original.title+' · '+next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
   e.preventDefault();
  };
  grid.onpointerup=async e=>{
@@ -550,13 +550,14 @@ function enableCalendarDrag(){
   if(!d.original)return;
   const ev=d.original,start=new Date(ev.starts_at),end=new Date(ev.ends_at),duration=end-start;
   let nextStart=new Date(start),nextEnd=new Date(end);
-  if(endCell){const delta=date(endCell)-date(daykey(start));nextStart=new Date(start.getTime()+delta);nextEnd=new Date(end.getTime()+delta)}
-  else if(d.item?.classList.contains('weekevent')){
-   const minutes=Math.round((e.clientY-d.y)/15/15)*15;
-   if(d.edge==='start')nextStart=new Date(Math.min(end-900000,start.getTime()+minutes*60000));
+  if(d.item?.classList.contains('weekevent')){
+   const minutes=Math.round((e.clientY-d.y)/15)*15;
+   const days=endCell?Math.round((date(endCell)-date(daykey(start)))/86400000):0;
+   if(d.edge==='start')nextStart=new Date(Math.min(end.getTime()-900000,start.getTime()+minutes*60000));
    else if(d.edge==='end')nextEnd=new Date(Math.max(start.getTime()+900000,end.getTime()+minutes*60000));
-   else {nextStart=new Date(start.getTime()+minutes*60000);nextEnd=new Date(nextStart.getTime()+duration)}
-  }else return;
+   else {nextStart=new Date(start.getTime()+minutes*60000+days*86400000);nextEnd=new Date(nextStart.getTime()+duration)}
+  }else if(endCell){const delta=date(endCell)-date(daykey(start));nextStart=new Date(start.getTime()+delta);nextEnd=new Date(end.getTime()+delta)}
+  else return;
   await changeOccurrence(ev,'update',{starts_at:nextStart.toISOString(),ends_at:nextEnd.toISOString()});
  };
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&drag?.started){cleanup();e.stopImmediatePropagation();e.preventDefault()}},{signal:undefined});
