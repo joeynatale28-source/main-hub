@@ -36,7 +36,7 @@ export function expandEvents(events,from,to){
    const en=new Date(st.getTime()+span);
    if(en.getTime()<lower-86400000)continue;
    const civil=!native&&original.source_subscription_id&&original.all_day?String(original.starts_at).slice(0,10):daykey(st);
-   const days=original.all_day?Math.max(1,Math.round(span/86400000)):Math.max(1,Math.floor((en-st)/86400000)+1);
+   const lastDay=daykey(new Date(Math.max(st.getTime(),en.getTime()-1)));const days=Math.max(1,Math.round((noon(lastDay)-noon(civil))/86400000)+1);
    for(let j=0;j<Math.min(366,days)&&out.length<3000;j++){
     const key=daykey(addDays(noon(civil),j));
     if(noon(key).getTime()<lower-86400000||noon(key).getTime()>upper+86400000)continue;
@@ -49,7 +49,7 @@ export function expandEvents(events,from,to){
 export const prettyShort=d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 export const prettyStamp=d=>new Date(d).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 export const prettyClock=d=>new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-export const repeatLabel=r=>{const f=(r?.frequency||r?.freq||'never').toLowerCase();return f==='never'?'':'Repeats '+(Number(r.interval)>1?'every '+r.interval+' '+f:f)};
+export const repeatLabel=r=>{const f=(r?.frequency||r?.freq||'never').toLowerCase();if(f==='never')return '';if(Number(r.interval)<=1)return 'Repeats '+f;const units={daily:'days',weekly:'weeks',monthly:'months',yearly:'years'};return 'Repeats every '+r.interval+' '+(units[f]||f)};
 const nth=(y,m,d,n)=>1+((d-new Date(y,m-1,1).getDay()+7)%7)+7*(n-1);
 function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k+7)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=(h+l-7*m+114)%31+1;return [y,String(mo).padStart(2,'0'),String(da).padStart(2,'0')].join('-')}
 export function greeting(first,at=new Date(),holidays=[]){
