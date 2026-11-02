@@ -243,6 +243,7 @@ test('precision shell hides the header view switcher and uses a 20px calendar ti
   await expect(page.locator('.view-toggle')).toBeHidden();
   await page.locator('#settingsNav').click();
   await expect(page.locator('#defaultViewSelect')).toHaveValue('month');
+  await page.locator('#settingsModal .settings-close').click();
   await page.locator('.nav[data-view="month"]').click();
   await expect(page.locator('.monthgrid')).toBeVisible();
 });
