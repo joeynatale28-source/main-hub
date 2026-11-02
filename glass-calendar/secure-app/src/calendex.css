@@ -171,7 +171,7 @@ html[data-theme=light] #root .all-day-span{background:color-mix(in srgb,var(--ev
 html[data-theme=dark] #root .weekevent{background:color-mix(in srgb,var(--event-color) 20%,#1f2226)!important}
 html[data-theme=light] #root .weekevent{background:color-mix(in srgb,var(--event-color) 20%,#eff2f5)!important}
 #root .weekevent:hover{filter:brightness(1.06)!important}
-#root .weekevent strong{display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden!important;text-overflow:ellipsis!important;line-height:15px!important;font-size:12px!important;font-weight:700!important;white-space:normal!important;flex:none!important}
+#root .weekevent strong{display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden!important;text-overflow:ellipsis!important;line-height:17px!important;font-size:13px!important;font-weight:650!important;white-space:normal!important;flex:none!important}
 #root .weekevent .event-card-time,#root .weekevent .event-card-location{display:block;font-size:11px!important;font-weight:500!important;line-height:14px!important;color:var(--cal-muted)!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;flex:none!important}
 #root .weekevent .event-card-location{opacity:.85}
 #root .weekevent .resize-edge{z-index:5}
@@ -224,3 +224,12 @@ body:has(.shell) #toast{box-shadow:none!important;border:1px solid var(--cal-bor
  #root .view-header .header-add .dl-icon-slot{width:18px;height:18px}
 }
 html[data-reduce-motion=true] #root *,html[data-reduce-motion=true] #root *:before,html[data-reduce-motion=true] #root *:after{animation:none!important;transition:none!important}
+
+/* Half-hour cards have two compact text lines rather than cropped details. */
+#root .weekevent.short-event{padding:3px 7px!important;gap:0!important;border-radius:9px!important}
+#root .weekevent.short-event strong{line-height:16px!important;white-space:nowrap!important;display:block!important;-webkit-line-clamp:1}
+#root .weekevent.short-event .event-card-time{line-height:14px!important}
+#root .weekevent.short-event .event-card-location{display:none!important}
+#root .agenda-item .agenda-event-copy{display:flex;flex-direction:column;gap:3px;align-items:flex-start;min-width:0}
+#root .agenda-item .agenda-location{font-size:12px!important;color:var(--cal-muted)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#root .agenda-item .agenda-time{margin-left:auto;flex:none;font-size:12px!important}
