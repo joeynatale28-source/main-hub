@@ -45,7 +45,7 @@ const setIcon=(element,name,size=18)=>{
 };
 const clean=(text)=>String(text||'').trim();
 const replaceText=(node)=>{
- const glyphs={'✳':'brand','▦':'calendar','◎':'plug','☑':'tasks','⚙':'settings','♧':'bell','☷':'align-left','⌖':'map-pin','◐':'sun','ⓘ':'info','‹':'chevron-left','›':'chevron-right','⋮':'more-vertical','⋯':'more-horizontal','◈':'palette','▤':'database','⌁':'brand','⌄':'chevron-down','▾':'chevron-down','×':'x','✎':'pencil','✓':'check','↗':'external-link'};
+ const glyphs={'✳':'brand','▦':'calendar','◎':'plug','☑':'tasks','⚙':'settings','♧':'bell','☷':'align-left','⌖':'map-pin','◐':'sun','◷':'clock','⌕':'search','ⓘ':'info','‹':'chevron-left','›':'chevron-right','⋮':'more-vertical','⋯':'more-horizontal','◈':'palette','▤':'database','⌁':'brand','⌄':'chevron-down','▾':'chevron-down','×':'x','✎':'pencil','✓':'check','↗':'external-link'};
  const key=clean(node.nodeValue);
  if(!Object.hasOwn(glyphs,key))return;
  const p=node.parentElement;
@@ -68,7 +68,7 @@ function decorateOne(scope){
  pick('.settings-nav [data-sec="notifications"] .glyph','bell');pick('.settings-nav [data-sec="ai"] .glyph','sparkles');
  pick('.settings-nav [data-sec="about"] .glyph','info');
  pick('#locationRow .row-icon','map-pin');pick('#calendarRow .row-icon','calendar');
- pick('.quick-row .row-icon',el=>el.closest('.quick-row')?.querySelector('#quickDescription')?'align-left':el.closest('.quick-row')?.querySelector('#repeatButton,#timedFields')?'clock':el.closest('.quick-row')?.querySelector('#reminderButton')?'bell':'clock');
+ pick('.quick-row .row-icon',el=>el.closest('#locationRow')?'map-pin':el.closest('#calendarRow')?'calendar':el.closest('.quick-row')?.querySelector('#quickDescription')?'align-left':el.closest('.quick-row')?.querySelector('#reminderButton')?'bell':'clock');
  pick('.cellplus,.mini-add,[data-add]','plus',16);
  pick('.whole-empty .empty-icon',el=>el.closest('.task-list')?'tasks':'calendar',18);
  scope.querySelectorAll('.floating-menu button').forEach(el=>{
