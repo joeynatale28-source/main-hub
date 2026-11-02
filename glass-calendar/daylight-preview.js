@@ -562,6 +562,54 @@ async function deleteWithScope(ev,occ,scope){
  renderAll(false);
  toast("Recurring series deleted",{label:"Undo",fn:async()=>{const copy={...snapshot};if(await saveEvent(copy,"create")){state.events.push(copy);renderAll(false)}}});
 }
+
+async function moveOccurrence(occ,newStart,newEnd,label="Event moved"){
+ const ev=occ.ev;if(calOf(ev.cal).subscribed){toast("Subscribed calendars are read-only");return}
+ const run=async scope=>{
+  if(scope==="only"){
+   if(await saveOccurrenceException(ev,occ,"moved",{starts_at:newStart.toISOString(),ends_at:newEnd.toISOString()})){renderAll(false);toast(label)}
+   return;
+  }
+  if(scope==="following"){
+   if(await splitFollowing(ev,occ,{...ev,start:newStart,end:newEnd})){renderAll(false);toast("Recurring series split")}
+   return;
+  }
+  const delta=newStart.getTime()-occ.start.getTime();
+  const patch={...ev,start:new Date(ev.start.getTime()+delta),end:new Date(ev.end.getTime()+delta)};
+  if(await saveEvent(patch,"update")){Object.assign(ev,patch);renderAll(false);toast(label)}
+ };
+ if(ev.repeat)chooseSeriesAction("Move recurring event",run);else await run("all");
+}
+async function resizeOccurrence(occ,newEnd){
+ const ev=occ.ev;
+ if(newEnd<=occ.start){toast("End must follow start");return}
+ if(calOf(ev.cal).subscribed){toast("Subscribed calendars are read-only");return}
+ const run=async scope=>{
+  if(scope==="only"){
+   if(await saveOccurrenceException(ev,occ,"edited",{starts_at:occ.start.toISOString(),ends_at:newEnd.toISOString()})){renderAll(false);toast("Occurrence resized")}
+  }else if(scope==="following"){
+   if(await splitFollowing(ev,occ,{...ev,start:occ.start,end:newEnd})){renderAll(false);toast("Following events resized")}
+  }else{
+   const copy={...ev,end:new Date(ev.end.getTime()+(newEnd.getTime()-occ.end.getTime()))};
+   if(await saveEvent(copy,"update")){Object.assign(ev,copy);renderAll(false);toast("Event resized")}
+  }
+ };
+ if(ev.repeat)chooseSeriesAction("Resize recurring event",run);else await run("all");
+}
+function installDragSource(element,occ){
+ if(calOf(occ.ev.cal).subscribed)return;
+ element.draggable=true;
+ element.addEventListener("dragstart",e=>{
+  if(e.target.closest(".resize-handle")){e.preventDefault();return}
+  const payload={id:occ.ev.id,originalStart:(occ.originalStart||occ.start).toISOString(),start:occ.start.toISOString(),end:occ.end.toISOString()};
+  e.dataTransfer.effectAllowed="move";
+  e.dataTransfer.setData("application/x-daylight-event",JSON.stringify(payload));
+ });
+}
+function dragPayload(e){
+ try{const raw=e.dataTransfer.getData("application/x-daylight-event");if(!raw)return null;const item=JSON.parse(raw);const ev=state.events.find(x=>x.id===item.id);return ev?{ev,start:new Date(item.start),end:new Date(item.end),originalStart:new Date(item.originalStart)}:null}
+ catch{return null}
+}
 function openPopover(occ,anchor){
  closeMenu();if(popEl?.dataset.id===occ.ev.id&&popEl?.dataset.start===String(occ.start.getTime())){closePopover();return}closePopover();
  const e=occ.ev,cal=calOf(e.cal),dateLine=sameDay(occ.start,occ.end)?fmtDateLong(occ.start):fmtDateShort(occ.start)+" - "+fmtDateShort(occ.end);
