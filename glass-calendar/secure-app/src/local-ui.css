@@ -167,3 +167,18 @@ html[data-reduce-motion=true] *,html[data-reduce-motion=true] *::before,html[dat
 #root .agenda .local-agenda-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
 #root .agenda .local-agenda-copy small{font-size:12px!important;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #root .view-header .greeting{width:max-content!important;min-width:max-content;overflow:visible!important}
+
+/* Laptop: keep real calendars visible above pinned Support without page scroll. */
+@media (max-height:820px) and (min-width:861px){
+ #root .side-middle{padding:8px 14px!important}
+ #root .side-middle #mini{height:218px!important;min-height:218px!important}
+ #root .mini-head{height:30px!important;min-height:30px!important;margin-bottom:4px!important}
+ #root .mini-grid{height:184px!important;grid-template-rows:repeat(7,26px)!important;grid-auto-rows:26px!important}
+ #root .mini-date{height:26px!important;min-height:26px!important;font-size:12px!important}
+ #root .mini-date.today:before{inset:2px!important}
+ #root .side-middle .micro{margin:8px 8px 5px!important}
+ #root .side-middle>.nav{height:34px!important;min-height:34px!important}
+ #root .cal-row{height:34px!important;min-height:34px!important}
+ #root .side-support{min-height:108px!important;padding:0 14px 8px!important}
+ #root .profile{height:70px!important;min-height:70px!important}
+}
