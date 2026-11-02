@@ -206,3 +206,24 @@ button,.icon,.nav,.pill-select{font-size:14px}
 html[data-reduce-motion=true] *,html[data-reduce-motion=true] *:before,html[data-reduce-motion=true] *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 @media(max-width:900px){.content{padding:16px!important}.view-header .tools{gap:4px!important}.integration-grid{grid-template-columns:1fr}.monthcells{grid-template-rows:repeat(var(--weeks),112px)!important}.monthcell{height:112px!important;min-height:112px!important}.month-more{margin-top:94px!important}}
+
+/* Final rail geometry and viewport-safe overlays */
+#root.collapsed .side-header{height:96px!important;min-height:96px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:6px!important;padding:8px 0!important}
+#root.collapsed .side-header .brand{flex:0 0 34px!important;height:34px!important;min-height:34px!important}
+#root.collapsed .side-header .collapse-toggle{flex:none!important;width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important}
+#root.collapsed .sidebar .brand strong,#root.collapsed .sidebar .brand small,#root.collapsed .sidebar .cal-name,#root.collapsed .sidebar .micro:not(:has(button)){display:none!important}
+#root.collapsed .side-middle .nav .glyph{display:grid!important;place-items:center!important;width:24px!important;height:24px!important}
+#root.collapsed .sidebar .profile{height:64px!important;min-height:64px!important;display:grid;place-items:center}
+#root.collapsed .profile>span:nth-child(2),#root.collapsed #profileMenu{display:none!important}
+#settingsModal .about-layout .about-head{display:flex;align-items:center;gap:16px}
+#settingsModal .about-history ul{padding-left:20px;line-height:1.65}
+#settingsModal .about-legal .setting-row{min-height:56px!important}
+.quick-dialog #quickInlineError{padding:0 20px;min-height:18px;margin:0;background:var(--card)}
+.dialog button:focus-visible,.date-grid-popup button:focus-visible,.floating-menu button:focus-visible{outline-color:var(--text)!important}
+.floating-menu [data-item][aria-current=true]{background:var(--surface2)!important;font-weight:600!important}
+.floating-menu [data-item] .menu-current-check{margin-left:auto;color:var(--text)}
+.integration-card h3 .integration-icon{margin-right:8px;color:var(--sub)}
+.ui-empty .ui-empty-icon .dl-icon-slot{width:20px;height:20px}
+#settingsModal .theme-mini.system{background:linear-gradient(90deg,#14161a 0 50%,#f9f9fa 50% 100%)}
+#settingsModal .theme-mini.system strong{left:59%!important;width:22%!important}
+@media(min-width:901px) and (max-height:780px){.monthcells{grid-template-rows:repeat(var(--weeks),116px)!important}.monthcell{height:116px!important;min-height:116px!important}.month-more{margin-top:98px!important}}
