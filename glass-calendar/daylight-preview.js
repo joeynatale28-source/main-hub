@@ -466,7 +466,7 @@ function layoutDayEvents(list){
 }
 function renderTimeGrid(firstDay,numDays){
  const days=Array.from({length:numDays},(_,i)=>addDays(firstDay,i)),occs=occsInRange(firstDay,addDays(firstDay,numDays));
- const template="56px repeat("+numDays+",1fr)",wrap=el('<div class="tg-wrap"></div>');
+ const template="56px repeat("+numDays+",1fr)",wrap=el('<div class="tg-wrap" data-days="'+numDays+'"></div>');
  const head=el('<div class="tg-head" style="grid-template-columns:'+template+'"></div>');
  head.append(el('<div class="tg-gutter-head">'+esc(state.tzLabel)+'</div>'));
  days.forEach(day=>{
