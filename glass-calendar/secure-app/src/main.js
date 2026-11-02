@@ -1,4 +1,5 @@
 import {icon,upgradeIcons,startIcons} from './icons.js';
+import {palette,paletteNames,colorFor,eventDate,expandEvents,prettyShort,prettyStamp,prettyClock,repeatLabel,greeting,makeDateGrid,daykey} from './polish.js';
 const root=document.querySelector('#root');
 const runtimeConfig=import.meta.env || window.__DAYLIGHT_CONFIG || {};
 const url=runtimeConfig.VITE_SUPABASE_URL,key=runtimeConfig.VITE_SUPABASE_ANON_KEY;
@@ -9,7 +10,7 @@ const h=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt
 const now=()=>new Date(),iso=d=>[d.getFullYear(),('0'+(d.getMonth()+1)).slice(-2),('0'+d.getDate()).slice(-2)].join('-');
 const date=s=>new Date(s+'T12:00:00'),add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
 const label=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,theme:'system'};
+const state={token:localStorage.getItem('dl-release-session')||'',user:null,calendars:[],events:[],tasks:[],subscriptions:[],settings:{},page:'calendar',date:now(),view:'week',drilled:false,setting:localStorage.getItem('daylight-settings-section')||'general',collapsed:localStorage.getItem('daylight-rail-collapsed')==='1',edit:null,timed:false,allDay:false,mode:'event',locationAddress:'',addrResults:[],popover:null,taskFilter:'all',returnView:null,theme:'system'};
 const toast=(text)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}el.textContent=text;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200);upgradeIcons()};
 async function api(action,data={},include=true){
  const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',apikey:key},body:JSON.stringify({...data,action,...(include?{token:state.token}:{})})});
@@ -19,10 +20,10 @@ async function api(action,data={},include=true){
 async function load(){
  try{const result=await api('auth_session');state.user=result.user;const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));Object.assign(state,{calendars,events,tasks,subscriptions,settings:settings[0]||{},date:now(),drilled:false,view:settings[0]?.default_view||'week'});applyTheme();render()}catch{localStorage.removeItem('dl-release-session');state.token='';login()}
 }
-function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;const hex=state.settings.custom_accent_hex;document.documentElement.style.setProperty('--accent',/^#[0-9a-f]{6}$/i.test(hex||'')?hex:'#777777');document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode)}
+function applyTheme(){let t=state.settings.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.dataset.reduceMotion=String(!!state.settings.reduce_motion);document.documentElement.dataset.compact=String(!!state.settings.compact_mode);document.querySelector('#themeButton')?.setAttribute('aria-label','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'));document.querySelector('#themeButton')?.setAttribute('title','Theme: '+(t==='dark'?'Midnight':t==='light'?'Daylight':'System'))}
 function login(){root.innerHTML='<main class="center"><form class="login" id="login"><div class="mark">✳</div><h1>daylight.</h1><p>Welcome back.</p><label>Username<input id="username" required autocomplete="username" placeholder="Username"></label><label>Password<div class="password"><input id="password" type="password" required autocomplete="current-password" placeholder="Password"><button type="button" id="eye">◉</button></div></label><p id="authError" class="error" hidden></p><button type="submit" class="primary block" id="loginBtn">Log in</button><small>Accounts are created by Joey — there’s no sign-up.</small></form></main>';
  $('#eye').onclick=()=>{$('#password').type=$('#password').type==='password'?'text':'password';$('#eye').innerHTML=icon($('#password').type==='password'?'eye':'eye-off')};
- $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
+ $('#login').onsubmit=async e=>{e.preventDefault();$('#loginBtn').textContent='Logging in…';$('#loginBtn').disabled=true;try{const r=await api('auth_login',{username:$('#username').value,password:$('#password').value},false);state.token=r.token;localStorage.setItem('dl-release-session',r.token);await load()}catch{const err=$('#authError');err.hidden=false;err.textContent="That username and password don't match.";$('#loginBtn').disabled=false;$('#loginBtn').textContent='Log in'}};
 }
 async function logout(){try{await api('auth_logout')}catch{}state.token='';localStorage.removeItem('dl-release-session');login()}
 async function list(entity){return (await api('data_list',{entity})).items}
@@ -68,7 +69,14 @@ function safeChange(entity,id,data,action){
   return null;
  });
 }
-function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true))}
+function visible(){return state.events.filter(e=>state.calendars.some(c=>c.id===e.calendar_id&&c.is_visible===true)&&(!state.settings.show_declined_events?e.status!=='declined':true))}
+function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents(visible(),from,to)}
+const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
+const eventStyle=e=>'--event-color:'+eventColor(e)+';';
+const eventAttr=e=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+'"';
+const eventOn=(e,key)=>eventDate(e)===key;
+const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
+function loading(button,on,text='Working…'){if(!button)return;if(on){button.dataset.oldHtml=button.innerHTML;button.innerHTML='<span class="action-spinner"></span>'+h(text);button.disabled=true}else{button.innerHTML=button.dataset.oldHtml||button.innerHTML;button.disabled=false;upgradeIcons()}}
 function nav(page,title,ico){return '<button class="nav '+(state.page===page?'selected':'')+'" title="'+h(title)+'" aria-label="'+h(title)+'" data-nav="'+page+'"><span class="glyph">'+ico+'</span>'+title+'</button>'}
 function render(){if(!state.user)return;root.classList.toggle('collapsed',state.collapsed);root.innerHTML='<div class="shell"><aside class="sidebar"><div class="side-header"><button id="brand" class="brand"><span class="logo">✳</span><span><strong>daylight.</strong><small>Personal calendar</small></span></button><button class="icon compact collapse-toggle" id="collapseRail" aria-label="Collapse sidebar" title="Collapse sidebar">‹</button></div><div class="side-middle"><button id="newEvent" class="primary block">'+icon('plus')+' New event</button><div id="mini"></div><div class="micro">WORKSPACE</div>'+nav('calendar','Calendar','▦')+nav('integrations','Integrations','◎')+nav('tasks','Tasks','☑')+'<div class="micro">MY CALENDARS <button class="mini-add" id="newCalendar">+</button></div><div id="calList"></div><div class="micro">SUPPORT</div><button class="nav" id="settings" title="Settings"><span class="glyph">⚙</span>Settings</button><button class="nav" id="about" title="About"><span class="glyph">ⓘ</span>About</button></div><div class="profile"><span class="avatar">'+h(state.user.first_name?.slice(0,1))+'</span><span><strong>'+h(state.user.first_name)+' '+h(state.user.last_name)+'</strong><small>@'+h(state.user.username)+'</small></span><button class="icon" id="profileMenu">⋮</button></div></aside><main class="content" id="content"></main></div><div id="modalHost"></div><div id="toast"></div>';
  $('#brand').onclick=()=>{state.page='calendar';state.date=now();state.drilled=false;state.view=state.settings.default_view||'week';render()};$('#newEvent').onclick=()=>openEditor();
@@ -80,16 +88,16 @@ function render(){if(!state.user)return;root.classList.toggle('collapsed',state.
 }
 function renderMini(){
  const d=state.date,first=new Date(d.getFullYear(),d.getMonth(),1),shift=state.settings.start_of_week==='monday'?1:0,start=add(first,-((first.getDay()-shift+7)%7));
- const active=iso(now());let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon">‹</button><button id="miniNext" class="icon">›</button></span></div><div class="mini-grid">';
+ const active=iso(now()),selected=iso(state.date),weekstart=add(state.date,-((state.date.getDay()-shift+7)%7)),weekend=add(weekstart,6),miniEvents=occurrences(add(start,-1),add(start,44));let html='<div class="mini-head"><strong>'+first.toLocaleDateString('en-US',{month:'long',year:'numeric'})+'</strong><span><button id="miniPrev" class="icon">‹</button><button id="miniNext" class="icon">›</button></span></div><div class="mini-grid">';
  for(let i=0;i<7;i++)html+='<span class="dayname">'+['S','M','T','W','T','F','S'][(i+shift)%7]+'</span>';
- for(let i=0;i<42;i++){const day=add(start,i),key=iso(day);html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+'" data-date="'+key+'">'+day.getDate()+(visible().some(e=>e.starts_at.startsWith(key))?'<i></i>':'')+'</button>'}
+ for(let i=0;i<42;i++){const day=add(start,i),key=iso(day);html+='<button class="mini-date '+(day.getMonth()!==first.getMonth()?'outside ':'')+(key===active?'today ':'')+(key===selected?'selected ':'')+(day>=weekstart&&day<=weekend?'selected-week ':'')+'" data-date="'+key+'">'+day.getDate()+(miniEvents.some(e=>eventOn(e,key))?'<i style="background:'+eventColor(miniEvents.find(e=>eventOn(e,key)))+'"></i>':'')+'</button>'}
  $('#mini').innerHTML=html+'</div>';upgradeIcons();
  $('#miniPrev').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()-1,1);renderMini()};$('#miniNext').onclick=()=>{state.date=new Date(d.getFullYear(),d.getMonth()+1,1);renderMini()};$$('[data-date]',$('#mini')).forEach(x=>x.onclick=()=>drill(x.dataset.date));
 }
 function renderCalList(){
  const container=$('#calList');if(!container)return;
  container.innerHTML=state.calendars.map(c=>
-  '<div class="cal-row '+(c.is_visible?'':'dim')+'" data-cal="'+h(c.id)+'" title="'+h(c.name)+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+!!c.is_visible+'" data-hide="'+h(c.id)+'" aria-label="'+(c.is_visible?'Hide ':'Show ')+h(c.name)+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon compact" data-menu="'+h(c.id)+'" aria-label="Actions for '+h(c.name)+'" title="Actions for '+h(c.name)+'">'+icon('more-vertical',16)+'</button></div>'
+  '<div class="cal-row '+(c.is_visible?'':'dim')+'" style="--event-color:'+colorFor(c)+'" data-cal="'+h(c.id)+'" title="'+h(c.name)+'"><button class="switch '+(c.is_visible?'on':'')+'" role="switch" aria-checked="'+!!c.is_visible+'" data-hide="'+h(c.id)+'" aria-label="'+(c.is_visible?'Hide ':'Show ')+h(c.name)+'"><span></span></button><i class="cal-dot"></i><span class="cal-name">'+h(c.name)+'</span><button class="icon compact" data-menu="'+h(c.id)+'" aria-label="Actions for '+h(c.name)+'" title="Actions for '+h(c.name)+'">'+icon('more-vertical',16)+'</button></div>'
  ).join('');
  $$('[data-hide]',container).forEach(x=>x.onclick=()=>{const c=state.calendars.find(c=>c.id===x.dataset.hide);if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update')});
  $$('[data-menu]',container).forEach(x=>x.onclick=()=>{
