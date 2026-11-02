@@ -243,14 +243,26 @@ function renderCalendar(){
  $('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1);
  $('#settingsButton').onclick=()=>settings();
  $('#themeButton').onclick=()=>{const modes=['dark','light','system'];saveSetting('theme',modes[(modes.indexOf(state.settings.theme)+1)%3]);};
- const closeSearch=()=>{$('#searchBar').hidden=true;$('#searchQuery').value='';$('#searchResults').innerHTML=''};
- $('#searchButton').onclick=()=>{$('#searchBar').hidden=!$('#searchBar').hidden;if(!$('#searchBar').hidden)$('#searchQuery').focus()};
+ const searchBar=$('#searchBar');searchBar.setAttribute('role','dialog');searchBar.setAttribute('aria-label','Search all dates');
+ $('#searchQuery').setAttribute('role','combobox');$('#searchQuery').setAttribute('aria-controls','searchResults');$('#searchQuery').setAttribute('aria-autocomplete','list');
+ let activeResult=0;
+ const closeSearch=()=>{searchBar.hidden=true;$('#searchQuery').value='';$('#searchResults').innerHTML='';activeResult=0};
+ const options=()=>$$('#searchResults [data-detail]');
+ const markActive=()=>{const opts=options();opts.forEach((el,i)=>{el.classList.toggle('active',i===activeResult);el.setAttribute('aria-selected',String(i===activeResult))});$('#searchQuery').setAttribute('aria-activedescendant',opts[activeResult]?.id||'')};
+ $('#searchButton').onclick=()=>{if(!searchBar.hidden){closeSearch();return}searchBar.hidden=false;$('#searchQuery').focus()};
  $('#searchClose').onclick=closeSearch;
- $('#searchQuery').onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();closeSearch()}};
+ $('#searchQuery').onkeydown=e=>{
+  if(e.key==='Escape'){e.stopPropagation();closeSearch();$('#searchButton').focus();return}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){const opts=options();if(!opts.length)return;e.preventDefault();activeResult=(activeResult+(e.key==='ArrowDown'?1:-1)+opts.length)%opts.length;markActive();opts[activeResult].scrollIntoView({block:'nearest'});return}
+  if(e.key==='Enter'){const opts=options();if(!opts.length)return;e.preventDefault();const selected=opts[activeResult];closeSearch();selected.click()}
+ };
  $('#searchQuery').oninput=e=>{
-  const q=e.target.value.trim(),results=occurrences(add(now(),-700),add(now(),1095)).filter(x=>x.title.toLowerCase().includes(q.toLowerCase())).slice(0,40);
-  $('#searchResults').innerHTML=q?(results.length?results.map(x=>'<button '+eventAttr(x)+'>'+h(x.title)+' · '+h(prettyShort(x._civilDate+'T12:00:00'))+'</button>').join(''):'<p class="empty-results">No results for &#39;'+h(q)+'&#39;</p>'):'';
-  bindEventButtons();
+  const q=e.target.value.trim(),found=q?uniqueInstances(occurrences(add(now(),-700),add(now(),1095))).filter(x=>x.title.toLowerCase().includes(q.toLowerCase())).slice(0,40):[];
+  const byMonth=new Map();for(const x of found){const key=new Date(x.starts_at).toLocaleDateString('en-US',{month:'long',year:'numeric'});if(!byMonth.has(key))byMonth.set(key,[]);byMonth.get(key).push(x)}
+  const content=[...byMonth].map(([month,events])=>'<div class="search-group-title">'+h(month)+'</div>'+events.map(x=>'<button role="option" id="searchResult-'+h(x.id)+'-'+h(x._occurrence||x.starts_at).replace(/[^a-z0-9-]/gi,'')+'" '+eventAttr(x)+'><span class="search-result-icon">'+icon('calendar',16)+'</span><span class="search-result-copy"><strong>'+h(x.title)+'</strong><small>'+h(prettyShort(x._civilDate+'T12:00:00'))+'</small></span>'+icon('chevron-right',16)+'</button>').join('')).join('');
+  $('#searchResults').setAttribute('role','listbox');$('#searchResults').innerHTML=q?(found.length?content:emptyState('No results yet',"No results for '"+q+"'.",'search')):'';
+  activeResult=0;markActive();bindEventButtons();
+  options().forEach((item,i)=>item.onmouseenter=()=>{activeResult=i;markActive()});
  };
  if(state.view==='month')renderMonth();else if(state.view==='agenda')renderAgenda();else renderWeek();
  if(uiGridDirection){$('#grid')?.classList.add(uiGridDirection>0?'ui-page-next':'ui-page-prev');uiGridDirection=0}else if(uiPreviousView!==state.view){$('#grid')?.classList.add('ui-view-enter')}uiPreviousView=state.view;
