@@ -7,6 +7,14 @@ async function launch(page,theme='dark'){
  await expect(page.locator('.shell')).toBeVisible();
  await expect(page.locator('#login')).toHaveCount(0);
  await expect(page.locator('#addEventHeader')).toBeVisible();
+ if(theme==='light'){
+  await page.locator('#settingsButton').click();
+  await page.locator('[data-sec="appearance"]').click();
+  await page.locator('[data-theme="light"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.locator('#settingsModal .dialog-close').click();
+ }else await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await page.waitForTimeout(400);
 }
 async function changeView(page,view){
  await page.locator('#settingsButton').click();
