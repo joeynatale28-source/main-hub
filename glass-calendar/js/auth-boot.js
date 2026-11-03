@@ -21,7 +21,7 @@ const icon=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const mode={name:'login',showPassword:false,values:{name:'',email:'',password:''},message:'',error:''};
 const e=id=>root.querySelector('#'+id);
-let launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null;
+let recovering=false,launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null;
 const rules=p=>[p.length>=8,/[A-Z]/.test(p),/[0-9]/.test(p)];
 function art(){
  const bars={3:'#e3a93d',7:'#43b581',11:'#e3a93d',16:'#5b8def',26:'#e3a93d'};
@@ -111,7 +111,7 @@ async function submit(ev){
   if(kind==='recovery'){
    response=await client.auth.updateUser({password:fields.password});
    if(response.error)throw response.error;
-   await client.auth.signOut();mode.values.password='';mode.error='';mode.message='Password updated. Sign in with the new password.';display('login');
+   recovering=false;await client.auth.signOut();mode.values.password='';mode.error='';mode.message='Password updated. Sign in with the new password.';display('login');
   }
  }catch(err){showError(kind==='signup'&&/password/i.test(err.message)?'password':'email',err?.message||'The request failed. Please try again.')}
  finally{if(button.isConnected)button.disabled=false}
@@ -217,12 +217,15 @@ async function signOut(){
 }
 window.DaylightCloud={client,signOut,flush,BASE:BASE.href,getUser:()=>currentUser,savePending:()=>!!pending||sending||blocked};
 client.auth.onAuthStateChange((event,session)=>{
- if(event==='PASSWORD_RECOVERY'){currentUser=session?.user;mode.error='';mode.values.password='';display('recovery')}
+ if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';display('recovery')}
  if(event==='SIGNED_OUT'){currentUser=null;if(launched)location.replace(BASE.href)}
 });
 (async()=>{
  const {data:{session},error}=await client.auth.getSession();
  if(error)console.warn('Session restore',error.message);
+ if(recovering||location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery'){
+   recovering=true;currentUser=session?.user||null;display('recovery');return;
+ }
  if(session?.user){const result=await client.auth.getUser();if(!result.error&&result.data.user){currentUser=result.data.user;if(isConsent)await showConsent();else await launch();return}}
  if(isConsent&&!consentId){mode.error='Missing OAuth authorization request';display('login');return}
  display('login');
