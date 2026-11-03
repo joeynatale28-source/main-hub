@@ -153,7 +153,7 @@ function display(modeName=mode.name){
    const hazard=input.closest('.auth-pill').querySelector('.auth-hazard');if(hazard){hazard.setAttribute('aria-hidden','true');hazard.tabIndex=-1;}if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(key==='password')redrawRules()};
   input.closest('.auth-pill').onclick=ev=>{if(!ev.target.closest('button'))input.focus()};
  });
- e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';transitionAuth(mode.name==='login'?'signup':'login')};
+ if(e('authSwitch'))e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';transitionAuth(mode.name==='login'?'signup':'login')};
  if(e('authForgot'))e('authForgot').onclick=ev=>{ev.preventDefault();mode.error='';mode.message='';transitionAuth('forgot')};
  if(e('authBackSignIn'))e('authBackSignIn').onclick=()=>{mode.error='';mode.message='';mode.code='';mode.values.password='';transitionAuth('login')};
  ['authEye','authPasswordEye','authConfirmPwEye'].forEach(id=>{const b=e(id);if(!b)return;b.onclick=()=>{const x=e(id==='authConfirmPwEye'?'authConfirmPw':'authPassword');const show=x.type==='password';x.type=show?'text':'password';b.innerHTML=icon(show?'eyeOff':'eye',18);b.setAttribute('aria-label',(show?'Hide':'Show')+' password');x.focus()}});
