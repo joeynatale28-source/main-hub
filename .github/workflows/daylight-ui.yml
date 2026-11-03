@@ -1,4 +1,4 @@
-name: Daylight reference-HTML UI verification
+name: Daylight current-build account and OAuth verification
 on:
   push:
     branches: [main]
@@ -12,11 +12,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: daylight-reference-ui-${{ github.ref }}
+  group: daylight-current-build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  reference-ui:
-    name: Exact HTML layout and working local interactions
+  auth-ui:
+    name: Existing calendar with supplied Supabase auth design
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -26,54 +26,54 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install
-        run: npm install --no-audit --no-fund
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Check exact HTML entry, standalone style and local-only runtime
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Static logic integrity (preserve the user-authored calendar styles)
         run: |
           test -s index.html
-          test -s daylight-preview.css
-          test -s daylight-preview.js
-          test -s secure-app/src/local-store.js
-          ! grep -q 'site-config.js' index.html
-          ! grep -q 'secure-app/src/main.js' index.html
-          grep -q 'id="sidebar"' index.html
-          grep -q 'id="headerBand"' index.html
-          grep -q 'id="viewWrap"' index.html
-          node --check daylight-preview.js
-          node --check secure-app/src/local-store.js
-      - name: Test events, calendars, themes and 16 screenshot layouts
-        run: CI= npx playwright test tests/reference-ui.spec.js --reporter=line --workers=1
-      - name: Preserve screenshots and traces
+          test -s style.css
+          test -s auth-screen.css
+          test -s js/store.js
+          test -s js/app.js
+          test -s js/auth-boot.js
+          test -s js/ai-access-logic.js
+          test -s oauth/consent/index.html
+          grep -q 'style.css' index.html
+          grep -q 'auth-boot.js' index.html
+          node --check js/app.js
+          node --check js/store.js
+          node --check js/ai-access-logic.js
+          node --check js/auth-boot.js
+      - name: Browser tests for login, signup, password reset and OAuth callback
+        run: npx playwright test tests/daylight-auth.spec.js --reporter=line --workers=1
+      - name: Preserve failure screenshots/traces
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daylight-reference-html-screenshots
+          name: daylight-auth-current-build
           path: |
             glass-calendar/test-results/**/*.png
             glass-calendar/test-results/**/*.zip
           retention-days: 7
           if-no-files-found: ignore
-  deployed-page:
-    name: Verify GitHub Pages serves the new reference HTML
+  deployed:
+    name: GitHub Pages serves the current user-authored build
     if: github.event_name == 'push'
-    needs: reference-ui
+    needs: auth-ui
     runs-on: ubuntu-latest
     steps:
-      - name: Check published new entry
-        shell: bash
+      - name: Verify updated authentication entry point
         run: |
           set -euo pipefail
           url="https://joeynatale28-source.github.io/main-hub/glass-calendar/"
-          for attempt in $(seq 1 35); do
-            if curl -LfsS --max-time 15 "$url?ref=${{ github.sha }}" -o /tmp/daylight.html &&
-               grep -q 'daylight-preview.js' /tmp/daylight.html &&
-               curl -LfsS --max-time 15 "${url}daylight-preview.js" | grep -q 'function renderTimeGrid'; then
-              echo "Daylight exact-reference UI deployed"
+          for n in $(seq 1 30); do
+            if curl -LfsS --max-time 15 "$url?build=${{ github.sha }}" -o /tmp/daylight.html &&
+               grep -q 'js/auth-boot.js' /tmp/daylight.html &&
+               curl -LfsS --max-time 15 "${url}js/auth-boot.js" | grep -q 'daylight_save_snapshot'; then
+              echo 'Current Daylight account build deployed'
               exit 0
             fi
             sleep 6
           done
-          echo "GitHub Pages has not served the new reference UI"
+          echo 'GitHub Pages has not deployed this commit yet'
           exit 1
