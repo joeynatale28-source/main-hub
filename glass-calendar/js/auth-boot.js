@@ -1,10 +1,9 @@
 /* Daylight account bootstrap. Only authentication is visually new.
    The existing calendar Store/UI are loaded unmodified after session verification. */
-import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.118.0';
 const URL='https://qrqemjgpzoqhtmsowmqv.supabase.co';
 const KEY='sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj';
 const BASE=new URL('../',import.meta.url);
-const client=createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
+let client=null;
 const root=document.getElementById('authRoot');
 const app=document.getElementById('app');
 const isConsent=location.pathname.includes('/oauth/consent');
@@ -87,6 +86,7 @@ async function submit(ev){
  if(kind!=='recovery'&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(fields.email.trim()))return showError('email','Enter a valid email address');
  if(kind!=='forgot'&&!fields.password)return showError('password',"Password can't be empty");
  if(['signup','recovery'].includes(kind)&&!rules(fields.password).every(Boolean))return showError('password','Use 8+ characters, an uppercase letter, and a number');
+ if(!client){showError('email','Secure account connection is still loading. Try again shortly.');return}
  const button=e('authSubmit');button.disabled=true;
  try{
   let response;
@@ -215,18 +215,40 @@ async function signOut(){
  if(blocked)throw Error('Your changes are not saved yet; resolve sync before signing out.');
  const {error}=await client.auth.signOut();if(error)throw error;location.replace(BASE.href)
 }
-window.DaylightCloud={client,signOut,flush,BASE:BASE.href,getUser:()=>currentUser,savePending:()=>!!pending||sending||blocked};
-client.auth.onAuthStateChange((event,session)=>{
- if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';display('recovery')}
- if(event==='SIGNED_OUT'){currentUser=null;if(launched)location.replace(BASE.href)}
-});
-(async()=>{
- const {data:{session},error}=await client.auth.getSession();
- if(error)console.warn('Session restore',error.message);
- if(recovering||location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery'){
+window.DaylightCloud={client:null,signOut,flush,BASE:BASE.href,getUser:()=>currentUser,savePending:()=>!!pending||sending||blocked};
+async function connectSupabase(){
+ try{
+  // Render the exact supplied HTML account screen before waiting for the SDK.
+  // The SDK is imported dynamically so slow/blocked CDNs cannot leave a blank page.
+  let createClient;
+  try{({createClient}=await import('https://esm.sh/@supabase/supabase-js@2.118.0'))}
+  catch(primaryError){
+   console.warn('Primary Supabase SDK CDN unavailable',primaryError);
+   ({createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm'));
+  }
+  client=createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
+  window.DaylightCloud.client=client;
+  client.auth.onAuthStateChange((event,session)=>{
+   if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';display('recovery')}
+   if(event==='SIGNED_OUT'){currentUser=null;if(launched)location.replace(BASE.href)}
+  });
+  const {data:{session},error}=await client.auth.getSession();
+  if(error)console.warn('Session restore',error.message);
+  if(recovering||location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery'){
    recovering=true;currentUser=session?.user||null;display('recovery');return;
+  }
+  if(session?.user){
+   const result=await client.auth.getUser();
+   if(!result.error&&result.data.user){
+    currentUser=result.data.user;if(isConsent)await showConsent();else await launch();return;
+   }
+  }
+  if(isConsent&&!consentId){mode.error='Missing OAuth authorization request';display('login');return}
+ }catch(err){
+  console.error('Supabase bootstrap failed',err);
+  mode.error='Could not connect to the account service. Check your connection and refresh to try again.';
+  if(e('authMessage')){e('authMessage').textContent=mode.error;e('authMessage').setAttribute('role','alert')}
  }
- if(session?.user){const result=await client.auth.getUser();if(!result.error&&result.data.user){currentUser=result.data.user;if(isConsent)await showConsent();else await launch();return}}
- if(isConsent&&!consentId){mode.error='Missing OAuth authorization request';display('login');return}
- display('login');
-})().catch(err=>{console.error('Daylight bootstrap',err);mode.error=err.message;display('login')});
+}
+display('login');
+connectSupabase();
