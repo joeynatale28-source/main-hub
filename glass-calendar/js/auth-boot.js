@@ -21,7 +21,7 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const mode={name:'login',showPassword:false,values:{name:'',email:'',password:'',confirm:''},message:'',error:'',code:'',resendUntil:0,verifying:false};
 let otpTicker=null,recoveryFlow=false,authTransitionSeq=0;
 const e=id=>root.querySelector('#'+id);
-let recovering=false,launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null;
+let recovering=false,launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null,activeFlush=null;
 const rules=p=>[p.length>=12,/[A-Z]/.test(p),/[a-z]/.test(p),/[0-9]/.test(p),/[^A-Za-z0-9]/.test(p)];
 function art(){
  const bars={3:'#e3a93d',7:'#43b581',11:'#e3a93d',16:'#5b8def',26:'#e3a93d'};
@@ -250,17 +250,31 @@ const defaultData=user=>{
 };
 function loadScript(path){return new Promise((resolve,reject)=>{const tag=document.createElement('script');tag.src=new URL(path,BASE).href;tag.onload=resolve;tag.onerror=()=>reject(new Error('Could not load '+path));document.body.append(tag)})}
 async function flush(){
- if(sending||blocked||!pending||!currentUser)return;
- sending=true;const blob=pending;pending=null;
- try{
-  const result=await client.rpc('daylight_save_snapshot',{expected_revision:revision,document:JSON.parse(blob)});
-  if(result.error)throw result.error;
-  revision=Number(result.data);acknowledged=blob;
- }catch(err){
-  pending=blob;blocked=true;
-  console.error('Daylight cloud save failed',err);
-  document.getElementById('toastRoot')?.append(Object.assign(document.createElement('div'),{className:'toast',textContent:'Your latest changes were not saved: '+(err?.message||'connection error')+'. Keep this tab open and reload after checking your connection.'}));
- }finally{sending=false;if(pending&&!blocked)setTimeout(flush,100)}
+ if(sending)return activeFlush;
+ if(blocked||!pending||!currentUser)return;
+ sending=true;
+ const blob=pending;pending=null;
+ const operation=(async()=>{
+  try{
+   const result=await client.rpc('daylight_save_snapshot',{expected_revision:revision,document:JSON.parse(blob)});
+   if(result.error)throw result.error;
+   revision=Number(result.data);acknowledged=blob;
+  }catch(err){
+   // Keep unsaved data visible rather than silently overwriting another client.
+   pending=blob;blocked=true;
+   console.error('Daylight cloud save failed',err);
+   document.getElementById('toastRoot')?.append(Object.assign(document.createElement('div'),{
+    className:'toast',
+    textContent:'Your changes were not saved: '+(err?.message||'connection error')+'. Keep this tab open; resolve sync before signing out.'
+   }));
+  }
+ })();
+ activeFlush=operation;
+ try{await operation}
+ finally{
+  sending=false;activeFlush=null;
+  if(pending&&!blocked)setTimeout(flush,100);
+ }
 }
 function queueSave(){
  if(!currentUser||blocked||!window.DaylightStore?.data)return;
@@ -371,8 +385,11 @@ async function showConsent(){
  }catch(err){mode.error='Unable to verify authorization request: '+err.message;display()}
 }
 async function signOut(){
- clearTimeout(saveTimer);if(pending)await flush();
- if(blocked)throw Error('Your changes are not saved yet; resolve sync before signing out.');
+ clearTimeout(saveTimer);
+ if(activeFlush)await activeFlush;
+ if(pending&&!blocked)await flush();
+ if(activeFlush)await activeFlush;
+ if(blocked||pending||sending)throw Error('Unsaved calendar changes must be resolved before signing out.');
  const {error}=await client.auth.signOut();if(error)throw error;location.replace(BASE.href)
 }
 window.DaylightCloud={client:null,signOut,flush,BASE:BASE.href,getUser:()=>currentUser,savePending:()=>!!pending||sending||blocked};
