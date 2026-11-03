@@ -406,8 +406,8 @@
         sidebarEl.appendChild(help); sidebarEl.appendChild(set); sidebarEl.appendChild(exp);
         var pw = el(
           '<div class="profile-wrap"><button class="profile-row" title="Account">' +
-            '<span class="avatar">JN</span>' +
-            '<span class="rail-hide" style="min-width:0"><span class="profile-name">Joey Natale</span><br><span class="profile-email">joeynatale28@gmail.com</span></span>' +
+            '<span class="avatar">' + esc(String(state.firstName||"").slice(0,2).toUpperCase()) + '</span>' +
+            '<span class="rail-hide" style="min-width:0"><span class="profile-name">' + esc(window.DaylightCloud?.getUser()?.user_metadata?.name||state.firstName) + '</span><br><span class="profile-email">' + esc(window.DaylightCloud?.getUser()?.email||"") + '</span></span>' +
             '<span class="icon-btn rail-hide" style="pointer-events:none">' + icon("dotsV", 17) + "</span>" +
           "</button></div>"
         );
@@ -416,7 +416,9 @@
             { icon: "settings", label: "Settings", fn: function () { openSettings("general"); } },
             { icon: "download", label: "Export UI code", fn: exportCode },
             { icon: effectiveTheme() === "dark" ? "sun" : "moon", label: effectiveTheme() === "dark" ? "Light theme" : "Dark theme", fn: function () { state.themeMode = effectiveTheme() === "dark" ? "light" : "dark"; applyTheme(); renderAll(false); } },
-            { icon: "lifebuoy", label: "Help center", fn: openHelp }
+            { icon: "lifebuoy", label: "Help center", fn: openHelp },
+            { sep: true },
+            { icon: "logout", label: "Log out", fn: function(){ window.DaylightCloud.signOut().catch(function(error){toast(error.message)}) } }
           ], { align: "right" });
         });
         sidebarEl.appendChild(pw);
@@ -1436,7 +1438,7 @@
         paneHead(pane, "General", "The basics of your daylight account.");
         var g = el('<div class="set-group"><div class="set-group-title">Profile</div>' +
           '<div class="field"><label for="gsName">First name</label><input class="text-input" id="gsName" style="max-width:300px" value="' + esc(state.firstName) + '"><p class="inline-note">Used in the greeting at the top of your calendar.</p></div>' +
-          '<div class="field"><label>Email</label><input class="text-input" style="max-width:300px" value="joeynatale28@gmail.com" disabled></div></div>');
+          '<div class="field"><label>Email</label><input class="text-input" style="max-width:300px" value="' + esc(window.DaylightCloud?.getUser()?.email||"") + '" disabled></div></div>');
         pane.appendChild(g);
         var nameIn = g.querySelector("#gsName");
         nameIn.addEventListener("input", function () { state.firstName = nameIn.value.trim() || "Joey"; renderGreeting(); });
