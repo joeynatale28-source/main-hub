@@ -1,6 +1,6 @@
 /* Daylight account bootstrap. Only authentication is visually new.
    The existing calendar Store/UI are loaded unmodified after session verification. */
-const URL='https://qrqemjgpzoqhtmsowmqv.supabase.co';
+const SUPABASE_URL='https://qrqemjgpzoqhtmsowmqv.supabase.co';
 const KEY='sb_publishable_MuX0ICyo0pYrhrj3wu5G0g_v6_gy8Pj';
 const BASE=new URL('../',import.meta.url);
 let client=null;
@@ -404,7 +404,7 @@ async function connectSupabase(){
    console.warn('Primary Supabase SDK CDN unavailable',primaryError);
    ({createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm'));
   }
-  client=createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
+  client=createClient(SUPABASE_URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
   window.DaylightCloud.client=client;
   client.auth.onAuthStateChange((event,session)=>{
    if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';if(!recoveryFlow)display('recovery')}
