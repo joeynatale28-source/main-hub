@@ -161,6 +161,7 @@ async function launch(){
   store.load=()=>{if(!store.data)store.data=structuredClone(initial);return store.data};
   store.save=queueSave;
   await loadScript('js/app.js');
+  await loadScript('js/ai-access-logic.js');
   if(!data)queueSave();
   if(app)app.hidden=false;
   root.innerHTML='';
