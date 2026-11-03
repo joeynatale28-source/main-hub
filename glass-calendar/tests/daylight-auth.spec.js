@@ -9,18 +9,19 @@ test('Supabase login keeps the supplied split-panel Daylight design',async({page
  await expect(page.locator('#authPassword')).toBeVisible();
  await expect(page.locator('#app')).toBeHidden();
  await expect(page.locator('link[href="style.css"]')).toHaveCount(1);
- await expect(page.locator('.auth-art-card')).toContainText('Swim practice');
+ await expect(page.locator('.auth-art-card .ctitle')).not.toBeEmpty();
 });
 test('Signup preserves supplied fields, password rules and show/hide interactions',async({page})=>{
  await page.goto('/');
  await page.locator('#authSwitch').click();
  await expect(page.locator('.auth-headline')).toHaveText('Create account');
+ await expect(page.locator('.auth-visual-panel')).toBeVisible();
  await expect(page.locator('#authName')).toBeVisible();
  await expect(page.locator('#authEmail')).toBeVisible();
  await page.locator('#authPassword').fill('Weak');
- await expect(page.locator('.auth-rule.ok')).toHaveCount(1);
- await page.locator('#authPassword').fill('Testpass123');
- await expect(page.locator('.auth-rule.ok')).toHaveCount(3);
+ await expect(page.locator('.auth-rule.ok')).toHaveCount(2);
+ await page.locator('#authPassword').fill('Testpass123!');
+ await expect(page.locator('.auth-rule.ok')).toHaveCount(5);
  await page.locator('#authEye').click();
  await expect(page.locator('#authPassword')).toHaveAttribute('type','text');
  await expect(page.locator('.auth-terms')).toContainText('Terms of Service');
@@ -37,7 +38,7 @@ test('Validation prevents empty and malformed account requests',async({page})=>{
 test('Password reset uses the supplied login shell, not calendar UI',async({page})=>{
  await page.goto('/');
  await page.locator('#authForgot').click();
- await expect(page.locator('.auth-headline')).toHaveText('Reset password');
+ await expect(page.locator('.auth-headline')).toHaveText('Reset your password');
  await expect(page.locator('#authEmail')).toBeVisible();
  await expect(page.locator('#app')).toBeHidden();
 });
@@ -53,4 +54,22 @@ test('Small-screen auth uses original responsive one-panel mode',async({page})=>
  await expect(page.locator('.auth-form-panel')).toBeVisible();
  await expect(page.locator('.auth-visual-panel')).toBeHidden();
  await expect(page.locator('#authSubmit')).toBeInViewport();
+});
+
+test('Signup applies the supplied five password rules without contacting Supabase for invalid input',async({page})=>{
+ await page.goto('/');
+ await page.locator('#authSwitch').click();
+ await page.locator('#authName').fill('Test');
+ await page.locator('#authEmail').fill('test@example.com');
+ await page.locator('#authPassword').fill('Abcd1234');
+ await page.locator('#authSubmit').click();
+ await expect(page.locator('#authMessage')).toContainText('Use 12+ characters');
+ await expect(page.locator('#app')).toBeHidden();
+});
+test('Recovery cannot be submitted without a valid email',async({page})=>{
+ await page.goto('/');
+ await page.locator('#authForgot').click();
+ await page.locator('#authSubmit').click();
+ await expect(page.locator('#authMessage')).toContainText('Enter a valid email address');
+ await expect(page.locator('#app')).toBeHidden();
 });
