@@ -19,7 +19,7 @@ const icon=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0
 })[name]+'</svg>';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const mode={name:'login',showPassword:false,values:{name:'',email:'',password:'',confirm:''},message:'',error:'',code:'',resendUntil:0,verifying:false};
-let otpTicker=null,recoveryFlow=false;
+let otpTicker=null,recoveryFlow=false,authTransitionSeq=0;
 const e=id=>root.querySelector('#'+id);
 let recovering=false,launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null;
 const rules=p=>[p.length>=12,/[A-Z]/.test(p),/[a-z]/.test(p),/[0-9]/.test(p),/[^A-Za-z0-9]/.test(p)];
@@ -44,7 +44,7 @@ function formContent(){
  const ruleHtml='<div class="auth-rules-wrap'+(pw?' show':'')+'" id="authRulesWrap"'+(!pw?' aria-hidden="true"':'')+'><div class="auth-rules" id="authRules">'+labels.map((label,i)=>
  '<span class="auth-rule'+(valid[i]?' ok':'')+'"><span class="rule-ic">'+icon('check',11)+'</span>'+label+'</span>').join('')+'</div></div>';
  const pwField=(label,placeholder,id='authPassword')=>pill(id,label,'password',placeholder,'new-password',
- '<button type="button" class="auth-eye" id="'+id+'Eye" aria-label="Show password">'+icon('eye',18)+'</button>');
+ '<button type="button" class="auth-eye" id="'+(id==='authPassword'?'authEye':id+'Eye')+'" aria-label="Show password">'+icon('eye',18)+'</button>');
  const emailField=pill('authEmail','Email','email','you@example.com','email');
  const codeHtml='<div class="auth-code-row" id="authCodeRow">'+Array.from({length:6},(_,i)=>
  '<input class="auth-code-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" data-digit="'+i+'" aria-label="Code digit '+(i+1)+' of 6">').join('')+'</div>'+
@@ -104,6 +104,25 @@ function bindOtp(){
  tick();if(mode.resendUntil>Date.now())otpTicker=setInterval(tick,500);
 }
 
+
+/* Replace only the left form, preserving the supplied right-side artwork and theme control. */
+function transitionAuth(next){
+ const inner=e('authFormInner');const seq=++authTransitionSeq;
+ if(otpTicker){clearInterval(otpTicker);otpTicker=null}
+ if(!inner||window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){display(next);return}
+ e('authScreen')?.classList.remove('is-enter');e('authForm')?.classList.remove('is-enter');
+ const before=inner.offsetHeight;inner.classList.remove('switch-in');inner.classList.add('switch-out');
+ setTimeout(()=>{
+  if(seq!==authTransitionSeq)return;
+  inner.style.height=before+'px';inner.style.overflow='hidden';
+  display(next);
+  const after=inner.scrollHeight;
+  inner.classList.add('switch-in');
+  if(after!==before){void inner.offsetHeight;inner.style.height=after+'px'}
+  else{inner.style.height='';inner.style.overflow=''}
+  setTimeout(()=>{if(seq!==authTransitionSeq)return;inner.classList.remove('switch-in');inner.style.height='';inner.style.overflow=''},330);
+ },170);
+}
 function display(modeName=mode.name){
  mode.name=modeName;
  if(!e('authScreen')){
@@ -125,9 +144,9 @@ function display(modeName=mode.name){
   input.oninput=()=>{mode.values[key]=input.value;input.closest('.auth-pill').classList.remove('err');input.setAttribute('aria-invalid','false');if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(key==='password')redrawRules()};
   input.closest('.auth-pill').onclick=ev=>{if(!ev.target.closest('button'))input.focus()};
  });
- e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';display(mode.name==='login'?'signup':'login')};
- if(e('authForgot'))e('authForgot').onclick=ev=>{ev.preventDefault();mode.error='';mode.message='';display('forgot')};
- if(e('authBackSignIn'))e('authBackSignIn').onclick=()=>{mode.error='';mode.message='';mode.code='';mode.values.password='';display('login')};
+ e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';transitionAuth(mode.name==='login'?'signup':'login')};
+ if(e('authForgot'))e('authForgot').onclick=ev=>{ev.preventDefault();mode.error='';mode.message='';transitionAuth('forgot')};
+ if(e('authBackSignIn'))e('authBackSignIn').onclick=()=>{mode.error='';mode.message='';mode.code='';mode.values.password='';transitionAuth('login')};
  ['authEye','authPasswordEye','authConfirmPwEye'].forEach(id=>{const b=e(id);if(!b)return;b.onclick=()=>{const x=e(id==='authConfirmPwEye'?'authConfirmPw':'authPassword');const show=x.type==='password';x.type=show?'text':'password';b.innerHTML=icon(show?'eyeOff':'eye',18);b.setAttribute('aria-label',(show?'Hide':'Show')+' password');x.focus()}});
  if(e('authCodeRow'))bindOtp();
 }
@@ -148,7 +167,7 @@ async function sendRecovery(resend=false){
   if(error)throw error;
   mode.resendUntil=Date.now()+60000;mode.code='';mode.error='';
   mode.message=resend?'Another recovery email was requested.':'Check your email for the recovery code.';
-  display('code');
+  if(resend)display('code');else transitionAuth('code');
  }catch(err){if(resend){if(e('authCodeMsgText'))e('authCodeMsgText').textContent=err.message;e('authCodeMsg')?.classList.add('show')}else showError('email',err.message||'Could not send a recovery email')}
  finally{if(b?.isConnected)b.disabled=false}
 }
@@ -160,7 +179,7 @@ async function verifyCode(){
   const {data,error}=await client.auth.verifyOtp({email:mode.values.email.trim(),token:mode.code,type:'recovery'});
   if(error)throw error;if(!data.session||!data.user)throw Error('Recovery verification did not return a valid session.');
   currentUser=data.user;recovering=true;recoveryFlow=true;
-  mode.values.password='';mode.values.confirm='';mode.error='';mode.message='';display('recovery');
+  mode.values.password='';mode.values.confirm='';mode.error='';mode.message='';transitionAuth('recovery');
  }catch(err){
   const row=e('authCodeRow');if(row){row.classList.remove('shake');void row.offsetWidth;row.classList.add('err','shake')}
   if(e('authCodeMsgText'))e('authCodeMsgText').textContent=err.message||'Check your code and try again';
@@ -194,7 +213,7 @@ async function submit(ev){
    if(response.error)throw response.error;
    mode.values.password='';
    if(response.data.session){currentUser=response.data.user;if(isConsent)await showConsent();else await launch();return}
-   mode.name='login';mode.error='';mode.message='Check your email to confirm your new account, then sign in.';display();return;
+   mode.name='login';mode.error='';mode.message='Check your email to confirm your new account, then sign in.';transitionAuth('login');return;
   }
   if(kind==='recovery'){
    const {data:{session},error:sessionError}=await client.auth.getSession();
@@ -203,7 +222,7 @@ async function submit(ev){
    if(response.error)throw response.error;
    recovering=false;recoveryFlow=false;await client.auth.signOut();
    mode.values.password='';mode.values.confirm='';mode.name='login';
-   mode.error='';mode.message='Password updated. Sign in with your new password.';display();return;
+   mode.error='';mode.message='Password updated. Sign in with your new password.';transitionAuth('login');return;
   }
  }catch(err){showError(kind==='recovery'?'password':kind==='signup'&&/password/i.test(err.message)?'password':'email',err?.message||'The request failed. Please try again.')}
  finally{if(button?.isConnected)button.disabled=false}
