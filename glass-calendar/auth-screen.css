@@ -112,3 +112,32 @@
 @media(max-width:899px){#authScreen{flex-direction:column}.auth-visual-panel{display:none}.auth-form-panel{flex:1;min-width:0;width:100%;border-right:none;padding:16px 20px 24px}.auth-topbar{justify-content:space-between}.auth-topbar .auth-wordmark{display:block}.auth-form-wrap{justify-content:safe center;padding-top:20px;max-width:430px}.auth-headline{font-size:38px}}
 @media(max-width:380px){.auth-form-panel{padding-left:16px;padding-right:16px}.auth-pill{padding-left:20px}.auth-error-space,.auth-rules{padding-left:20px}}
 @media(prefers-reduced-motion:reduce){#authScreen,.auth-form-wrap.is-enter .auth-form-inner>*,.auth-art,.auth-form-inner.switch-in{animation:none!important}.auth-form-inner{transition:none!important}.auth-art-float{animation:none!important}}
+
+/* Daylight's supplied auth-only code-entry and live password-rule design. */
+.auth-rules-wrap{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows 360ms cubic-bezier(.22,.8,.3,1),opacity 280ms ease}
+.auth-rules-wrap.show{grid-template-rows:1fr;opacity:1}
+.auth-rules-wrap .auth-rules{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:11px;padding:0 4px 2px 23px;transition:padding-top 360ms cubic-bezier(.22,.8,.3,1)}
+.auth-rules-wrap.show .auth-rules{padding-top:14px}
+.auth-rules-wrap .auth-rule{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--auth-muted);line-height:1.4;transition:color 240ms ease}
+.auth-rules-wrap .auth-rule .rule-ic{width:18px;height:18px;border-radius:50%;border:1px solid var(--auth-ghost-border);display:inline-flex;align-items:center;justify-content:center;color:#fff;flex:none;transition:background 220ms ease,border-color 220ms ease}
+.auth-rules-wrap .auth-rule .rule-ic svg path{stroke-dasharray:26;stroke-dashoffset:26;opacity:0;transition:stroke-dashoffset 280ms ease 70ms,opacity 140ms ease}
+.auth-rules-wrap .auth-rule.ok{color:var(--auth-text)}
+.auth-rules-wrap .auth-rule.ok .rule-ic{background:#22a06b;border-color:#22a06b;animation:authRulePop 340ms cubic-bezier(.34,1.56,.64,1)}
+.auth-rules-wrap .auth-rule.ok .rule-ic svg path{stroke-dashoffset:0;opacity:1}
+@keyframes authRulePop{0%{transform:scale(.55)}55%{transform:scale(1.22)}100%{transform:scale(1)}}
+.auth-code-row{display:flex;gap:8px}
+.auth-code-box{flex:1 1 0;min-width:0;height:58px;border-radius:16px;background:var(--auth-field);border:1px solid transparent;color:var(--auth-text);font-size:21px;font-weight:600;text-align:center;outline:none;caret-color:var(--accent);transition:background 120ms,border-color 120ms,box-shadow 120ms}
+.auth-code-box:hover{background:var(--auth-field-hover)}
+.auth-code-box:focus{border-color:color-mix(in srgb,var(--accent) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent);background:var(--auth-field-hover)}
+.auth-code-row.err .auth-code-box{border-color:color-mix(in srgb,var(--auth-danger) 52%,transparent);background:color-mix(in srgb,var(--auth-field) 90%,var(--auth-danger) 10%)}
+.auth-code-row.ok .auth-code-box{border-color:color-mix(in srgb,#22a06b 55%,transparent);background:color-mix(in srgb,var(--auth-field) 88%,#22a06b 12%)}
+.auth-code-row.shake{animation:authShake 400ms ease}
+@keyframes authShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.auth-code-msg{display:flex;align-items:center;gap:6px;min-height:18px;margin-top:10px;padding-left:4px;font-size:12.5px;font-weight:500;color:var(--auth-danger);opacity:0;transition:opacity 150ms ease}
+.auth-code-msg.show{opacity:1}
+.auth-resend-row{display:flex;justify-content:center;margin-top:14px}
+.auth-resend[disabled],.auth-resend[disabled]:hover{color:var(--auth-faint);cursor:default}
+.auth-art-card{background:color-mix(in srgb,var(--auth-card) 85%,var(--card-accent,#5b8def) 15%);border-color:color-mix(in srgb,var(--auth-card-line) 55%,var(--card-accent,#5b8def) 45%)}
+.auth-art-card .cdot{background:var(--card-accent,#5b8def)}
+@media(max-width:380px){.auth-code-row{gap:6px}.auth-code-box{height:52px;font-size:19px}.auth-rules-wrap .auth-rules{padding-left:20px}}
+@media(prefers-reduced-motion:reduce){.auth-rules-wrap,.auth-rules-wrap .auth-rules,.auth-code-row.shake,.auth-code-box{transition:none!important;animation:none!important}}
