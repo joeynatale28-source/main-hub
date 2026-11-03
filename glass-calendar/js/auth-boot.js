@@ -126,7 +126,7 @@ const defaultData=user=>{
  ];
  const parsed=window.ICAL?.parse(window.US_HOLIDAYS_ICS||'')?.events||[];
  const events=parsed.map((rec,i)=>({id:'holiday-'+i,cal:'holidays',title:rec.title,loc:rec.loc||'',desc:rec.desc||'',allDay:!!rec.allDay,startMs:rec.startMs,endMs:rec.endMs,rrule:rec.rrule||null,repeat:null,exdates:rec.exdates||[],uid:rec.uid,feedKey:rec.feedKey,declined:!!rec.declined}));
- return {version:1,calendars,events,tasks:[],settings:{themeMode:'dark',firstName:name,tzLabel:Intl.DateTimeFormat().resolvedOptions().timeZone||'America/New_York',weekNumbers:false,showDeclined:true,reduceMotion:false,defaultView:'month',sidebarRail:false,notify15:true,notifyDaily:false},ui:{cursorMs:null,selectedMs:null,miniCursorMs:null,miniSelectedMs:null},notified:{},lastDailySummary:null};
+ return {version:1,calendars,events,tasks:[],settings:{themeMode:'dark',firstName:name,tzLabel:new Intl.DateTimeFormat('en-US',{timeZoneName:'short'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName')?.value||'EST',weekNumbers:false,showDeclined:true,reduceMotion:false,defaultView:'month',sidebarRail:false,notify15:true,notifyDaily:false},ui:{cursorMs:null,selectedMs:null,miniCursorMs:null,miniSelectedMs:null},notified:{},lastDailySummary:null};
 };
 function loadScript(path){return new Promise((resolve,reject)=>{const tag=document.createElement('script');tag.src=new URL(path,BASE).href;tag.onload=resolve;tag.onerror=()=>reject(new Error('Could not load '+path));document.body.append(tag)})}
 async function flush(){
