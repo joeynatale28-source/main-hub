@@ -157,12 +157,22 @@ async function launch(){
   await loadScript('js/holidays.js');await loadScript('js/ics.js');await loadScript('js/rrule.js');await loadScript('js/store.js');
   const store=window.DaylightStore;
   let initial=data?.payload||defaultData(currentUser);
-  acknowledged=data?.payload?JSON.stringify(initial):'';
+  if(!data){
+   // Initialize the account atomically BEFORE showing the calendar. A newly
+   // approved MCP client can then never create a competing empty workspace.
+   const created=await client.rpc('daylight_save_snapshot',{expected_revision:0,document:initial});
+   if(created.error){
+    const latest=await client.from('workspace_snapshots').select('payload,revision').eq('user_id',currentUser.id).maybeSingle();
+    if(latest.error||!latest.data)throw created.error;
+    initial=latest.data.payload;
+    revision=Number(latest.data.revision);
+   }else revision=Number(created.data);
+  }
+  acknowledged=JSON.stringify(initial);
   store.load=()=>{if(!store.data)store.data=structuredClone(initial);return store.data};
   store.save=queueSave;
   await loadScript('js/app.js');
   await loadScript('js/ai-access-logic.js');
-  if(!data)queueSave();
   if(app)app.hidden=false;
   root.innerHTML='';
   // Read-only polling: cross-device updates are applied only when there are no unsaved edits.
