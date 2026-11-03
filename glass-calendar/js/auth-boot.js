@@ -149,7 +149,8 @@ function display(modeName=mode.name){
  const inputNames={authName:'name',authEmail:'email',authPassword:'password',authConfirmPw:'confirm'};
  Object.entries(inputNames).forEach(([id,key])=>{
   const input=e(id);if(!input)return;
-  input.oninput=()=>{mode.values[key]=input.value;input.closest('.auth-pill').classList.remove('err');input.setAttribute('aria-invalid','false');if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(key==='password')redrawRules()};
+  input.oninput=()=>{mode.values[key]=input.value;input.closest('.auth-pill').classList.remove('err');input.setAttribute('aria-invalid','false');
+   const hazard=input.closest('.auth-pill').querySelector('.auth-hazard');if(hazard){hazard.setAttribute('aria-hidden','true');hazard.tabIndex=-1;}if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(key==='password')redrawRules()};
   input.closest('.auth-pill').onclick=ev=>{if(!ev.target.closest('button'))input.focus()};
  });
  e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';transitionAuth(mode.name==='login'?'signup':'login')};
@@ -160,7 +161,7 @@ function display(modeName=mode.name){
 }
 function showError(key,msg){
  mode.error=msg;mode.message='';if(e('authMessage')){e('authMessage').textContent=msg;e('authMessage').setAttribute('role','alert')}
- const id={name:'authName',email:'authEmail',password:'authPassword'}[key];const input=e(id);
+ const id={name:'authName',email:'authEmail',password:'authPassword',confirm:'authConfirmPw'}[key];const input=e(id);
  if(input){input.closest('.auth-pill').classList.add('err');input.setAttribute('aria-invalid','true');const tooltip=input.closest('.auth-pill').querySelector('.auth-tip');tooltip.textContent=msg;const hazard=input.closest('.auth-pill').querySelector('.auth-hazard');hazard.removeAttribute('aria-hidden');hazard.tabIndex=0;hazard.onclick=()=>hazard.closest('.auth-hazard-wrap').classList.toggle('tip-open');input.focus()}
 }
 
