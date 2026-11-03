@@ -18,37 +18,92 @@ const icon=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0
  check:'<path d="M20 6 9 17l-5-5"/>'
 })[name]+'</svg>';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const mode={name:'login',showPassword:false,values:{name:'',email:'',password:''},message:'',error:''};
+const mode={name:'login',showPassword:false,values:{name:'',email:'',password:'',confirm:''},message:'',error:'',code:'',resendUntil:0,verifying:false};
+let otpTicker=null,recoveryFlow=false;
 const e=id=>root.querySelector('#'+id);
 let recovering=false,launched=false,revision=0,acknowledged='',pending=null,sending=false,blocked=false,saveTimer=null,currentUser=null;
-const rules=p=>[p.length>=8,/[A-Z]/.test(p),/[0-9]/.test(p)];
+const rules=p=>[p.length>=12,/[A-Z]/.test(p),/[a-z]/.test(p),/[0-9]/.test(p),/[^A-Za-z0-9]/.test(p)];
 function art(){
  const bars={3:'#e3a93d',7:'#43b581',11:'#e3a93d',16:'#5b8def',26:'#e3a93d'};
  let cells='';for(let d=1;d<=21;d++)cells+='<div class="auth-art-day'+(d===2?' today':'')+'">'+d+(bars[d]?'<span class="bar" style="background:'+bars[d]+'"></span>':'')+'</div>';
  return '<div class="auth-art"><div class="auth-art-float"><p class="auth-art-month">November</p><div class="auth-art-grid">'+cells+'</div><div class="auth-art-card"><span class="cdot"></span><span>Swim practice</span><span class="ctime">6:30 PM</span></div></div></div>';
 }
 function pill(id,label,type,placeholder,autocomplete,extras=''){
- return '<div class="auth-field"><label class="auth-pill" data-pill-for="'+id+'"><span class="auth-pill-label">'+label+'</span><input class="auth-pill-input" id="'+id+'" type="'+type+'" placeholder="'+placeholder+'" autocomplete="'+autocomplete+'" value="'+escape(mode.values[id==='authName'?'name':id==='authEmail'?'email':'password'])+'" aria-invalid="false" aria-describedby="'+id+'Err">'+extras+'<span class="auth-hazard-wrap"><button type="button" class="auth-hazard" tabindex="-1" aria-hidden="true">'+icon('alert',19)+'</button><span class="auth-tip" role="tooltip"></span></span></label><div class="auth-error-space"><span class="auth-error" id="'+id+'Err" aria-live="polite"></span></div></div>';
+ return '<div class="auth-field"><label class="auth-pill" data-pill-for="'+id+'"><span class="auth-pill-label">'+label+'</span><input class="auth-pill-input" id="'+id+'" type="'+type+'" placeholder="'+placeholder+'" autocomplete="'+autocomplete+'" value="'+escape(mode.values[id==='authName'?'name':id==='authEmail'?'email':id==='authConfirmPw'?'confirm':'password'])+'" aria-invalid="false" aria-describedby="'+id+'Err">'+extras+'<span class="auth-hazard-wrap"><button type="button" class="auth-hazard" tabindex="-1" aria-hidden="true">'+icon('alert',19)+'</button><span class="auth-tip" role="tooltip"></span></span></label><div class="auth-error-space"><span class="auth-error" id="'+id+'Err" aria-live="polite"></span></div></div>';
 }
+
 function formContent(){
- const login=mode.name==='login',signup=mode.name==='signup',forgot=mode.name==='forgot',reset=mode.name==='recovery';
- const headline=login?'Sign in':signup?'Create account':forgot?'Reset password':'New password';
- const subtitle=login?'create an account':signup?'sign in instead':'back to sign in';
- const r=rules(mode.values.password);
- const rulestxt=['8+ characters','One uppercase letter','One number'];
- const pwrules='<div class="auth-rules" id="authRules">'+r.map((yes,i)=>'<span class="auth-rule'+(yes?' ok':'')+'"><span class="rule-ic">'+icon('check',10)+'</span>'+rulestxt[i]+'</span>').join('')+'</div>';
- return '<div class="auth-mark">'+icon('sunrise',34)+'</div><h1 class="auth-headline">'+headline+'</h1>'+
- '<p class="auth-altline">or <button type="button" id="authSwitch">'+subtitle+'</button></p>'+
- '<div class="auth-fields">'+(signup?pill('authName','Name','text','Your name','name'):'')+
- (!reset?pill('authEmail','Email','email','you@example.com','email'):'')+
- (!forgot?pill('authPassword','Password',mode.showPassword?'text':'password',signup?'Create a password':reset?'New password':'Your password',login?'current-password':'new-password',
- '<button type="button" class="auth-eye" id="authEye" aria-label="'+(mode.showPassword?'Hide':'Show')+' password">'+icon(mode.showPassword?'eyeOff':'eye',18)+'</button>'):'')+
- ((signup||reset)?pwrules:'')+'</div>'+
- '<p class="auth-msg" id="authMessage" '+(mode.error?'role="alert"':'')+'>'+escape(mode.error||mode.message)+'</p>'+
- '<button type="submit" class="auth-primary" id="authSubmit">'+(login?'Log in':signup?'Create account':forgot?'Send reset link':'Update password')+'</button>'+
+ const login=mode.name==='login',signup=mode.name==='signup',forgot=mode.name==='forgot',code=mode.name==='code',reset=mode.name==='recovery';
+ const heading=login?'Sign in':signup?'Create account':'Reset your password';
+ const subtitle=login?'or <button type="button" id="authSwitch">create an account</button>':
+ signup?'or <button type="button" id="authSwitch">sign in instead</button>':
+ forgot?'Enter the email address for your account.':
+ code?'Enter the 6-digit code sent to your email.':'Choose a new password for your account.';
+ const pw=mode.values.password,valid=rules(pw);
+ const labels=['At least 12 characters','An uppercase letter (A–Z)','A lowercase letter (a–z)','A number (0–9)','A symbol (e.g. ! @ # $ %)'];
+ const ruleHtml='<div class="auth-rules-wrap'+(pw?' show':'')+'" id="authRulesWrap"'+(!pw?' aria-hidden="true"':'')+'><div class="auth-rules" id="authRules">'+labels.map((label,i)=>
+ '<span class="auth-rule'+(valid[i]?' ok':'')+'"><span class="rule-ic">'+icon('check',11)+'</span>'+label+'</span>').join('')+'</div></div>';
+ const pwField=(label,placeholder,id='authPassword')=>pill(id,label,'password',placeholder,'new-password',
+ '<button type="button" class="auth-eye" id="'+id+'Eye" aria-label="Show password">'+icon('eye',18)+'</button>');
+ const emailField=pill('authEmail','Email','email','you@example.com','email');
+ const codeHtml='<div class="auth-code-row" id="authCodeRow">'+Array.from({length:6},(_,i)=>
+ '<input class="auth-code-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" data-digit="'+i+'" aria-label="Code digit '+(i+1)+' of 6">').join('')+'</div>'+
+ '<div class="auth-code-msg" id="authCodeMsg" aria-live="polite">'+icon('alert',14)+'<span id="authCodeMsgText">That code is invalid.</span></div>'+
+ '<div class="auth-resend-row"><button class="auth-forgot auth-resend" id="authResend" type="button">Resend code</button></div>';
+ const fields=code?codeHtml:
+ (signup?pill('authName','Name','text','Your name','name'):'')+(reset?'':emailField)+
+ (login?pill('authPassword','Password','password','Your password','current-password','<button type="button" class="auth-eye" id="authEye" aria-label="Show password">'+icon('eye',18)+'</button>'):'')+
+ (signup||reset?pwField(reset?'New password':'Password',reset?'Create a new password':'Create a password')+ruleHtml:'')+
+ (reset?pwField('Confirm new password','Enter it again','authConfirmPw'):'');
+ const btn=login?'Log in':signup?'Create account':forgot?'Send reset code':reset?'Reset password':'';
+ return '<div class="auth-mark">'+icon('sunrise',34)+'</div><h1 class="auth-headline">'+heading+'</h1>'+
+ '<p class="auth-altline">'+subtitle+'</p><div class="auth-fields">'+fields+'</div>'+
+ '<p class="auth-msg" id="authMessage" role="status" aria-live="polite">'+escape(mode.error||mode.message)+'</p>'+
+ (btn?'<button type="submit" class="auth-primary" id="authSubmit">'+btn+'</button>':'')+
  (login?'<div class="auth-forgot-row"><a class="auth-forgot" href="#" id="authForgot">Forgot password?</a></div>':'')+
+ (forgot||code||reset?'<div class="auth-forgot-row"><button class="auth-forgot" type="button" id="authBackSignIn">Back to sign in</button></div>':'')+
  (signup?'<p class="auth-terms">By continuing, you agree to the <a href="'+BASE.href+'terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="'+BASE.href+'privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>':'');
 }
+function redrawRules(){
+ const wrap=e('authRulesWrap');if(!wrap)return;
+ const pw=mode.values.password;
+ wrap.classList.toggle('show',!!pw);wrap.setAttribute('aria-hidden',pw?'false':'true');
+ wrap.querySelectorAll('.auth-rule').forEach((n,i)=>n.classList.toggle('ok',rules(pw)[i]));
+}
+function bindOtp(){
+ const boxes=Array.from(root.querySelectorAll('.auth-code-box'));if(!boxes.length)return;
+ const read=()=>{mode.code=boxes.map(x=>x.value).join('');if(mode.code.length===6)verifyCode()};
+ const clear=()=>{e('authCodeRow')?.classList.remove('err','ok','shake');e('authCodeMsg')?.classList.remove('show')};
+ boxes.forEach((box,i)=>{
+  box.oninput=()=>{
+   clear();let value=box.value.replace(/\D/g,'');
+   if(value.length>1){for(let j=0;j<value.length&&i+j<6;j++)boxes[i+j].value=value[j];boxes[Math.min(i+value.length,5)].focus()}
+   else{box.value=value;if(value&&i<5)boxes[i+1].focus()}
+   read();
+  };
+  box.onkeydown=ev=>{
+   if(ev.key==='Backspace'&&!box.value&&i>0){ev.preventDefault();boxes[i-1].value='';boxes[i-1].focus();clear();read()}
+   if(ev.key==='ArrowLeft'&&i>0){ev.preventDefault();boxes[i-1].focus()}
+   if(ev.key==='ArrowRight'&&i<5){ev.preventDefault();boxes[i+1].focus()}
+  };
+  box.onfocus=()=>box.select();
+ });
+ e('authCodeRow').onpaste=ev=>{
+  ev.preventDefault();clear();
+  const d=String(ev.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,6);
+  boxes.forEach((box,i)=>box.value=d[i]||'');boxes[Math.min(d.length,5)].focus();read();
+ };
+ e('authResend').onclick=()=>sendRecovery(true);
+ if(otpTicker)clearInterval(otpTicker);
+ const tick=()=>{
+  const b=e('authResend');if(!b){clearInterval(otpTicker);otpTicker=null;return}
+  const n=Math.max(0,Math.ceil((mode.resendUntil-Date.now())/1000));
+  b.disabled=n>0;b.textContent=n?'Resend code in 0:'+String(n).padStart(2,'0'):'Resend code';
+  if(!n&&otpTicker){clearInterval(otpTicker);otpTicker=null}
+ };
+ tick();if(mode.resendUntil>Date.now())otpTicker=setInterval(tick,500);
+}
+
 function display(modeName=mode.name){
  mode.name=modeName;
  if(!e('authScreen')){
@@ -64,58 +119,96 @@ function display(modeName=mode.name){
  const inner=e('authFormInner');
  inner.classList.remove('switch-in','switch-out');
  inner.innerHTML=formContent();
- const inputNames={authName:'name',authEmail:'email',authPassword:'password'};
+ const inputNames={authName:'name',authEmail:'email',authPassword:'password',authConfirmPw:'confirm'};
  Object.entries(inputNames).forEach(([id,key])=>{
   const input=e(id);if(!input)return;
-  input.oninput=()=>{mode.values[key]=input.value;input.closest('.auth-pill').classList.remove('err');input.setAttribute('aria-invalid','false');if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(e('authRules')){const r=rules(mode.values.password);e('authRules').querySelectorAll('.auth-rule').forEach((node,i)=>node.classList.toggle('ok',r[i]))}};
+  input.oninput=()=>{mode.values[key]=input.value;input.closest('.auth-pill').classList.remove('err');input.setAttribute('aria-invalid','false');if(e('authMessage')){mode.error='';e('authMessage').textContent=''};if(key==='password')redrawRules()};
   input.closest('.auth-pill').onclick=ev=>{if(!ev.target.closest('button'))input.focus()};
  });
  e('authSwitch').onclick=()=>{mode.error='';mode.message='';mode.showPassword=false;mode.values.password='';display(mode.name==='login'?'signup':'login')};
  if(e('authForgot'))e('authForgot').onclick=ev=>{ev.preventDefault();mode.error='';mode.message='';display('forgot')};
- if(e('authEye'))e('authEye').onclick=()=>{mode.showPassword=!mode.showPassword;const x=e('authPassword');x.type=mode.showPassword?'text':'password';e('authEye').innerHTML=icon(mode.showPassword?'eyeOff':'eye',18);x.focus()};
+ if(e('authBackSignIn'))e('authBackSignIn').onclick=()=>{mode.error='';mode.message='';mode.code='';mode.values.password='';display('login')};
+ ['authEye','authPasswordEye','authConfirmPwEye'].forEach(id=>{const b=e(id);if(!b)return;b.onclick=()=>{const x=e(id==='authConfirmPwEye'?'authConfirmPw':'authPassword');const show=x.type==='password';x.type=show?'text':'password';b.innerHTML=icon(show?'eyeOff':'eye',18);b.setAttribute('aria-label',(show?'Hide':'Show')+' password');x.focus()}});
+ if(e('authCodeRow'))bindOtp();
 }
 function showError(key,msg){
  mode.error=msg;mode.message='';if(e('authMessage')){e('authMessage').textContent=msg;e('authMessage').setAttribute('role','alert')}
  const id={name:'authName',email:'authEmail',password:'authPassword'}[key];const input=e(id);
  if(input){input.closest('.auth-pill').classList.add('err');input.setAttribute('aria-invalid','true');const tooltip=input.closest('.auth-pill').querySelector('.auth-tip');tooltip.textContent=msg;const hazard=input.closest('.auth-pill').querySelector('.auth-hazard');hazard.removeAttribute('aria-hidden');hazard.tabIndex=0;hazard.onclick=()=>hazard.closest('.auth-hazard-wrap').classList.toggle('tip-open');input.focus()}
 }
+
+const emailValid=v=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v||'').trim());
+async function sendRecovery(resend=false){
+ if(!client)return showError('email','Account service is not ready. Refresh and try again.');
+ if(!emailValid(mode.values.email))return showError('email','Enter a valid email address');
+ if(resend&&mode.resendUntil>Date.now())return;
+ const b=e(resend?'authResend':'authSubmit');if(b)b.disabled=true;
+ try{
+  const {error}=await client.auth.resetPasswordForEmail(mode.values.email.trim(),{redirectTo:BASE.href});
+  if(error)throw error;
+  mode.resendUntil=Date.now()+60000;mode.code='';mode.error='';
+  mode.message=resend?'Another recovery email was requested.':'Check your email for the recovery code.';
+  display('code');
+ }catch(err){if(resend){if(e('authCodeMsgText'))e('authCodeMsgText').textContent=err.message;e('authCodeMsg')?.classList.add('show')}else showError('email',err.message||'Could not send a recovery email')}
+ finally{if(b?.isConnected)b.disabled=false}
+}
+async function verifyCode(){
+ if(mode.verifying||mode.code.length!==6||mode.name!=='code'||!client)return;
+ mode.verifying=true;
+ const boxes=Array.from(root.querySelectorAll('.auth-code-box'));boxes.forEach(x=>x.disabled=true);
+ try{
+  const {data,error}=await client.auth.verifyOtp({email:mode.values.email.trim(),token:mode.code,type:'recovery'});
+  if(error)throw error;if(!data.session||!data.user)throw Error('Recovery verification did not return a valid session.');
+  currentUser=data.user;recovering=true;recoveryFlow=true;
+  mode.values.password='';mode.values.confirm='';mode.error='';mode.message='';display('recovery');
+ }catch(err){
+  const row=e('authCodeRow');if(row){row.classList.remove('shake');void row.offsetWidth;row.classList.add('err','shake')}
+  if(e('authCodeMsgText'))e('authCodeMsgText').textContent=err.message||'Check your code and try again';
+  e('authCodeMsg')?.classList.add('show');
+  mode.code='';boxes.forEach(x=>{x.value='';x.disabled=false});boxes[0]?.focus();
+ }finally{mode.verifying=false}
+}
 async function submit(ev){
- ev.preventDefault();
- const fields={...mode.values};const kind=mode.name;
+ ev.preventDefault();const fields={...mode.values},kind=mode.name;
+ if(kind==='code')return;
  if(kind==='signup'&&!fields.name.trim())return showError('name',"Name can't be empty");
- if(kind!=='recovery'&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(fields.email.trim()))return showError('email','Enter a valid email address');
- if(kind!=='forgot'&&!fields.password)return showError('password',"Password can't be empty");
- if(['signup','recovery'].includes(kind)&&!rules(fields.password).every(Boolean))return showError('password','Use 8+ characters, an uppercase letter, and a number');
- if(!client){showError('email','Secure account connection is still loading. Try again shortly.');return}
- const button=e('authSubmit');button.disabled=true;
+ if(kind!=='recovery'&&!emailValid(fields.email))return showError('email','Enter a valid email address');
+ if(kind==='forgot'){await sendRecovery();return}
+ if(!fields.password)return showError('password',"Password can't be empty");
+ if(['signup','recovery'].includes(kind)&&!rules(fields.password).every(Boolean))return showError('password','Use 12+ characters, uppercase and lowercase letters, a number, and a symbol');
+ if(kind==='recovery'&&fields.confirm!==fields.password)return showError('confirm',"Passwords don't match");
+ if(!client)return showError('email','Secure account service is loading; try again shortly');
+ const button=e('authSubmit');if(button)button.disabled=true;
  try{
   let response;
   if(kind==='login'){
    response=await client.auth.signInWithPassword({email:fields.email.trim(),password:fields.password});
    if(response.error)throw response.error;
-   currentUser=response.data.user;
+   if(!response.data.session)throw Error('Sign-in did not return an active session');
+   currentUser=response.data.user;mode.values.password='';
    if(isConsent)await showConsent();else await launch();
    return;
   }
   if(kind==='signup'){
    response=await client.auth.signUp({email:fields.email.trim(),password:fields.password,options:{data:{name:fields.name.trim(),first_name:fields.name.trim().split(/\s+/)[0]},emailRedirectTo:BASE.href}});
    if(response.error)throw response.error;
+   mode.values.password='';
    if(response.data.session){currentUser=response.data.user;if(isConsent)await showConsent();else await launch();return}
-   mode.values.password='';mode.name='login';mode.error='';mode.message='Check your email to confirm your new account, then sign in.';display();return;
-  }
-  if(kind==='forgot'){
-   response=await client.auth.resetPasswordForEmail(fields.email.trim(),{redirectTo:BASE.href});
-   if(response.error)throw response.error;
-   mode.name='login';mode.error='';mode.message='If this account exists, a password reset link has been sent.';display();return;
+   mode.name='login';mode.error='';mode.message='Check your email to confirm your new account, then sign in.';display();return;
   }
   if(kind==='recovery'){
+   const {data:{session},error:sessionError}=await client.auth.getSession();
+   if(sessionError||!session)throw Error('Your recovery session has expired. Request a new code.');
    response=await client.auth.updateUser({password:fields.password});
    if(response.error)throw response.error;
-   recovering=false;await client.auth.signOut();mode.values.password='';mode.error='';mode.message='Password updated. Sign in with the new password.';display('login');
+   recovering=false;recoveryFlow=false;await client.auth.signOut();
+   mode.values.password='';mode.values.confirm='';mode.name='login';
+   mode.error='';mode.message='Password updated. Sign in with your new password.';display();return;
   }
- }catch(err){showError(kind==='signup'&&/password/i.test(err.message)?'password':'email',err?.message||'The request failed. Please try again.')}
- finally{if(button.isConnected)button.disabled=false}
+ }catch(err){showError(kind==='recovery'?'password':kind==='signup'&&/password/i.test(err.message)?'password':'email',err?.message||'The request failed. Please try again.')}
+ finally{if(button?.isConnected)button.disabled=false}
 }
+
 const defaultData=user=>{
  const name=user.user_metadata?.first_name||user.user_metadata?.name?.split(/\s+/)[0]||user.email?.split('@')[0]||'there';
  const calendars=[
@@ -239,13 +332,14 @@ async function connectSupabase(){
   client=createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
   window.DaylightCloud.client=client;
   client.auth.onAuthStateChange((event,session)=>{
-   if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';display('recovery')}
+   if(event==='PASSWORD_RECOVERY'){recovering=true;currentUser=session?.user;mode.error='';mode.values.password='';if(!recoveryFlow)display('recovery')}
    if(event==='SIGNED_OUT'){currentUser=null;if(launched)location.replace(BASE.href)}
   });
   const {data:{session},error}=await client.auth.getSession();
   if(error)console.warn('Session restore',error.message);
   if(recovering||location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery'){
-   recovering=true;currentUser=session?.user||null;display('recovery');return;
+   if(session?.user){recovering=true;currentUser=session.user;display('recovery');return}
+   mode.error='Your recovery link has expired. Request a new code.';
   }
   if(session?.user){
    const result=await client.auth.getUser();
