@@ -316,18 +316,48 @@ async function showConsent(){
     '<p class="auth-msg" role="alert" id="consentError"></p><div class="auth-consent-actions"><button type="button" class="auth-secondary" id="denyAccess">Deny</button><button type="button" class="auth-primary" id="approveAccess">Approve</button></div>';
   e('allowWrite').onchange=()=>{if(!e('allowWrite').checked)e('allowDelete').checked=false};
   e('allowDelete').onchange=()=>{if(e('allowDelete').checked)e('allowWrite').checked=true};
+
   const decide=async approved=>{
-   const btn=e(approved?'approveAccess':'denyAccess');btn.disabled=true;
+   const btn=e(approved?'approveAccess':'denyAccess');
+   if(!btn||btn.disabled)return;
+   btn.disabled=true;
+   const grants=client.from('oauth_mcp_grants');
+   let oldGrant=null,grantChanged=false;
    try{
     if(approved){
-     const {error:grantError}=await client.from('oauth_mcp_grants').upsert({user_id:currentUser.id,client_id:clientId,client_name:label,can_read:true,can_write:e('allowWrite').checked,can_delete:e('allowDelete').checked,revoked:false,approved_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:'user_id,client_id'});
+     // Keep the existing permission level to roll back if Supabase denies the authorization.
+     const previous=await grants.select('*').eq('user_id',currentUser.id).eq('client_id',clientId).maybeSingle();
+     if(previous.error)throw previous.error;
+     oldGrant=previous.data;
+     const {error:grantError}=await grants.upsert({
+      user_id:currentUser.id,client_id:clientId,client_name:label,
+      can_read:true,can_write:e('allowWrite').checked,can_delete:e('allowDelete').checked,
+      revoked:false,approved_at:new Date().toISOString(),updated_at:new Date().toISOString()
+     },{onConflict:'user_id,client_id'});
      if(grantError)throw grantError;
+     grantChanged=true;
     }
     const result=await (approved?client.auth.oauth.approveAuthorization(consentId):client.auth.oauth.denyAuthorization(consentId));
     if(result.error)throw result.error;
-    if(!result.data?.redirect_url)throw Error('Authorization did not return a callback URL');
+    if(!result.data?.redirect_url)throw Error('The OAuth server did not return a callback URL');
+    // Redirect only to the callback Supabase validated for this authorization request.
     location.assign(result.data.redirect_url);
-   }catch(err){e('consentError').textContent=err.message||'Authorization failed';btn.disabled=false}
+   }catch(err){
+    if(grantChanged){
+     try{
+      const rollback=oldGrant
+       ?await grants.upsert(oldGrant,{onConflict:'user_id,client_id'})
+       :await grants.delete().eq('user_id',currentUser.id).eq('client_id',clientId);
+      if(rollback.error)throw rollback.error;
+     }catch(rollbackError){
+      console.error('OAuth approval rollback failed',rollbackError);
+      // Fail closed if a rejected approval cannot be rolled back.
+      await grants.update({revoked:true,can_read:false,can_write:false,can_delete:false}).eq('user_id',currentUser.id).eq('client_id',clientId);
+     }
+    }
+    if(e('consentError'))e('consentError').textContent=err?.message||'Authorization failed';
+    if(btn.isConnected)btn.disabled=false;
+   }
   };
   e('denyAccess').onclick=()=>decide(false);e('approveAccess').onclick=()=>decide(true);
  }catch(err){mode.error='Unable to verify authorization request: '+err.message;display()}
