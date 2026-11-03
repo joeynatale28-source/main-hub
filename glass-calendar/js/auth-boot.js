@@ -25,8 +25,15 @@ let recovering=false,launched=false,revision=0,acknowledged='',pending=null,send
 const rules=p=>[p.length>=12,/[A-Z]/.test(p),/[a-z]/.test(p),/[0-9]/.test(p),/[^A-Za-z0-9]/.test(p)];
 function art(){
  const bars={3:'#e3a93d',7:'#43b581',11:'#e3a93d',16:'#5b8def',26:'#e3a93d'};
+ const titles=['Swim practice','Soccer game','Q1 meeting'];
+ const colors=['#5b8def','#8b7cf6','#43b581','#e3a93d','#e5534b'];
+ const title=titles[Math.floor(Math.random()*titles.length)];
+ const color=colors[Math.floor(Math.random()*colors.length)];
+ const minutes=420+Math.floor(Math.random()*27)*30;
+ const h=Math.floor(minutes/60),m=minutes%60;
+ const time=(h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM');
  let cells='';for(let d=1;d<=21;d++)cells+='<div class="auth-art-day'+(d===2?' today':'')+'">'+d+(bars[d]?'<span class="bar" style="background:'+bars[d]+'"></span>':'')+'</div>';
- return '<div class="auth-art"><div class="auth-art-float"><p class="auth-art-month">November</p><div class="auth-art-grid">'+cells+'</div><div class="auth-art-card"><span class="cdot"></span><span>Swim practice</span><span class="ctime">6:30 PM</span></div></div></div>';
+ return '<div class="auth-art"><div class="auth-art-float"><p class="auth-art-month">November</p><div class="auth-art-grid">'+cells+'</div><div class="auth-art-card" style="--card-accent:'+color+'"><span class="cdot"></span><span class="ctitle">'+title+'</span><span class="ctime">'+time+'</span></div></div></div>';
 }
 function pill(id,label,type,placeholder,autocomplete,extras=''){
  return '<div class="auth-field"><label class="auth-pill" data-pill-for="'+id+'"><span class="auth-pill-label">'+label+'</span><input class="auth-pill-input" id="'+id+'" type="'+type+'" placeholder="'+placeholder+'" autocomplete="'+autocomplete+'" value="'+escape(mode.values[id==='authName'?'name':id==='authEmail'?'email':id==='authConfirmPw'?'confirm':'password'])+'" aria-invalid="false" aria-describedby="'+id+'Err">'+extras+'<span class="auth-hazard-wrap"><button type="button" class="auth-hazard" tabindex="-1" aria-hidden="true">'+icon('alert',19)+'</button><span class="auth-tip" role="tooltip"></span></span></label><div class="auth-error-space"><span class="auth-error" id="'+id+'Err" aria-live="polite"></span></div></div>';
@@ -129,6 +136,7 @@ function display(modeName=mode.name){
   root.innerHTML='<div id="authScreen" class="is-enter"><section class="auth-form-panel"><div class="auth-topbar"><span class="auth-wordmark">daylight.</span><button class="auth-theme-btn" id="authThemeBtn" aria-label="Switch theme"></button></div><form class="auth-form-wrap is-enter" id="authForm" novalidate><div class="auth-form-inner" id="authFormInner"></div></form></section><aside class="auth-visual-panel" aria-hidden="true"><span class="auth-visual-word">daylight.</span>'+art()+'</aside></div>';
   e('authThemeBtn').onclick=()=>{
    document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+   try{localStorage.setItem('daylight-auth-theme-mode',document.documentElement.dataset.theme)}catch{}
    e('authThemeBtn').innerHTML=icon(document.documentElement.dataset.theme==='dark'?'sun':'moon',17);
   };
   e('authForm').onsubmit=submit;
@@ -402,6 +410,13 @@ async function connectSupabase(){
   mode.error='Could not connect to the account service. Check your connection and refresh to try again.';
   if(e('authMessage')){e('authMessage').textContent=mode.error;e('authMessage').setAttribute('role','alert')}
  }
+}
+try{
+ const preferred=localStorage.getItem('daylight-auth-theme-mode');
+ document.documentElement.dataset.theme=['light','dark'].includes(preferred)?preferred:
+ (window.matchMedia?.('(prefers-color-scheme: light)').matches?'light':'dark');
+}catch{
+ document.documentElement.dataset.theme=window.matchMedia?.('(prefers-color-scheme: light)').matches?'light':'dark';
 }
 display('login');
 connectSupabase();
