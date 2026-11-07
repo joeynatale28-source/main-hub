@@ -16,11 +16,16 @@ const state={token:'',user:null,calendars:[],events:[],tasks:[],subscriptions:[]
 const toast=(message)=>{let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)}const label=String(message||'').replace(/\.$/,'');const bad=/couldn.t|error|fail|invalid|required|blocked|denied|not found|check your connection/i.test(label);el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.innerHTML='<span class="toast-icon">'+icon(bad?'alert-circle':'check-circle',16)+'</span><span class="toast-message">'+h(label)+'</span><button type="button" class="toast-dismiss" aria-label="Dismiss notification">'+icon('x',16)+'</button>';el.querySelector('.toast-dismiss').onclick=()=>{clearTimeout(toast.timer);el.classList.remove('show')};el.classList.remove('show');void el.offsetWidth;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),bad?6500:3200)};
 async function api(action,data={}){return localApi(action,data)}
 async function load(){
+ const started=performance.now();
+ root.innerHTML='<div class="workspace-loading" aria-label="Loading workspace">'+shimmer()+shimmer()+'</div>';
  try{
   const {user}=await api('auth_session');
   const [calendars,events,tasks,subscriptions,settings]=await Promise.all(['calendars','events','tasks','subscriptions','settings'].map(async entity=>(await api('data_list',{entity})).items));
   Object.assign(state,{user,calendars,events,tasks,subscriptions,settings:settings[0]||{},drilled:false,view:settings[0]?.default_view||'week'});
-  applyTheme();render();
+  applyTheme();
+  const wait=Math.max(0,200-(performance.now()-started));
+  if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
+  render();
  }catch(error){
   console.error('Daylight local workspace could not start',error);
   root.innerHTML='<main class="center"><div class="login"><div class="mark">'+icon('brand',28)+'</div><h1>daylight.</h1><p>Local browser storage is unavailable. Enable site storage and reload.</p></div></main>';
@@ -78,7 +83,8 @@ function occurrences(from=add(now(),-400),to=add(now(),450)){return expandEvents
 const eventColor=e=>colorFor(state.calendars.find(c=>c.id===e.calendar_id));
 const eventStyle=e=>'--event-color:'+(['declined','cancelled'].includes(e.status)?'#92929a':eventColor(e))+';';
 const clockShort=value=>new Date(value).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\\s?(AM|PM)$/,(match,p)=>p.toLowerCase());
-const rangeShort=e=>clockShort(e.starts_at)+' - '+clockShort(e.ends_at);
+const effectiveZone=()=>state.settings.time_zone&&state.settings.time_zone!=='auto'?state.settings.time_zone:Intl.DateTimeFormat().resolvedOptions().timeZone;
+const rangeShort=e=>{const fmt={hour:'numeric',minute:'2-digit',timeZone:effectiveZone()};return new Date(e.starts_at).toLocaleTimeString('en-US',fmt)+' – '+new Date(e.ends_at).toLocaleTimeString('en-US',fmt)};
 const eventAttr=(e,extra='')=>' data-detail="'+h(e.id)+'" data-occ="'+h(e._occurrence||e.starts_at)+'" style="'+eventStyle(e)+extra+'"';
 const eventOn=(e,key)=>eventDate(e)===key;
 const getOccurrence=(id,when)=>occurrences(add(now(),-900),add(now(),1200)).find(e=>e.id===id&&(e._occurrence||e.starts_at)===when)||state.events.find(e=>e.id===id);
@@ -445,8 +451,8 @@ function settings(which){
  renderSettings();
 }
 function renderSettings(){
- const dlg=$('#settingsModal');if(!dlg)return;const pane=$('#settingsPane',dlg);pane.innerHTML=settingsContent(state.setting);
- pane.scrollTop=0;
+ const dlg=$('#settingsModal');if(!dlg)return;const pane=$('#settingsPane',dlg),previousScroll=pane.scrollTop;pane.innerHTML=settingsContent(state.setting);
+ pane.scrollTop=previousScroll;
  $$('[data-setting-switch]',pane).forEach(b=>b.onclick=()=>{const key=b.dataset.settingSwitch;if(key==='preview'){const on=b.getAttribute('aria-checked')!=='true';b.classList.toggle('on',on);b.setAttribute('aria-checked',String(on));return}if(key==='holidays'){const c=state.calendars.find(x=>x.client_id==='us-holidays');if(c)safeChange('calendars',c.id,{is_visible:!c.is_visible},'update');return}saveSetting(key,!state.settings[key])});
  $$('[data-select]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.select;menu(b,selectOptions[name].map(x=>[x[1],()=>saveSetting(name,name==='default_reminder_minutes'?Number(x[0]):x[0])]),name==='time_zone')});
  $$('[data-time]',pane).forEach(b=>b.onclick=()=>{const name=b.dataset.time;menu(b,Array.from({length:96},(_,i)=>{const time=String(Math.floor(i/4)).padStart(2,'0')+':'+String((i%4)*15).padStart(2,'0');return[readableTime(time),()=>saveSetting(name,time)]}))});
@@ -645,7 +651,7 @@ function openEditor(existing=null,chosenDate=null,chosenTime=null,kind='event',i
  let controller=null,cache=new Map(),active=-1;
  const choose=i=>{const item=state.addrResults[i];if(!item)return;selectedLocation=item;field.value=item.display;saved.hidden=false;saved.textContent='Full address saved: '+(item.address.toLowerCase()===item.display.toLowerCase()?item.display:item.address);optionsEl.hidden=true;field.focus()};
  const draw=()=>{active=-1;optionsEl.hidden=false;optionsEl.innerHTML=state.addrResults.length?state.addrResults.map((r,i)=>'<button type="button" data-address="'+i+'"><span>'+icon('map-pin',16)+'</span><strong>'+h(r.display)+'</strong><small>'+h(r.address)+'</small></button>').join(''):'<div class="quiet">No matches — you can still use what you typed.</div>';$$('[data-address]',optionsEl).forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();choose(+b.dataset.address)}));requestAnimationFrame(()=>{const footer=$('.quick-footer',dlg),bottom=footer?.getBoundingClientRect().top??innerHeight;if(optionsEl.isConnected&&!optionsEl.hidden){optionsEl.classList.toggle('flip-up',optionsEl.getBoundingClientRect().bottom>bottom-8)}})};
- field.oninput=()=>{selectedLocation=null;saved.hidden=true;clearTimeout(addressTimer);controller?.abort();const q=field.value.trim();if(q.length<3){optionsEl.hidden=true;return}if(cache.has(q)){state.addrResults=cache.get(q);draw();return}addressTimer=setTimeout(async()=>{controller=new AbortController();try{optionsEl.hidden=false;optionsEl.innerHTML='<div class="quiet">Searching…</div>';const response=await fetch('https://photon.komoot.io/api/?lang=en&limit=5&q='+encodeURIComponent(q),{signal:controller.signal});const json=await response.json();state.addrResults=[...new Map((json.features||[]).slice(0,12).map(f=>{const p=f.properties||{},display=p.name||p.street||p.city||'Location',parts=[p.name||p.street,p.housenumber,p.city,p.state,p.country].filter(Boolean);const address=parts.filter((v,i)=>i===0||v!==parts[i-1]).join(', ');return[address.toLowerCase(),{display,address}]})).values()].slice(0,5);cache.set(q,state.addrResults);draw()}catch{optionsEl.hidden=true}},300)};
+ field.oninput=()=>{selectedLocation=null;saved.hidden=true;clearTimeout(addressTimer);controller?.abort();const q=field.value.trim();if(q.length<3){optionsEl.hidden=true;return}if(cache.has(q)){state.addrResults=cache.get(q);draw();return}addressTimer=setTimeout(async()=>{controller=new AbortController();try{optionsEl.hidden=false;optionsEl.innerHTML='<div class="quiet">Searching…</div>';const response=await fetch('https://photon.komoot.io/api/?lang=en&limit=5&q='+encodeURIComponent(q),{signal:controller.signal});const json=await response.json();const features=(json.features||[]).map(f=>{const p=f.properties||{},display=p.name||p.street||p.city||'Location',hasHouse=!!p.housenumber,address=hasHouse?[p.name||p.street,p.housenumber,p.city,p.state,p.postcode,p.country].filter(Boolean).join(', '):[p.name||p.street,p.city,p.state,p.postcode,p.country].filter(Boolean).join(', ');return{display,address,hasHouse,importance:Number(p.importance)||0}});const addressQuery=/\\d|\\b(street|road|rd\\.?|avenue|ave\\.?|drive|dr\\.?|lane|ln\\.?|boulevard|blvd\\.?)\\b/i.test(q);features.sort((a,b)=>addressQuery?(Number(b.hasHouse)-Number(a.hasHouse))||b.importance-a.importance:b.importance-a.importance);state.addrResults=[...new Map(features.map(x=>[x.address.toLowerCase(),x])).values()].slice(0,5);cache.set(q,state.addrResults);draw()}catch{optionsEl.hidden=true}},300)};
  field.onfocus=()=>{if(cache.has(field.value.trim())){state.addrResults=cache.get(field.value.trim());draw()}};
  field.onkeydown=e=>{if(optionsEl.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+state.addrResults.length)%state.addrResults.length;$$('[data-address]',optionsEl).forEach((x,i)=>x.classList.toggle('highlight',i===active))}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();choose(active<0?0:active)}else if(e.key==='Escape'){optionsEl.hidden=true;e.stopPropagation()}else if(e.key==='Tab')optionsEl.hidden=true};
  upgradeIcons();

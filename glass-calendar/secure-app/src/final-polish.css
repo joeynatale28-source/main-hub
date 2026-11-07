@@ -118,3 +118,22 @@ html[data-reduce-motion=true] .action-spinner{animation:none!important}
 
 #root.collapsed .sidebar [data-tooltip]:is(:hover,:focus-visible)::after{display:none!important}
 #railTooltip{position:fixed;z-index:2147483600;display:block;pointer-events:none;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 25px #0004;padding:8px 12px;white-space:nowrap;font:500 12px/1.2 Inter,-apple-system,sans-serif}
+
+
+/* Section 3 layout corrections */
+.month-span-bar{margin-top:29px!important}
+.monthcells{height:100%!important;grid-template-rows:repeat(var(--weeks),minmax(0,1fr))!important;align-content:stretch!important}
+.monthcell{height:auto!important;min-height:0!important;overflow:hidden!important}
+.month-more{font-size:11px!important;margin-top:0!important}
+.quick-dialog .quick-content{gap:4px!important}
+.quick-dialog .quick-row{min-height:0!important;padding:4px 0!important}
+.quick-dialog .quick-footer{margin-top:12px!important}
+#searchResults [data-detail]{min-height:50px;display:flex;align-items:center;gap:10px;white-space:normal;overflow:visible}
+#searchResults .search-result-copy{min-width:0;flex:1;overflow:visible}
+#searchResults .search-result-copy strong,#searchResults .search-result-copy small{white-space:normal;overflow-wrap:normal;word-break:normal;overflow:visible;text-overflow:clip}
+#searchResults [data-detail] .dl-icon-slot:last-child{flex:none}
+.workspace-loading{height:100%;min-height:240px;display:grid;align-content:center;justify-items:start;gap:14px;padding:32px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.workspace-loading .ui-skeleton{height:17px}
+.workspace-loading .ui-skeleton.wide{width:min(56%,560px)}
+.workspace-loading .ui-skeleton.mid{width:min(42%,420px)}
+.workspace-loading .ui-skeleton.short{width:min(28%,280px)}
